@@ -1,0 +1,289 @@
+ZX Spectrum Pico Interface One
+==============================
+
+Implement an Interface One using a Pico. Currently envisaged as a software only
+microdrive emulator, providing a high volume storage facility the traditional
+way. I wasn't planning doing an actual Microdrive emulation, or the network.
+
+Error Handling
+--------------
+
+The Service Manual says the Spectrum transfers to address 0x08 when it hits an
+error. Putting a breakpoint on that address in Fuse shows it gets hit a various
+points. Enter garbage and it gets hit when you'd expect to see the ? symbol come
+up. It gets hit at the "D Break - CONT repeats" message. It seems to be the
+standard error handler point.
+
+0x08 is called via a RST 8 instruction. That's got CALL semantics, it PUSHes the
+PC ready for a RET.
+
+There's a disassembly of the IF1 ROM here: https://www.tablix.org/~avian/spectrum/rom/if1_2.htm
+
+The IF1 hardware traps the address and Z80 lines when it goes to read an instruction from
+address 0x08. Thus, when the ROM (or user program) calls that address the IF1 ROM is
+already in place.
+
+
+How does the ROM get paged?
+---------------------------
+
+Hardware looks for 0x0008.
+
+AAAA AAAA AAAA AAAA
+1111 1100 0000 0000
+5432 1098 7654 3210
+
+0000 0000 0000 1000
+  *  *    ***   ***        Marked address lines are fed into IC3
+
+That's bit A3 being one, all others being zero.
+
+
+Also, hardware looks for 0x1708.
+
+AAAA AAAA AAAA AAAA
+1111 1100 0000 0000
+5432 1098 7654 3210
+
+0001 0111 0000 1000
+  *  *    ***   ***        Marked address lines are fed into IC3
+
+That's bit A3, A8, A9, A10 and A12 being one, all others being zero.
+
+
+How does the ROM get unpaged?
+-----------------------------
+
+UNPAGE is at 0x0700 in the IF1 disassembly.
+
+AAAA AAAA AAAA AAAA
+1111 1100 0000 0000
+5432 1098 7654 3210
+
+0000 0111 0000 0000
+  *  *    ***   ***        Marked address lines are fed into IC3
+
+That's bits A8, A9 and A10 being one, all others being zero.
+
+It contains a single RET instruction so the stack needs to have the required return
+address ready. Assumption is that the IF1 ROM is unpaged when address 0x0700 has been
+read. Not sure how.
+
+From Kiwi at Spectrum Computing:
+
+There are three addresses where the paging mechanism kicks in:
+
+0x0008 - error RST - page in
+0x1708 - channel handler - page in
+0x0700 - page out
+
+The LS260 NOR gates, diode AND gate and ULA decode these addresses
+along with M1 and MREQ to determine when a paging event occurs. If you
+decode all the other address bits then A3 indicates if the shadow ROM
+should be paged in or out.
+
+In hardware terms, the paging mechanism can be thought of as a two
+stage process. The first stage flags if a paging event has occurred -
+it decodes the address bits, MREQ and M1 and uses the signal as a
+clock input to a LS74 flip flop, with A3 being the data input. The
+second stage delays the actual paging of the ROM to the next
+instruction. It does this with a second flip flop where the clock
+input is the falling edge of M1 and data is the stage 1 page flag. The
+combined mechanism recognises the page address and delays the ROM page
+until the next M1 cycle (when it pages immediately).
+
+This means that the CPU picks up the return instruction in the IF1 ROM
+at 0x0700, executes the instruction (changing the PC), and the on CPU
+setting up the address bus to get the instruction at the new PC
+location, i.e. M1 active, the IF1 ROM pages out immediately meaning
+the CPU picks up the value from the 48K ROM/RAM and normal execution
+continues.
+
+GPIO Lines Required
+===================
+
+Address Bus (16 GPIOs required)
+=========== -------------------
+
+Needs all 16 address lines. It needs to be able to trap address 0x0008, but that needs to
+be differentiated fromm eg., 0x8008. So although only the bottom 13 address lines are required
+to emulate the 8K ROM, the Pico needs to see all 16 so it knows when the page in the IF1 ROM.
+
+These are all inputs to the Pico, they don't need direction swapping.
+
+
+
+Data Bus (8 GPIOs required)
+======== ------------------
+
+8 lines required, all need level shifting and direction swapping. Input from ZX is needed
+for the IF1 to receive the data to be written to the microdrive. Output to the ZX is
+needed for the ROM emulation and to pass read data out to the ZX.
+
+These all need level shifting. They arrive as 5V and need returning as 5V.
+
+
+Z80 Control Bus (3 GPIOs required)
+=============== ------------------
+
+M1 is required so I know it's doing an instruction read from 0x0008 or 0x0700.
+
+/ROMCS is required so the Pico can switch out the Spectrum ROM.
+
+/RD is required so I know when the read of the byte has ended and the ROM page can happen.
+
+
+
+
+Microdrive Control (7 GPIOs required)
+================== ------------------
+
+The service manual says there are 7 microdrive control lines. I/O here is from the
+IF1 point of view:
+
+ERASE		output
+R/W		output
+COMMS OUT	output
+COMMS CLK	output
+WR PROT		input, the microdrive telling IF1 whether the cartridge is write protected
+DATA1		bidirectional (input when the microdrive is reading, output when its writing)
+DATA2		bidirectional (input when the microdrive is reading, output when its writing)
+
+I need all of them to correctly talk to a microdrive.
+
+
+
+Network (1 GPIO required)
+======= -----------------
+
+The network appears to be a single bit input/output on the IF1 ULA ("NET"). Not sure I care
+about this yet, but keeping the GPIO free might be wise.
+
+
+
+RS232 (4 GPIOs required)
+===== ------------------
+
+RS232 uses Rx and Tx pins, so one input, one output. It uses CTS and DTR, so one output
+and one input.  Not sure I care about this yet, but keeping the GPIOs free might be wise.
+
+
+
+So 36 GPIOs required. I absolutely need 8 for data bus and 7 for microdrive control, that's
+15. I need 13 for the address bus for ROM emulation, so that's 28. A few more for the Z80
+control bus. So some form of latching is going to be reqiured. AM pointed me at
+
+https://www.mouser.co.uk/c/?q=max7317
+
+which is a 10 bit parallel to serial which can clock out at 26MHz. Needs testing though.
+
+
+
+Rethink
+=======
+
+My Pico ROM emulator works, and handles an IF1 ROM with this code added:
+
+    if( ((rom_address == 0x0008) || (rom_address == 0x1708)) && (rom_image_ptr == __ROMs_48_original_rom) )
+    {
+      rom_image_ptr = __ROMs_if1_rom;
+    }
+    else if( (rom_address == 0x0700) && (rom_image_ptr == __ROMs_if1_rom) )
+    {
+      rom_image_ptr = __ROMs_48_original_rom;
+    }
+
+It needs the /M1 line merged in there to be correct.
+
+So I can use 1 Pico to do the ROM emulation.
+
+I'm now thinking I can use the Fuse code ported to Pico to do the Microdrive handling. TomD isn't
+going to be open sourcing his microdrive emulator any time soon; the Fuse idea seems a better option.
+
+How does Fuse code work?
+========================
+
+The Z80 opcode handler for IN uses a function called readport(). That's in periph.c, it loops
+over a list of 'port' structures calling a function called read_peripheral(). That looks at
+the list entry and the port being read by the Z80 and calls the handler function for either
+a port read or a port write if the IN instruction the Z80 is running matches what's been
+registered. The IF1's port input and output functions are if1_port_in() and if1_port_out():
+
+static const periph_port_t if1_ports[] = {
+  { 0x0018, 0x0010, if1_port_in, if1_port_out },
+  { 0x0018, 0x0008, if1_port_in, if1_port_out },
+  { 0x0018, 0x0000, if1_port_in, if1_port_out },
+  { 0, 0, NULL, NULL }
+};
+
+Putting a breakpoint on one and doing a CAT 1 command gives:
+
+(gdb) bt
+#0  if1_port_in (port=24559, attached=0x7fffffffdc46 "") at peripherals/if1.c:787
+#1  0x0000555555588aad in read_peripheral (data=<optimised out>, user_data=0x7fffffffdc44) at periph.c:304
+#2  0x00007ffff7154b20 in g_slist_foreach () at /lib/x86_64-linux-gnu/libglib-2.0.so.0
+#3  0x0000555555589057 in readport_internal (port=24559) at periph.c:344
+#4  readport_internal (port=<optimised out>) at periph.c:312
+#5  0x00005555555891a4 in readport (port=port@entry=24559) at periph.c:277
+#6  0x00005555555ed965 in z80_do_opcodes () at ./z80/opcodes_base.c:944
+#7  0x000055555558001d in main (argc=<optimised out>, argv=<optimised out>) at fuse.c:203
+
+Decoding the port gives 1 of 3 responses:
+
+static enum if1_port
+decode_port( libspectrum_word port )
+{
+    switch( port & 0x0018 ) {
+    case 0x0000: return PORT_MDR;
+    case 0x0008: return PORT_CTR;
+    case 0x0010: return PORT_NET;
+        default: return PORT_UNKNOWN;
+    }
+}
+
+0xF7 & 0x18 gives 0x10, so port 0xF7 is PORT_NET  (network)
+0xEF & 0x18 gives 0x08, so port 0xEF is PORT_CTR  (control)
+0xE7 & 0x18 gives 0x00, so port 0xE7 is PORT_MDR  (microdrive)
+
+The one I want is the MDR one, so if1_port_in() for a read calls port_mdr_in(). Which 
+is this:
+
+
+static libspectrum_byte
+port_mdr_in( void )
+{
+  libspectrum_byte ret = 0xff;
+  int m;
+
+  for( m = 0; m < 8; m++ ) {
+
+    microdrive_t *mdr = &microdrive[ m ];
+
+    if( mdr->motor_on && mdr->inserted ) {
+
+      if( mdr->transfered < mdr->max_bytes ) {
+	mdr->last = libspectrum_microdrive_data( mdr->cartridge,
+						   mdr->head_pos );
+	increment_head( m );
+      }
+
+      mdr->transfered++;
+      ret &= mdr->last;  /* I assume negative logic, but how know? */
+    }
+
+  }
+
+  return ret;
+}
+
+So for each microdrive, if it's on and inserted, read some data, increment the head
+position. This seems to work with the idea that more than one microdrive can be
+running, which is not possible in hardware as far as I know. Nevertheless, it merges
+the bytes read from each device and that's what it returns. It also returns the next
+byte in the data sequence (i.e on the tape) for each IN instruction.
+
+I think what's happening is that each IN instruction is assumed to be reading the
+next byte from the IF1 ULA. The IF1 does all the timing stuff, then says right,
+/now/ is the time to read the next data byte from the stream. And that's what it
+gets. In practise it doesn't matter what timing it puts in place, it'll get the next
+byte in the stream regardless.
