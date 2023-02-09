@@ -5,6 +5,11 @@ Implement an Interface One using a Pico. Currently envisaged as a software only
 microdrive emulator, providing a high volume storage facility the traditional
 way. I wasn't planning doing an actual Microdrive emulation, or the network.
 
+
+
+Pico-1 Emulates the IF1 ROM
+===========================
+
 Error Handling
 --------------
 
@@ -99,106 +104,94 @@ location, i.e. M1 active, the IF1 ROM pages out immediately meaning
 the CPU picks up the value from the 48K ROM/RAM and normal execution
 continues.
 
-GPIO Lines Required
-===================
+Pcio-1 Conclusion
+-----------------
 
-Address Bus (16 GPIOs required)
-=========== -------------------
+This is implemented in my ROM emulator. It requires the entire Pico,
+all 26 GPIOs. The magic address ROM paging is done in software.
 
-Needs all 16 address lines. It needs to be able to trap address 0x0008, but that needs to
-be differentiated fromm eg., 0x8008. So although only the bottom 13 address lines are required
-to emulate the 8K ROM, the Pico needs to see all 16 so it knows when the page in the IF1 ROM.
+Proven working, final version needs the /M1 signal which I've got in
+place on the schematic.
 
-These are all inputs to the Pico, they don't need direction swapping.
 
+
+Pico-2 Emulates the IF1 Hardware
+================================
 
 
 Data Bus (8 GPIOs required)
-======== ------------------
+---------------------------
 
 8 lines required, all need level shifting and direction swapping. Input from ZX is needed
 for the IF1 to receive the data to be written to the microdrive. Output to the ZX is
 needed for the ROM emulation and to pass read data out to the ZX.
 
-These all need level shifting. They arrive as 5V and need returning as 5V.
+The ROM emulation only needs output data lines. The ROM emulator project ties the
+direction of the level shifter to Pico->ZX. That needs changing because Pico-2 needs
+to handle INs (Pico->ZX) and OUTs (ZX->Pico).
 
 
 Z80 Control Bus (3 GPIOs required)
-=============== ------------------
+----------------------------------
 
-M1 is required so I know it's doing an instruction read from 0x0008 or 0x0700.
+The ROM part uses /MREQ; Pico-2 needs /IORQ.
 
-/ROMCS is required so the Pico can switch out the Spectrum ROM.
+/RD and /WR  are required so Pico-2 can tell when it needs to field an IN or an OUT.
 
-/RD is required so I know when the read of the byte has ended and the ROM page can happen.
+Pico-1 only needs Pico->ZX, which is B->A, which is low on the pin. Pico-2 needs
+both directions. But I can't have Pico-1 driving the data bus when Pico-2 wants
+it, so I need to update the ROM emulation software to keep the data bus GPIOs as
+inputs until they need to output their value.
 
+The data bus level shifter should be permanently enabled. I'll tie /RD to the
+shifter's direction pin then a read from ROM or a read of the IO space will set the
+shifter to Pico->ZX, switching straight back when the read finishes. The ROM code
+(Pico-1) needs to keep the data bus GPIOs as inputs while it's not supplying a data
+byte. A write-to-ROM won't change the level shifter, so that scenario is harmless.
+ROM_ACCESS_INV now appears redundant.
 
-
-
-Microdrive Control (7 GPIOs required)
-================== ------------------
-
-The service manual says there are 7 microdrive control lines. I/O here is from the
-IF1 point of view:
-
-ERASE		output
-R/W		output
-COMMS OUT	output
-COMMS CLK	output
-WR PROT		input, the microdrive telling IF1 whether the cartridge is write protected
-DATA1		bidirectional (input when the microdrive is reading, output when its writing)
-DATA2		bidirectional (input when the microdrive is reading, output when its writing)
-
-I need all of them to correctly talk to a microdrive.
+One issue: one of the Picos will have it's databus GPIOs set as outputs. When the
+Z80's read finishes the /RD will go high and the level shifter will drive its
+3V3 side as outputs. I don't want both Pico and level shifter driving each other,
+but there's no easy alternative. So I'll put some resistors inline to prevent
+too much current flowing from one device to the other. It'll only be brief, I
+think it'll be OK.
 
 
 
-Network (1 GPIO required)
-======= -----------------
-
-The network appears to be a single bit input/output on the IF1 ULA ("NET"). Not sure I care
-about this yet, but keeping the GPIO free might be wise.
 
 
 
-RS232 (4 GPIOs required)
-===== ------------------
-
-RS232 uses Rx and Tx pins, so one input, one output. It uses CTS and DTR, so one output
-and one input.  Not sure I care about this yet, but keeping the GPIOs free might be wise.
 
 
 
-So 36 GPIOs required. I absolutely need 8 for data bus and 7 for microdrive control, that's
-15. I need 13 for the address bus for ROM emulation, so that's 28. A few more for the Z80
-control bus. So some form of latching is going to be reqiured. AM pointed me at
 
-https://www.mouser.co.uk/c/?q=max7317
+Pico-3 Handles the user interface
+=================================
 
-which is a 10 bit parallel to serial which can clock out at 26MHz. Needs testing though.
-
+Currently assuming an SD card reader and an LCD screen. Some buttons or a rotary?
+Not sure. This comes later.
 
 
-Rethink
-=======
 
-My Pico ROM emulator works, and handles an IF1 ROM with this code added:
+I think this is the one AM uses:
 
-    if( ((rom_address == 0x0008) || (rom_address == 0x1708)) && (rom_image_ptr == __ROMs_48_original_rom) )
-    {
-      rom_image_ptr = __ROMs_if1_rom;
-    }
-    else if( (rom_address == 0x0700) && (rom_image_ptr == __ROMs_if1_rom) )
-    {
-      rom_image_ptr = __ROMs_48_original_rom;
-    }
+https://github.com/carlk3/no-OS-FatFS-SD-SPI-RPi-Pico/tree/sdio
 
-It needs the /M1 line merged in there to be correct.
 
-So I can use 1 Pico to do the ROM emulation.
 
-I'm now thinking I can use the Fuse code ported to Pico to do the Microdrive handling. TomD isn't
-going to be open sourcing his microdrive emulator any time soon; the Fuse idea seems a better option.
+
+
+
+
+
+
+
+
+
+
+
+
 
 How does Fuse code work?
 ========================
