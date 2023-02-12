@@ -5,8 +5,8 @@
   (paper "A4")
 
   (title_block
-    (title "ZX Spectrum IF1 ROM")
-    (date "2023-02-07")
+    (title "Pico Interface One")
+    (date "2023-02-12")
     (rev "1.0")
   )
 
