@@ -1,0 +1,4 @@
+v1.0
+====
+
+Transistor Q1 is rotated. Needs turning 90deg anticlockwise.

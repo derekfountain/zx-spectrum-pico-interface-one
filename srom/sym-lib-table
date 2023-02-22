@@ -3,4 +3,5 @@
   (lib (name "rp-pico")(type "Legacy")(uri "${KIPRJMOD}/rp-pico.lib")(options "")(descr ""))
   (lib (name "pico-sym")(type "KiCad")(uri "${KIPRJMOD}/KiCad-RP-Pico/RP-Pico Libraries/MCU_RaspberryPi_and_Boards.kicad_sym")(options "")(descr ""))
   (lib (name "uSD")(type "Legacy")(uri "${KIPRJMOD}/datapack-tool1-rescue.lib")(options "")(descr ""))
+  (lib (name "2222 SMD")(type "KiCad")(uri "/home/derek/BEETLE/Derek/Hobbies/Electronics/Projects/zx-spectrum-pico-rom/srom/pmbt2222a.kicad_sym")(options "")(descr ""))
 )
