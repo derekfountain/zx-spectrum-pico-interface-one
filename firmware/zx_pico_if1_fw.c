@@ -115,6 +115,10 @@ const uint32_t  D7_BIT_MASK  = ((uint32_t)1 <<  D7_GP);
 const uint8_t  ROM_ACCESS_GP            = 8;
 const uint32_t ROM_ACCESS_BIT_MASK      = ((uint32_t)1 << ROM_ACCESS_GP);
 
+/* Z80's M1 signal, needs to be merged into the IF1 paging logic */
+const uint8_t  M1_GP                    = 27;
+const uint32_t M1_INPUT_BIT_MASK        = ((uint32_t)1 << M1_GP);
+
 /* This pin triggers a transistor which shorts the Z80's /RESET to ground */
 const uint8_t  PICO_RESET_Z80_GP        = 28;
 
@@ -223,11 +227,23 @@ uint8_t *rom_image_ptr = __ROMs_48_original_rom;
 
 
 /*
- * This is called by an alarm function at startup. It just resets
- * the Z80 by pulling the Pico's GPIO low
+ * This is called by an alarm function. It lets the Z80 run by pulling the
+ * Pico's controlling GPIO low
  */
-int64_t initial_reset_alarm_func( alarm_id_t id, void *user_data )
+int64_t start_z80_alarm_func( alarm_id_t id, void *user_data )
 {
+  /*
+   * At power up the Z80 starts running, and with the Pico not yet booted
+   * and able to get the Z80 into reset, the Z80 will cheerfully run what
+   * are random instructions found in the noise on the data bus. If that
+   * takes it to one of the "page IF1 in" addresses, the IF1 will be paged
+   * in. So just to be absolutely sure, when the Pico is ready and the code
+   * comes through here to start the Z80, ensure that the 48K ROM is in
+   * place.
+   */
+  rom_image_ptr = __ROMs_48_original_rom;
+  gpio_put(LED_PIN, 0);
+
   gpio_put( PICO_RESET_Z80_GP, 0 );
   return 0;
 }
@@ -307,7 +323,7 @@ int main()
    * Ready to go, give it a few milliseconds for this Pico code to get into
    * its main loop, then let the Z80 start
    */
-  add_alarm_in_ms( 50, initial_reset_alarm_func, NULL, 0 );
+  add_alarm_in_ms( 5, start_z80_alarm_func, NULL, 0 );
 
 
   while(1)
@@ -335,15 +351,18 @@ int main()
      */
     while( (gpio_get_all() & ROM_ACCESS_BIT_MASK) == 0 );
 
-    if( (rom_address == 0x0008) || (rom_address == 0x1708) )
+    if( (gpios_state & M1_INPUT_BIT_MASK) == 0 )
     {
-      // gpio_put(LED_PIN, 1);
-      rom_image_ptr = __ROMs_if1_rom;
-    }
-    else if( rom_address == 0x0700 )
-    {
-      rom_image_ptr = __ROMs_48_original_rom;
-      // gpio_put(LED_PIN, 0);
+      if( (rom_address == 0x0008) || (rom_address == 0x1708) )
+      {
+	gpio_put(LED_PIN, 1);
+	rom_image_ptr = __ROMs_if1_rom;
+      }
+      else if( rom_address == 0x0700 )
+      {
+	rom_image_ptr = __ROMs_48_original_rom;
+	gpio_put(LED_PIN, 0);
+      }
     }
 
     /*
