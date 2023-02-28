@@ -228,17 +228,6 @@ void create_indirection_table( void )
 
 uint8_t *rom_image_ptr = __ROMs_48_original_rom;
 
-#if 0
-typedef struct _recorder
-{
-  uint16_t address;
-} RECORDER;
-#define RECORDER_SIZE 2048
-#define RECORDER_RESET ((uint16_t)65535)
-int32_t recorder_index=0;
-RECORDER address_recorder[ RECORDER_SIZE ];
-#endif
-
 /*
  * This is called by an alarm function. It lets the Z80 run by pulling the
  * Pico's controlling GPIO low
@@ -323,11 +312,11 @@ int main()
 
   /* Input from logic hardware, indicates the ROM is being read by the Z80 */
   gpio_init( ROM_READ_GP ); gpio_set_dir( ROM_READ_GP, GPIO_IN );
-//  gpio_pull_down( ROM_READ_GP );
+  gpio_pull_down( ROM_READ_GP );
 
   /* M1 signal input */
   gpio_init( M1_GP ); gpio_set_dir( M1_GP, GPIO_IN );
-//  gpio_pull_up( M1_GP );
+  gpio_pull_up( M1_GP );
 
   /* Blip LED to show we're running */
   gpio_init(LED_PIN);
@@ -370,18 +359,6 @@ int main()
     gpio_set_dir_out_masked( DBUS_MASK );
     gpio_put_masked( DBUS_MASK, rom_value );
 
-#if 0
-    /* Log to the recorder buffer the ROM address requested */
-    if( ((gpio_get_all() & M1_INPUT_BIT_MASK) == 0) && (recorder_index >=0) )
-    {
-      address_recorder[ recorder_index++ ].address  = rom_address;
-      if( recorder_index == RECORDER_SIZE )
-      {
-	recorder_index = -1;
-      }
-    }
-#endif
-
     /*
      * Spin until the Z80 releases MREQ indicating the read is complete.
      * ROM_READ is active low - if it's 0 then the ROM is still being read.
@@ -395,21 +372,10 @@ int main()
      */
     if( (gpios_state & M1_INPUT_BIT_MASK) == 0 )
     {
-#if 0
-      if( recorder_index >=0 )
-      {
-	address_recorder[ recorder_index++ ].address  = rom_address;
-      }
-#endif
-
       if( (rom_address == 0x0008) || (rom_address == 0x1708) )
       {
 	gpio_put(LED_PIN, 1);
 	rom_image_ptr = __ROMs_if1_rom;
-#if 0
-	address_recorder[ recorder_index ].address = RECORDER_RESET;
-	recorder_index = -1;
-#endif
       }
       else if( rom_address == 0x0700 )
       {
