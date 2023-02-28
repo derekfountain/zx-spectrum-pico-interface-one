@@ -112,12 +112,15 @@ const uint32_t  D5_BIT_MASK  = ((uint32_t)1 <<  D5_GP);
 const uint32_t  D6_BIT_MASK  = ((uint32_t)1 <<  D6_GP);
 const uint32_t  D7_BIT_MASK  = ((uint32_t)1 <<  D7_GP);
 
-const uint8_t  ROM_ACCESS_GP            = 8;
-const uint32_t ROM_ACCESS_BIT_MASK      = ((uint32_t)1 << ROM_ACCESS_GP);
+const uint8_t  ROM_READ_GP              = 8;
+const uint32_t ROM_READ_BIT_MASK        = ((uint32_t)1 << ROM_READ_GP);
 
 /* Z80's M1 signal, needs to be merged into the IF1 paging logic */
-const uint8_t  M1_GP                    = 27;
+const uint8_t  M1_GP                    = 15;
 const uint32_t M1_INPUT_BIT_MASK        = ((uint32_t)1 << M1_GP);
+
+/* Test pin */
+const uint8_t  TEST_OUTPUT_GP           = 27;
 
 /* This pin triggers a transistor which shorts the Z80's /RESET to ground */
 const uint8_t  PICO_RESET_Z80_GP        = 28;
@@ -225,6 +228,16 @@ void create_indirection_table( void )
 
 uint8_t *rom_image_ptr = __ROMs_48_original_rom;
 
+#if 0
+typedef struct _recorder
+{
+  uint16_t address;
+} RECORDER;
+#define RECORDER_SIZE 2048
+#define RECORDER_RESET ((uint16_t)65535)
+int32_t recorder_index=0;
+RECORDER address_recorder[ RECORDER_SIZE ];
+#endif
 
 /*
  * This is called by an alarm function. It lets the Z80 run by pulling the
@@ -243,6 +256,9 @@ int64_t start_z80_alarm_func( alarm_id_t id, void *user_data )
    */
   rom_image_ptr = __ROMs_48_original_rom;
   gpio_put(LED_PIN, 0);
+
+  /* Don't need the timers anymore, no interrupts now */
+  irq_set_mask_enabled( 0xFFFFFFFF, 0 );
 
   gpio_put( PICO_RESET_Z80_GP, 0 );
   return 0;
@@ -292,18 +308,26 @@ int main()
   gpio_init( A12_GP ); gpio_set_dir( A12_GP, GPIO_IN );  gpio_pull_down( A12_GP );
   gpio_init( A13_GP ); gpio_set_dir( A13_GP, GPIO_IN );  gpio_pull_down( A13_GP );
 
-  gpio_init( D0_GP  ); gpio_set_dir( D0_GP,  GPIO_OUT ); gpio_put( D0_GP, 0 );
-  gpio_init( D1_GP  ); gpio_set_dir( D1_GP,  GPIO_OUT ); gpio_put( D1_GP, 0 );
-  gpio_init( D2_GP  ); gpio_set_dir( D2_GP,  GPIO_OUT ); gpio_put( D2_GP, 0 );
-  gpio_init( D3_GP  ); gpio_set_dir( D3_GP,  GPIO_OUT ); gpio_put( D3_GP, 0 );
-  gpio_init( D4_GP  ); gpio_set_dir( D4_GP,  GPIO_OUT ); gpio_put( D4_GP, 0 );
-  gpio_init( D5_GP  ); gpio_set_dir( D5_GP,  GPIO_OUT ); gpio_put( D5_GP, 0 );
-  gpio_init( D6_GP  ); gpio_set_dir( D6_GP,  GPIO_OUT ); gpio_put( D6_GP, 0 );
-  gpio_init( D7_GP  ); gpio_set_dir( D7_GP,  GPIO_OUT ); gpio_put( D7_GP, 0 );
+  gpio_init( D0_GP  ); gpio_set_dir( D0_GP,  GPIO_IN );
+  gpio_init( D1_GP  ); gpio_set_dir( D1_GP,  GPIO_IN );
+  gpio_init( D2_GP  ); gpio_set_dir( D2_GP,  GPIO_IN );
+  gpio_init( D3_GP  ); gpio_set_dir( D3_GP,  GPIO_IN );
+  gpio_init( D4_GP  ); gpio_set_dir( D4_GP,  GPIO_IN );
+  gpio_init( D5_GP  ); gpio_set_dir( D5_GP,  GPIO_IN );
+  gpio_init( D6_GP  ); gpio_set_dir( D6_GP,  GPIO_IN );
+  gpio_init( D7_GP  ); gpio_set_dir( D7_GP,  GPIO_IN );
 
-  /* Input from logic hardware, indicates the ROM is being accessed by the Z80 */
-  gpio_init( ROM_ACCESS_GP ); gpio_set_dir( ROM_ACCESS_GP, GPIO_IN );
-  gpio_pull_down( ROM_ACCESS_GP );
+  /* Init the debug pin */
+  gpio_init(TEST_OUTPUT_GP); gpio_set_dir(TEST_OUTPUT_GP, GPIO_OUT);
+  gpio_put(TEST_OUTPUT_GP, 0);
+
+  /* Input from logic hardware, indicates the ROM is being read by the Z80 */
+  gpio_init( ROM_READ_GP ); gpio_set_dir( ROM_READ_GP, GPIO_IN );
+//  gpio_pull_down( ROM_READ_GP );
+
+  /* M1 signal input */
+  gpio_init( M1_GP ); gpio_set_dir( M1_GP, GPIO_IN );
+//  gpio_pull_up( M1_GP );
 
   /* Blip LED to show we're running */
   gpio_init(LED_PIN);
@@ -316,8 +340,7 @@ int main()
     gpio_put(LED_PIN, 0);
     busy_wait_us_32(250000);
   }
-  gpio_put(LED_PIN, 0);
-
+  gpio_put(LED_PIN, 1);
 
   /*
    * Ready to go, give it a few milliseconds for this Pico code to get into
@@ -326,15 +349,16 @@ int main()
   add_alarm_in_ms( 5, start_z80_alarm_func, NULL, 0 );
 
 
+  gpio_set_dir_in_masked( DBUS_MASK );
   while(1)
   {
     register uint32_t gpios_state;
 
     /*
      * Spin while the hardware is saying at least one of A14, A15 and MREQ is 1.
-     * ROM_ACCESS is active low - if it's 1 then the ROM is not being accessed.
+     * ROM_READ is active low - if it's 1 then the ROM is not being read.
      */
-    while( (gpios_state=gpio_get_all()) & ROM_ACCESS_BIT_MASK );
+    while( (gpios_state=gpio_get_all()) & ROM_READ_BIT_MASK );
 
     register uint16_t raw_bit_pattern = pack_address_gpios( gpios_state );
 
@@ -343,20 +367,49 @@ int main()
     register uint8_t rom_value = *(rom_image_ptr+rom_address);
 
     /* The level shifter is enabled via hardware, so just set the GPIOs */
+    gpio_set_dir_out_masked( DBUS_MASK );
     gpio_put_masked( DBUS_MASK, rom_value );
+
+#if 0
+    /* Log to the recorder buffer the ROM address requested */
+    if( ((gpio_get_all() & M1_INPUT_BIT_MASK) == 0) && (recorder_index >=0) )
+    {
+      address_recorder[ recorder_index++ ].address  = rom_address;
+      if( recorder_index == RECORDER_SIZE )
+      {
+	recorder_index = -1;
+      }
+    }
+#endif
 
     /*
      * Spin until the Z80 releases MREQ indicating the read is complete.
-     * ROM_ACCESS is active low - if it's 0 then the ROM is still being accessed.
+     * ROM_READ is active low - if it's 0 then the ROM is still being read.
      */
-    while( (gpio_get_all() & ROM_ACCESS_BIT_MASK) == 0 );
+    while( (gpio_get_all() & ROM_READ_BIT_MASK) == 0 );
+    gpio_set_dir_in_masked( DBUS_MASK );
 
+    /*
+     * M1 active means that was an instruction fetch the Z80 just did.
+     * If it's one of the magic addresses, page the IF1 ROM
+     */
     if( (gpios_state & M1_INPUT_BIT_MASK) == 0 )
     {
+#if 0
+      if( recorder_index >=0 )
+      {
+	address_recorder[ recorder_index++ ].address  = rom_address;
+      }
+#endif
+
       if( (rom_address == 0x0008) || (rom_address == 0x1708) )
       {
 	gpio_put(LED_PIN, 1);
 	rom_image_ptr = __ROMs_if1_rom;
+#if 0
+	address_recorder[ recorder_index ].address = RECORDER_RESET;
+	recorder_index = -1;
+#endif
       }
       else if( rom_address == 0x0700 )
       {

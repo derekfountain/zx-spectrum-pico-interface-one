@@ -2,3 +2,30 @@ v1.0
 ====
 
 Transistor Q1 is rotated. Needs turning 90deg anticlockwise.
+- Done on board #2
+
+"ROM Acc 3V3" is on the silkscreen, test point was removed.
+Same for "GND" just above U4.
+
+Disconnect the 3V3s for all the Picos. I've got the outputs
+of 3 regulators tied together.
+
+The direction for the data bus level shifter needs to be
+ROM_READ_INV, not /RD.
+ - Cut ZXRD track on back of board #2
+ - Cut tiny track to via from pin 19 of U4 on board #2.
+ - Picked up ROM_READ_INV from OR output (pin 9) and
+   connected to /OE (pin 19) on level shifter U4
+   - This matches the ROM emulator. Proper fix is to
+     connect /OE (pin 19) to GND and ROM_READ_INV to
+     pin 1 (DIR)
+ - Connected pin 1 of U4 (DIR) to GND to make it A->B (zx->pico)
+ 
+Move the GND via from pin 19 on U4, it's under the chip and
+I can't get to it. This is /OE.
+
+Remove level shifter U2
+ - Bridged across gap on board #2
+
+Remove level shifter U3
+ - Bridged across gap on board #2
