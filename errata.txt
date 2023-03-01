@@ -8,9 +8,6 @@ Transistor Q1 is rotated. Needs turning 90deg anticlockwise.
 Same for "GND" just above U4.
 - Done on board #2
 
-Disconnect the 3V3s for all the Picos. I've got the outputs
-of 3 regulators tied together.
-
 The direction for the data bus level shifter needs to be
 ROM_READ_INV, not /RD.
  - Cut ZXRD track on back of board #2
@@ -29,3 +26,13 @@ Remove level shifter U2
 Remove level shifter U3
  - Bridged across gap on board #2
  - Removed on board #2
+
+All the above were fixed (by hand) in v1.1
+
+
+v1.1
+====
+
+Disconnect the 3V3s for all the Picos. I've got the outputs
+of 3 regulators tied together. Separate into 3 supplies.
+
