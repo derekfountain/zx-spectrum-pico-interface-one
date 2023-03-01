@@ -280,3 +280,40 @@ next byte from the IF1 ULA. The IF1 does all the timing stuff, then says right,
 /now/ is the time to read the next data byte from the stream. And that's what it
 gets. In practise it doesn't matter what timing it puts in place, it'll get the next
 byte in the stream regardless.
+
+
+Logic to operate the level shifter
+==================================
+
+To switch the level shifter on the data bus to output mode (Pico->ZX) the ROM
+read negative logic is
+
+!(MREQ OR A14 OR A15 OR RD)
+
+So if A14/5, or MREQ, or RD are high, keep it at input mode (ZX->Pico).
+Otherwise pull it low (Pico->ZX).
+
+So that's
+
+(MREQ AND A14 AND A15 AND RD)
+
+
+The IO Pico also needs to be able to switch that level shifter to output
+mode (Pico->ZX)
+
+(IORQ AND RD)
+
+So if it's an IO, and it's a read, pull the level shifter direction low
+(Pico->ZX).
+
+So that's
+
+!(IORQ OR RD)
+
+
+The plan then is to keep the quad 3-way OR gate. IORQ and RD are both already
+inputs to Pico-2, so have Pico-2 have an output when it wants to send out a
+byte (IORQ==0, RD==0 and the address lines say 0xE7 or 0xEF). Pico keeps an
+output GPIO at 1 until that condition is met. That GPIO output, plus the MREQ
+one, go into the last OR gate I have, and it's the output of that which goes
+to the elvel shifter's DIR pin.
