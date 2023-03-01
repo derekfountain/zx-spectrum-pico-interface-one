@@ -316,4 +316,4 @@ inputs to Pico-2, so have Pico-2 have an output when it wants to send out a
 byte (IORQ==0, RD==0 and the address lines say 0xE7 or 0xEF). Pico keeps an
 output GPIO at 1 until that condition is met. That GPIO output, plus the MREQ
 one, go into the last OR gate I have, and it's the output of that which goes
-to the elvel shifter's DIR pin.
+to the elvel shifter's DIR pin. THIS NEEDS RETHINKING
