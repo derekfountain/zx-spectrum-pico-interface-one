@@ -24,6 +24,7 @@
 #include "pico/stdlib.h"
 #include "hardware/gpio.h"
 #include "pico/binary_info.h"
+#include "pico/multicore.h"
 #include "hardware/timer.h"
 
 
@@ -32,8 +33,8 @@
 /* 1 instruction on the 150MHz microprocessor is 6.6ns */
 /* 1 instruction on the 200MHz microprocessor is 5.0ns */
 
-#define OVERCLOCK 150000
-//#define OVERCLOCK 180000
+//#define OVERCLOCK 150000
+#define OVERCLOCK 180000
 
 const uint8_t LED_PIN = PICO_DEFAULT_LED_PIN;
 
@@ -97,6 +98,13 @@ const uint32_t DBUS_MASK     = ((uint32_t)1 << D0_GP) |
                                ((uint32_t)1 << D6_GP) |
                                ((uint32_t)1 << D7_GP);
 
+const uint8_t  IORQ_GP                  = 8;
+const uint32_t IORQ_BIT_MASK            = ((uint32_t)1 << IORQ_GP);
+
+const uint8_t  RD_GP                    = 9;
+const uint32_t RD_BIT_MASK              = ((uint32_t)1 << RD_GP);
+
+
 /* ROM read logic input, goes 0 when the MREQ to ROM is happening */
 const uint8_t  ROM_READ_GP              = 27;
 const uint32_t ROM_READ_BIT_MASK        = ((uint32_t)1 << ROM_READ_GP);
@@ -148,6 +156,47 @@ void create_indirection_table( void )
 }
 
 
+void core1_main( void )
+{
+  while( 1 )
+  {
+    register uint32_t gpios_state = gpio_get_all();
+
+    if( (gpios_state & ROM_READ_BIT_MASK) == 0 )
+    {
+      gpio_set_dir_in_masked( DBUS_MASK );
+      gpio_put( DIR_OUTPUT_GP, 0 );
+    }
+    else if( (gpios_state & (IORQ_BIT_MASK|RD_BIT_MASK)) == 0 )
+    {
+      register uint16_t io_address = ((gpios_state >>  A0_GP   ) & 0x01) |
+                                     ((gpios_state >> (A1_GP-1)) & 0x02) |
+                                     ((gpios_state >> (A2_GP-2)) & 0x04) |
+                                     ((gpios_state >> (A3_GP-3)) & 0x08) |
+                                     ((gpios_state >> (A4_GP-4)) & 0x10) |
+                                     ((gpios_state >> (A5_GP-5)) & 0x20) |
+                                     ((gpios_state >> (A6_GP-6)) & 0x40) |
+                                     ((gpios_state >> (A7_GP-7)) & 0x80);
+
+      if( io_address == 223 )
+      {
+	gpio_put(LED_PIN, 1);
+	gpio_put( DIR_OUTPUT_GP, 0 );
+
+	gpio_set_dir_out_masked( DBUS_MASK );
+	gpio_put_masked( DBUS_MASK, 7 );
+	gpio_put(LED_PIN, 0);
+      }
+    }
+    else
+    {
+      gpio_set_dir_in_masked( DBUS_MASK );
+      gpio_put( DIR_OUTPUT_GP, 1 );
+    }
+  }
+}
+
+
 
 int main()
 {
@@ -182,6 +231,12 @@ int main()
   gpio_init( D6_GP  ); gpio_set_dir( D6_GP,  GPIO_IN );
   gpio_init( D7_GP  ); gpio_set_dir( D7_GP,  GPIO_IN );
 
+  gpio_init( IORQ_GP ); gpio_set_dir( IORQ_GP, GPIO_IN );
+  gpio_pull_up( IORQ_GP );
+
+  gpio_init( RD_GP ); gpio_set_dir( RD_GP, GPIO_IN );
+  gpio_pull_up( RD_GP );
+
   /* Input from ROM logic, 1 when MREQ isn't happening, 0 when it is */
   gpio_init( ROM_READ_GP ); gpio_set_dir( ROM_READ_GP, GPIO_IN );
   gpio_pull_up( ROM_READ_GP );
@@ -205,12 +260,24 @@ int main()
     busy_wait_us_32(250000);
   }
 
+  /* 2nd core code */
+  multicore_launch_core1( core1_main ); 
+
+
   gpio_set_dir_in_masked( DBUS_MASK );
   while( 1 )
   {
-    register uint32_t gpios_state;
+//    register uint32_t gpios_state = gpio_get_all();
 
-    gpio_put( DIR_OUTPUT_GP, ((gpios_state=gpio_get_all()) & ROM_READ_BIT_MASK) );
+//    gpio_put( DIR_OUTPUT_GP, ((gpios_state & (IORQ_BIT_MASK|RD_BIT_MASK)) > 0)
+//                                   &
+//	      ((gpios_state & ROM_READ_BIT_MASK) > 0) );
+
+//    register uint8_t dir_output  = ((gpios_state & ROM_READ_BIT_MASK) > 0);
+//                     dir_output &= ((gpios_state & (IORQ_BIT_MASK|RD_BIT_MASK)) > 0);
+
+//    uint8_t dir_values[] = { 0, 1 };
+//    gpio_put( DIR_OUTPUT_GP, dir_values[dir_output] );
 
   } /* Infinite loop */
 
