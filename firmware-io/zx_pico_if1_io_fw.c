@@ -33,8 +33,8 @@
 /* 1 instruction on the 150MHz microprocessor is 6.6ns */
 /* 1 instruction on the 200MHz microprocessor is 5.0ns */
 
-//#define OVERCLOCK 150000
-#define OVERCLOCK 200000
+#define OVERCLOCK 150000
+//#define OVERCLOCK 200000
 
 const uint8_t LED_PIN = PICO_DEFAULT_LED_PIN;
 
@@ -156,6 +156,27 @@ void create_indirection_table( void )
 }
 
 
+/*
+ * Instead of shuffling the bits of an output value around at the point
+ * they need to be sent back to the Z80, preconvert them and put them
+ * in a table. The table is indexed 0-255, and each entry holds the
+ * index value shuffled to match the GPIOs of the data bus.
+ */
+uint8_t preconverted_data[256];
+void preconvert_data( void )
+{
+  uint16_t conv_index;
+  for( conv_index=0; conv_index < 256; conv_index++ )
+  {
+    preconverted_data[conv_index] = 
+                               (conv_index & 0x87)       |        /* bxxx xbbb */
+                              ((conv_index & 0x08) << 1) |        /* xxxb xxxx */
+                              ((conv_index & 0x10) << 2) |        /* xbxx xxxx */
+                              ((conv_index & 0x20) >> 2) |        /* xxxx bxxx */
+                              ((conv_index & 0x40) >> 1);         /* xxbx xxxx */
+  }
+}
+
 void core1_main( void )
 {
   while( 1 )
@@ -175,6 +196,9 @@ int main()
 #ifdef OVERCLOCK
   set_sys_clock_khz( OVERCLOCK, 1 );
 #endif
+
+  /* Build the preconverted data table */
+  preconvert_data();
 
   /* Create address indirection table, this is the address bus optimisation  */
   create_indirection_table();
@@ -232,7 +256,7 @@ int main()
   multicore_launch_core1( core1_main ); 
 #endif
 
-  uint8_t response_byte = 191;
+  uint8_t response_byte = 0;
 
   gpio_set_dir_in_masked( DBUS_MASK );
   while( 1 )
@@ -282,11 +306,7 @@ int main()
 	/* Make data bus GPIOs outputs, pointed at the ZX */
 	gpio_set_dir_out_masked( DBUS_MASK );
 
-	gpio_put_masked( DBUS_MASK, (response_byte & 0x87)       |        /* bxxx xbbb */
-                                   ((response_byte & 0x08) << 1) |        /* xxxb xxxx */
-                                   ((response_byte & 0x10) << 2) |        /* xbxx xxxx */
-                                   ((response_byte & 0x20) >> 2) |        /* xxxx bxxx */
-			           ((response_byte & 0x40) >> 1) );       /* xxbx xxxx */
+	gpio_put_masked( DBUS_MASK, preconverted_data[response_byte] );
 
 //	response_byte++;
 
