@@ -36,8 +36,8 @@ v1.1
 Disconnect the 3V3s for all the Picos. I've got the outputs
 of 3 regulators tied together. Separate into 3 supplies.
 - Done on v1.2 of the board
-: Need t cut the 3v3 tracks to 2 picos on current board.
-  One pico can power all the 3v3 lines
+- Cut 3V3 track to Pico2 on current board
+: Need to cut 3v3 track to pico3 on current board
 
 Change the level shifter direction control from hardware to
 software. Wire GPIO27 to the data bus level shifter's DIR
