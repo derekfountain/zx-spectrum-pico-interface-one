@@ -32,8 +32,8 @@
 /* 1 instruction on the 150MHz microprocessor is 6.6ns */
 /* 1 instruction on the 200MHz microprocessor is 5.0ns */
 
-//#define OVERCLOCK 150000
-#define OVERCLOCK 180000
+#define OVERCLOCK 150000
+//#define OVERCLOCK 180000
 
 const uint8_t LED_PIN = PICO_DEFAULT_LED_PIN;
 
@@ -49,16 +49,6 @@ const uint8_t A4_GP          = 20;
 const uint8_t A5_GP          = 21;
 const uint8_t A6_GP          = 22;
 const uint8_t A7_GP          = 26;
-
-/*
- * Given the GPIOs with an address bus value on them, this packs the
- * 14 address bits down into the least significant 14 bits
- */
-inline uint16_t pack_address_gpios( uint32_t gpios )
-{
-  /*     Bits 0,1,2,3,4,5       Bits 6,7,8,9,10,11,12     Bit 13                   */
-  return ((gpios>>9) & 0x03F) | ((gpios>>10) & 0x1FC0) | ((gpios & 0x4000000) >> 13);
-}
 
 /*
  * Given value i, this calculates the pattern of the GPIOs if
@@ -98,26 +88,6 @@ const uint32_t  D5_BIT_MASK  = ((uint32_t)1 <<  D5_GP);
 const uint32_t  D6_BIT_MASK  = ((uint32_t)1 <<  D6_GP);
 const uint32_t  D7_BIT_MASK  = ((uint32_t)1 <<  D7_GP);
 
-const uint8_t  ROM_READ_GP              = 8;
-const uint32_t ROM_READ_BIT_MASK        = ((uint32_t)1 << ROM_READ_GP);
-
-/* Z80's M1 signal, needs to be merged into the IF1 paging logic */
-const uint8_t  M1_GP                    = 15;
-const uint32_t M1_INPUT_BIT_MASK        = ((uint32_t)1 << M1_GP);
-
-const uint8_t  ROM_OUTPUT_REQ_GP        = 27;
-const uint32_t ROM_OUTPUT_REQ_BIT_MASK  = ((uint32_t)1 << ROM_OUTPUT_REQ_GP);
-
-/*
- * Data bus leve shifter direction pin, 1 is zx->pico, which is the normal
- * position, 0 means pico->zx which is temporarily switched to when the
- * Pico wants to send a data byte back to the Spectrum
- */
-const uint8_t  DIR_OUTPUT_GP            = 28;
-
-/* This pin triggers a transistor which shorts the Z80's /RESET to ground */
-const uint8_t  PICO_RESET_Z80_GP        = 28;
-
 const uint32_t DBUS_MASK     = ((uint32_t)1 << D0_GP) |
                                ((uint32_t)1 << D1_GP) |
                                ((uint32_t)1 << D2_GP) |
@@ -127,7 +97,55 @@ const uint32_t DBUS_MASK     = ((uint32_t)1 << D0_GP) |
                                ((uint32_t)1 << D6_GP) |
                                ((uint32_t)1 << D7_GP);
 
+/* ROM read logic input, goes 0 when the MREQ to ROM is happening */
+const uint8_t  ROM_READ_GP              = 27;
+const uint32_t ROM_READ_BIT_MASK        = ((uint32_t)1 << ROM_READ_GP);
 
+/*
+ * Data bus leve shifter direction pin, 1 is zx->pico, which is the normal
+ * position, 0 means pico->zx which is temporarily switched to when the
+ * Pico wants to send a data byte back to the Spectrum
+ */
+const uint8_t  DIR_OUTPUT_GP            = 28;
+
+
+/*
+ * The 8 address bus bits arrive on the GPIOs in a weird pattern which is
+ * defined by the edge connector layout and the board design. See the
+ * ROM code for the description of this.
+ *
+ * Here it's an 8 bit IO address, so a smaller table than in the ROM code.
+ */
+uint16_t address_indirection_table[ 256 ];
+
+/*
+ * Given the GPIOs with an address bus value on them, this packs the
+ * 14 address bits down into the least significant 14 bits
+ */
+inline uint16_t pack_address_gpios( uint32_t gpios )
+{
+  /*     Bits 0,1,2,3,4,5       Bits 6,7,8,9,10,11,12     Bit 13                   */
+  return ((gpios>>9) & 0x03F) | ((gpios>>10) & 0x1FC0) | ((gpios & 0x4000000) >> 13);
+}
+
+/*
+ * Populate the address bus indirection table.
+ */
+void create_indirection_table( void )
+{
+  uint32_t i;
+
+  for( i=0; i<256; i++ )
+  {
+    uint32_t raw_bit_pattern = create_gpios_for_address( i );
+
+    uint32_t packed_bit_pattern = pack_address_gpios( raw_bit_pattern );
+
+    address_indirection_table[packed_bit_pattern] = i;
+  }
+
+  return;
+}
 
 
 
@@ -135,55 +153,15 @@ int main()
 {
   bi_decl(bi_program_description("ZX Spectrum Pico IF1 board binary."));
 
+  /* All interrupts off except the timers */
+  irq_set_mask_enabled( 0xFFFFFFFF, 0 );
+
 #ifdef OVERCLOCK
   set_sys_clock_khz( OVERCLOCK, 1 );
 #endif
 
-  /* Input from ROM Pico, goes high when the ROM-emulating Pico wants to output onto the data bus */
-  gpio_init( ROM_OUTPUT_REQ_GP ); gpio_set_dir( ROM_OUTPUT_REQ_GP, GPIO_IN );
-  gpio_pull_down( ROM_OUTPUT_REQ_GP );
-
-  gpio_init(DIR_OUTPUT_GP); gpio_set_dir(DIR_OUTPUT_GP, GPIO_OUT);
-  gpio_put(DIR_OUTPUT_GP, 1);
-
-  gpio_init(LED_PIN);
-  gpio_set_dir(LED_PIN, GPIO_OUT);
-  int signal;
-  for( signal=0; signal<2; signal++ )
-  {
-    gpio_put(LED_PIN, 1);
-    busy_wait_us_32(250000);
-    gpio_put(LED_PIN, 0);
-    busy_wait_us_32(250000);
-  }
-
-  while( 1 )
-  {
-    gpio_put( DIR_OUTPUT_GP, (gpio_get_all() & ROM_OUTPUT_REQ_BIT_MASK) );
-  }
-
-}
-
-
-#if 0
-
-  /*
-   * Set up Pico's Z80 reset pin, hold this at 0 to let Z80 run.
-   * Set and hold 1 here to hold Spectrum in reset at startup until we're good
-   * to provide its ROM
-   */
-  gpio_init( PICO_RESET_Z80_GP );  gpio_set_dir( PICO_RESET_Z80_GP, GPIO_OUT );
-  gpio_put( PICO_RESET_Z80_GP, 1 );
-
-  /* All interrupts off except the timers */
-  irq_set_mask_enabled( 0xFFFFFFFF, 0 );
-  irq_set_mask_enabled( 0x0000000F, 1 );
-
   /* Create address indirection table, this is the address bus optimisation  */
   create_indirection_table();
-
-  /* Switch the bits in the ROM bytes around, this is the data bus optimisation */
-  preconvert_roms();
 
   /* Pull the buses to zeroes */
   gpio_init( A0_GP  ); gpio_set_dir( A0_GP,  GPIO_IN );  gpio_pull_down( A0_GP  );
@@ -194,12 +172,6 @@ int main()
   gpio_init( A5_GP  ); gpio_set_dir( A5_GP,  GPIO_IN );  gpio_pull_down( A5_GP  );
   gpio_init( A6_GP  ); gpio_set_dir( A6_GP,  GPIO_IN );  gpio_pull_down( A6_GP  );
   gpio_init( A7_GP  ); gpio_set_dir( A7_GP,  GPIO_IN );  gpio_pull_down( A7_GP  );
-  gpio_init( A8_GP  ); gpio_set_dir( A8_GP,  GPIO_IN );  gpio_pull_down( A8_GP  );
-  gpio_init( A9_GP  ); gpio_set_dir( A9_GP,  GPIO_IN );  gpio_pull_down( A9_GP  );
-  gpio_init( A10_GP ); gpio_set_dir( A10_GP, GPIO_IN );  gpio_pull_down( A10_GP );
-  gpio_init( A11_GP ); gpio_set_dir( A11_GP, GPIO_IN );  gpio_pull_down( A11_GP );
-  gpio_init( A12_GP ); gpio_set_dir( A12_GP, GPIO_IN );  gpio_pull_down( A12_GP );
-  gpio_init( A13_GP ); gpio_set_dir( A13_GP, GPIO_IN );  gpio_pull_down( A13_GP );
 
   gpio_init( D0_GP  ); gpio_set_dir( D0_GP,  GPIO_IN );
   gpio_init( D1_GP  ); gpio_set_dir( D1_GP,  GPIO_IN );
@@ -210,19 +182,18 @@ int main()
   gpio_init( D6_GP  ); gpio_set_dir( D6_GP,  GPIO_IN );
   gpio_init( D7_GP  ); gpio_set_dir( D7_GP,  GPIO_IN );
 
-  /* Init the direction pin */
+  /* Input from ROM logic, 1 when MREQ isn't happening, 0 when it is */
+  gpio_init( ROM_READ_GP ); gpio_set_dir( ROM_READ_GP, GPIO_IN );
+  gpio_pull_up( ROM_READ_GP );
+
+  /*
+   * Output to databus level shifter DIRection pin. Normally 1 meaning
+   * zx->pico, we assert 0 to switch it pico->zx to send back a response
+   * to the Z80
+   */
   gpio_init(DIR_OUTPUT_GP); gpio_set_dir(DIR_OUTPUT_GP, GPIO_OUT);
   gpio_put(DIR_OUTPUT_GP, 1);
 
-  /* Input from logic hardware, indicates the ROM is being read by the Z80 */
-  gpio_init( ROM_READ_GP ); gpio_set_dir( ROM_READ_GP, GPIO_IN );
-  gpio_pull_down( ROM_READ_GP );
-
-  /* M1 signal input */
-  gpio_init( M1_GP ); gpio_set_dir( M1_GP, GPIO_IN );
-  gpio_pull_up( M1_GP );
-
-  /* Blip LED to show we're running */
   gpio_init(LED_PIN);
   gpio_set_dir(LED_PIN, GPIO_OUT);
   int signal;
@@ -233,19 +204,25 @@ int main()
     gpio_put(LED_PIN, 0);
     busy_wait_us_32(250000);
   }
-  gpio_put(LED_PIN, 1);
-
-  /*
-   * Ready to go, give it a few milliseconds for this Pico code to get into
-   * its main loop, then let the Z80 start
-   */
-  add_alarm_in_ms( 5, start_z80_alarm_func, NULL, 0 );
-
 
   gpio_set_dir_in_masked( DBUS_MASK );
-  while(1)
+  while( 1 )
   {
     register uint32_t gpios_state;
+
+    gpio_put( DIR_OUTPUT_GP, ((gpios_state=gpio_get_all()) & ROM_READ_BIT_MASK) );
+
+  } /* Infinite loop */
+
+}
+
+
+#if 0
+
+
+
+  while(1)
+  {
 
     /*
      * Spin while the hardware is saying at least one of A14, A15 and MREQ is 1.
@@ -281,26 +258,9 @@ int main()
     gpio_set_dir_in_masked( DBUS_MASK );
     gpio_put(DIR_OUTPUT_GP, 1);
 
-    /*
-     * M1 active means that that was an instruction fetch the Z80 just did.
-     * If it's one of the magic addresses, page the IF1 ROM
-     */
-    if( (gpios_state & M1_INPUT_BIT_MASK) == 0 )
-    {
-      if( (rom_address == 0x0008) || (rom_address == 0x1708) )
-      {
-	gpio_put(LED_PIN, 1);
-	rom_image_ptr = __ROMs_if1_rom;
-      }
-      else if( rom_address == 0x0700 )
-      {
-	rom_image_ptr = __ROMs_48_original_rom;
-	gpio_put(LED_PIN, 0);
-      }
-    }
 
 
-  } /* Infinite loop */
+  }
 
 }
 
