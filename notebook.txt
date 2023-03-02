@@ -311,9 +311,16 @@ So that's
 !(IORQ OR RD)
 
 
-The plan then is to keep the quad 3-way OR gate. IORQ and RD are both already
-inputs to Pico-2, so have Pico-2 have an output when it wants to send out a
-byte (IORQ==0, RD==0 and the address lines say 0xE7 or 0xEF). Pico keeps an
-output GPIO at 1 until that condition is met. That GPIO output, plus the MREQ
-one, go into the last OR gate I have, and it's the output of that which goes
-to the elvel shifter's DIR pin. THIS NEEDS RETHINKING
+/MREQ  A14  A15  DIR           /IORQ  /RD      DIR
+  0     0    0    0               0    0        0         IO read (IN instruction)
+  0     0    1    1               0    1        1         IO write (OUT instruction)
+  0     1    0    1               1    0        1         Mem read
+  0     1    1    1               1    1        1         Mem write
+  1     0    0    1               
+  1     0    1    1               
+  1     1    0    1               
+  1     1    1    1               
+
+
+DIR = ( (MREQ OR A14 OR A15) AND (IORQ OR RD) )
+

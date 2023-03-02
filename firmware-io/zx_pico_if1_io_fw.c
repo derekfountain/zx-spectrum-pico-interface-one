@@ -33,7 +33,7 @@
 /* 1 instruction on the 200MHz microprocessor is 5.0ns */
 
 //#define OVERCLOCK 150000
-//#define OVERCLOCK 200000
+#define OVERCLOCK 180000
 
 const uint8_t LED_PIN = PICO_DEFAULT_LED_PIN;
 
@@ -105,12 +105,15 @@ const uint32_t ROM_READ_BIT_MASK        = ((uint32_t)1 << ROM_READ_GP);
 const uint8_t  M1_GP                    = 15;
 const uint32_t M1_INPUT_BIT_MASK        = ((uint32_t)1 << M1_GP);
 
+const uint8_t  ROM_OUTPUT_REQ_GP        = 27;
+const uint32_t ROM_OUTPUT_REQ_BIT_MASK  = ((uint32_t)1 << ROM_OUTPUT_REQ_GP);
+
 /*
  * Data bus leve shifter direction pin, 1 is zx->pico, which is the normal
  * position, 0 means pico->zx which is temporarily switched to when the
  * Pico wants to send a data byte back to the Spectrum
  */
-const uint8_t  DIR_OUTPUT_GP            = 27;
+const uint8_t  DIR_OUTPUT_GP            = 28;
 
 /* This pin triggers a transistor which shorts the Z80's /RESET to ground */
 const uint8_t  PICO_RESET_Z80_GP        = 28;
@@ -136,15 +139,27 @@ int main()
   set_sys_clock_khz( OVERCLOCK, 1 );
 #endif
 
+  /* Input from ROM Pico, goes high when the ROM-emulating Pico wants to output onto the data bus */
+  gpio_init( ROM_OUTPUT_REQ_GP ); gpio_set_dir( ROM_OUTPUT_REQ_GP, GPIO_IN );
+  gpio_pull_down( ROM_OUTPUT_REQ_GP );
+
+  gpio_init(DIR_OUTPUT_GP); gpio_set_dir(DIR_OUTPUT_GP, GPIO_OUT);
+  gpio_put(DIR_OUTPUT_GP, 1);
+
   gpio_init(LED_PIN);
   gpio_set_dir(LED_PIN, GPIO_OUT);
-
-  while( 1 )
+  int signal;
+  for( signal=0; signal<2; signal++ )
   {
     gpio_put(LED_PIN, 1);
     busy_wait_us_32(250000);
     gpio_put(LED_PIN, 0);
     busy_wait_us_32(250000);
+  }
+
+  while( 1 )
+  {
+    gpio_put( DIR_OUTPUT_GP, (gpio_get_all() & ROM_OUTPUT_REQ_BIT_MASK) );
   }
 
 }

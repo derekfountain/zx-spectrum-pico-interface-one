@@ -119,13 +119,6 @@ const uint32_t ROM_READ_BIT_MASK        = ((uint32_t)1 << ROM_READ_GP);
 const uint8_t  M1_GP                    = 15;
 const uint32_t M1_INPUT_BIT_MASK        = ((uint32_t)1 << M1_GP);
 
-/*
- * Data bus leve shifter direction pin, 1 is zx->pico, which is the normal
- * position, 0 means pico->zx which is temporarily switched to when the
- * Pico wants to send a data byte back to the Spectrum
- */
-const uint8_t  DIR_OUTPUT_GP            = 27;
-
 /* This pin triggers a transistor which shorts the Z80's /RESET to ground */
 const uint8_t  PICO_RESET_Z80_GP        = 28;
 
@@ -310,10 +303,6 @@ int main()
   gpio_init( D6_GP  ); gpio_set_dir( D6_GP,  GPIO_IN );
   gpio_init( D7_GP  ); gpio_set_dir( D7_GP,  GPIO_IN );
 
-  /* Init the direction pin */
-  gpio_init(DIR_OUTPUT_GP); gpio_set_dir(DIR_OUTPUT_GP, GPIO_OUT);
-  gpio_put(DIR_OUTPUT_GP, 1);
-
   /* Input from logic hardware, indicates the ROM is being read by the Z80 */
   gpio_init( ROM_READ_GP ); gpio_set_dir( ROM_READ_GP, GPIO_IN );
   gpio_pull_down( ROM_READ_GP );
@@ -360,11 +349,13 @@ int main()
     register uint8_t rom_value = *(rom_image_ptr+rom_address);
 
     /*
-     * The level shifter for the data bus lines is switched to Pico->ZX,
-     * the Pico GPIOs are set to outputs and the value asserted for the
-     * Z80 to collect
+     * This Pico is about to put a value on the data bus. The "ROM read" logic
+     * hardware signal goes to Pico2 (the IO handling Pico) as well as this one.
+     * The other Pico uses that (plus its own IORQ logic) to set the level
+     * shifter for the data bus lines to Pico->ZX. This Pico doesn't need to
+     * worry about the level shifter direction. So here, the Pico GPIOs are set
+     * to outputs and the value asserted for the Z80 to collect
      */
-    gpio_put(DIR_OUTPUT_GP, 0);
     gpio_set_dir_out_masked( DBUS_MASK );
     gpio_put_masked( DBUS_MASK, rom_value );
 
@@ -375,11 +366,10 @@ int main()
     while( (gpio_get_all() & ROM_READ_BIT_MASK) == 0 );
 
     /*
-     * Set the data bus GPIOs back to inputs, then switch the level shifter
-     * for the data bus lines back to ZX->Pico
+     * Set the data bus GPIOs back to inputs. The level shifter for the data
+     * bus lines is switched back to ZX->Pico by the IO handling Pico
      */
     gpio_set_dir_in_masked( DBUS_MASK );
-    gpio_put(DIR_OUTPUT_GP, 1);
 
     /*
      * M1 active means that that was an instruction fetch the Z80 just did.
