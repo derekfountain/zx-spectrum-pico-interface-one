@@ -34,7 +34,7 @@
 /* 1 instruction on the 200MHz microprocessor is 5.0ns */
 
 //#define OVERCLOCK 150000
-#define OVERCLOCK 180000
+#define OVERCLOCK 200000
 
 const uint8_t LED_PIN = PICO_DEFAULT_LED_PIN;
 
@@ -160,39 +160,6 @@ void core1_main( void )
 {
   while( 1 )
   {
-    register uint32_t gpios_state = gpio_get_all();
-
-    if( (gpios_state & ROM_READ_BIT_MASK) == 0 )
-    {
-      gpio_set_dir_in_masked( DBUS_MASK );
-      gpio_put( DIR_OUTPUT_GP, 0 );
-    }
-    else if( (gpios_state & (IORQ_BIT_MASK|RD_BIT_MASK)) == 0 )
-    {
-      register uint16_t io_address = ((gpios_state >>  A0_GP   ) & 0x01) |
-                                     ((gpios_state >> (A1_GP-1)) & 0x02) |
-                                     ((gpios_state >> (A2_GP-2)) & 0x04) |
-                                     ((gpios_state >> (A3_GP-3)) & 0x08) |
-                                     ((gpios_state >> (A4_GP-4)) & 0x10) |
-                                     ((gpios_state >> (A5_GP-5)) & 0x20) |
-                                     ((gpios_state >> (A6_GP-6)) & 0x40) |
-                                     ((gpios_state >> (A7_GP-7)) & 0x80);
-
-      if( io_address == 223 )
-      {
-	gpio_put(LED_PIN, 1);
-	gpio_put( DIR_OUTPUT_GP, 0 );
-
-	gpio_set_dir_out_masked( DBUS_MASK );
-	gpio_put_masked( DBUS_MASK, 7 );
-	gpio_put(LED_PIN, 0);
-      }
-    }
-    else
-    {
-      gpio_set_dir_in_masked( DBUS_MASK );
-      gpio_put( DIR_OUTPUT_GP, 1 );
-    }
   }
 }
 
@@ -260,24 +227,79 @@ int main()
     busy_wait_us_32(250000);
   }
 
+#if 0
   /* 2nd core code */
   multicore_launch_core1( core1_main ); 
+#endif
 
+  uint8_t response_byte = 191;
 
   gpio_set_dir_in_masked( DBUS_MASK );
   while( 1 )
   {
-//    register uint32_t gpios_state = gpio_get_all();
+    register uint32_t gpios_state = gpio_get_all();
 
-//    gpio_put( DIR_OUTPUT_GP, ((gpios_state & (IORQ_BIT_MASK|RD_BIT_MASK)) > 0)
-//                                   &
-//	      ((gpios_state & ROM_READ_BIT_MASK) > 0) );
+    if( (gpios_state & ROM_READ_BIT_MASK) == 0 )
+    {
+      /* ROM memory read, the other Pico handles this */
 
-//    register uint8_t dir_output  = ((gpios_state & ROM_READ_BIT_MASK) > 0);
-//                     dir_output &= ((gpios_state & (IORQ_BIT_MASK|RD_BIT_MASK)) > 0);
+      /* Ensure this Pico's data bus GPIOs are inputs */
+      gpio_set_dir_in_masked( DBUS_MASK );
 
-//    uint8_t dir_values[] = { 0, 1 };
-//    gpio_put( DIR_OUTPUT_GP, dir_values[dir_output] );
+      /*
+       * This Pico's responsibility is to switch the data bus level
+       * switcher direction to Pico->ZX
+       */
+      gpio_put( DIR_OUTPUT_GP, 0 );
+
+      /* Wait for the ROM request to complete */
+      while( (gpio_get_all() & ROM_READ_BIT_MASK) == 0 );
+
+      /* Put level shifter direction back to ZX->Pico */
+      gpio_put( DIR_OUTPUT_GP, 1 );
+
+    }
+    else if( (gpios_state & (IORQ_BIT_MASK|RD_BIT_MASK)) == 0 )
+    {
+      /* IO read, this Pico does this */
+
+      /* Sort out the port from the address bus */
+      register uint16_t io_address = ((gpios_state >>  A0_GP   ) & 0x01) |
+                                     ((gpios_state >> (A1_GP-1)) & 0x02) |
+                                     ((gpios_state >> (A2_GP-2)) & 0x04) |
+                                     ((gpios_state >> (A3_GP-3)) & 0x08) |
+                                     ((gpios_state >> (A4_GP-4)) & 0x10) |
+                                     ((gpios_state >> (A5_GP-5)) & 0x20) |
+                                     ((gpios_state >> (A6_GP-6)) & 0x40) |
+                                     ((gpios_state >> (A7_GP-7)) & 0x80);
+
+      /* If that port is one of ours, deal with it. Otherwise ignore it */
+      if( io_address == 223 )
+      {
+	/* Direction needs to be Pico->ZX */
+	gpio_put( DIR_OUTPUT_GP, 0 );
+
+	/* Make data bus GPIOs outputs, pointed at the ZX */
+	gpio_set_dir_out_masked( DBUS_MASK );
+
+	gpio_put_masked( DBUS_MASK, (response_byte & 0x87)       |        /* bxxx xbbb */
+                                   ((response_byte & 0x08) << 1) |        /* xxxb xxxx */
+                                   ((response_byte & 0x10) << 2) |        /* xbxx xxxx */
+                                   ((response_byte & 0x20) >> 2) |        /* xxxx bxxx */
+			           ((response_byte & 0x40) >> 1) );       /* xxbx xxxx */
+
+//	response_byte++;
+
+	/* Wait for the IO request to complete */
+	while( (gpio_get_all() & (IORQ_BIT_MASK|RD_BIT_MASK)) == 0 );
+
+	/* Make the GPIOs inputs again */
+	gpio_set_dir_in_masked( DBUS_MASK );
+
+	/* Put level shifter direction back to ZX->Pico */
+	gpio_put( DIR_OUTPUT_GP, 1 );
+      }
+    }
 
   } /* Infinite loop */
 
