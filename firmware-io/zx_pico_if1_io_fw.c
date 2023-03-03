@@ -190,25 +190,6 @@ void preconvert_data( void )
   }
 }
 
-const uint32_t SET_DIR_MASK = ( ROM_READ_BIT_MASK | IORQ_BIT_MASK | RD_BIT_MASK |
-                                A0_BIT_MASK | 
-                                A1_BIT_MASK | 
-                                A2_BIT_MASK | 
-                                A3_BIT_MASK | 
-                                A4_BIT_MASK | 
-                                A5_BIT_MASK | 
-                                A6_BIT_MASK | 
-                                A7_BIT_MASK );
-typedef struct _set_dir_table_entry
-{
-  uint32_t gpios_state;
-  uint8_t  direction;
-} SET_DIR_TABLE_ENTRY;
-
-SET_DIR_TABLE_ENTRY direction_table[] =
-{
-#include "dir_table.inc"
-};
 
 void core1_main( void )
 {
