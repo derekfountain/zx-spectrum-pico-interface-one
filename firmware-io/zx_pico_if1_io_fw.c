@@ -171,12 +171,13 @@ void preconvert_data( void )
   uint16_t conv_index;
   for( conv_index=0; conv_index < 256; conv_index++ )
   {
+    /* Convert the number to the pattern the GPIOs show when that number is on them */
     preconverted_data[conv_index] = 
-                               (conv_index & 0x87)       |        /* bxxx xbbb */
-                              ((conv_index & 0x08) << 1) |        /* xxxb xxxx */
-                              ((conv_index & 0x10) << 2) |        /* xbxx xxxx */
-                              ((conv_index & 0x20) >> 2) |        /* xxxx bxxx */
-                              ((conv_index & 0x40) >> 1);         /* xxbx xxxx */
+                                   (conv_index & 0x87)       |        /* bxxx xbbb */
+                                  ((conv_index & 0x08) << 1) |        /* xxxb xxxx */
+                                  ((conv_index & 0x10) << 2) |        /* xbxx xxxx */
+                                  ((conv_index & 0x20) >> 2) |        /* xxxx bxxx */
+                                  ((conv_index & 0x40) >> 1);         /* xxbx xxxx */
   }
 }
 
@@ -193,7 +194,7 @@ int main()
 {
   bi_decl(bi_program_description("ZX Spectrum Pico IF1 board binary."));
 
-  /* All interrupts off except the timers */
+  /* All interrupts off */
   irq_set_mask_enabled( 0xFFFFFFFF, 0 );
 
 #ifdef OVERCLOCK
@@ -268,10 +269,7 @@ int main()
 
     if( (gpios_state & ROM_READ_BIT_MASK) == 0 )
     {
-      /* ROM memory read, the other Pico handles this */
-
-      /* Ensure this Pico's data bus GPIOs are inputs */
-      gpio_set_dir_in_masked( DBUS_MASK );
+      /* ROM memory read, the other Pico handles the details of this */
 
       /*
        * This Pico's responsibility is to switch the data bus level
@@ -288,19 +286,23 @@ int main()
     }
     else if( (gpios_state & IORQ_BIT_MASK) == 0 )
     {
-      /* IO, this Pico does this */
+      /* IO, this Pico does this for the IF1 ports */
 
       /* Sort out the port from the address bus */
-      uint16_t io_address = ((gpios_state >>  A0_GP   ) & 0x01) |
-                            ((gpios_state >> (A1_GP-1)) & 0x02) |
-                            ((gpios_state >> (A2_GP-2)) & 0x04) |
-                            ((gpios_state >> (A3_GP-3)) & 0x08) |
-                            ((gpios_state >> (A4_GP-4)) & 0x10) |
-                            ((gpios_state >> (A5_GP-5)) & 0x20) |
-                            ((gpios_state >> (A6_GP-6)) & 0x40) |
-                            ((gpios_state >> (A7_GP-7)) & 0x80);
+      uint16_t io_address = ((gpios_state >>  A0_GP   ) & 0x01);
 
-      if( io_address == 223 )
+
+
+//      uint16_t io_address = ((gpios_state >>  A0_GP   ) & 0x01) |
+      //                           ((gpios_state >> (A1_GP-1)) & 0x02) |
+      //                     ((gpios_state >> (A2_GP-2)) & 0x04) |
+      //                     ((gpios_state >> (A3_GP-3)) & 0x08) |
+      //                     ((gpios_state >> (A4_GP-4)) & 0x10) |
+      //                     ((gpios_state >> (A5_GP-5)) & 0x20) |
+      //                     ((gpios_state >> (A6_GP-6)) & 0x40) |
+      //                     ((gpios_state >> (A7_GP-7)) & 0x80);
+
+      if( io_address == 1 )
       {
 
 	/* It's one for us to worry about */
@@ -309,6 +311,7 @@ int main()
 	{
 	  /* A Z80 read, an IN instruction. Load a byte onto the data bus */
 
+#if 1
 	  /* Direction needs to be Pico->ZX */
 	  gpio_put( DIR_OUTPUT_GP, 0 );
 
@@ -320,29 +323,33 @@ int main()
 //        response_byte++;
 
 	  /* Wait for the IO request to complete */
-	  while( (gpio_get_all() & (IORQ_BIT_MASK|RD_BIT_MASK)) == 0 );
+	  while( (gpio_get_all() & IORQ_BIT_MASK) == 0 );
 
 	  /* Make the GPIOs inputs again */
 	  gpio_set_dir_in_masked( DBUS_MASK );
 
 	  /* Put level shifter direction back to ZX->Pico */
 	  gpio_put( DIR_OUTPUT_GP, 1 );
+#endif
 	}
 	else if( (gpios_state & WR_BIT_MASK) == 0 )
 	{
 	  /* A Z80 write, an OUT instruction. Fetch the byte from the data bus */
 
-	  gpio_put(LED_PIN, 1);
-	  uint8_t input_byte = (gpios_state & DBUS_MASK) & 0xFF;
+	  /* Pick up the pattern of bits from the jumbled data bus GPIOs */
+	  uint8_t raw_pattern = (gpios_state & DBUS_MASK) & 0xFF;
 
-	  response_byte =        (input_byte & 0x87)       |        /* bxxx xbbb */
-                                ((input_byte & 0x08) << 2) |        /* xxbx xxxx */
-                                ((input_byte & 0x10) >> 1) |        /* xxxx bxxx */
-                                ((input_byte & 0x20) << 1) |        /* xbxx xxxx */
-                                ((input_byte & 0x40) >> 2);         /* xxxb xxxx */
+	  /* Sort those bits out into the value which the Z80 originally wrote */
+	  uint8_t z80_written_byte =  (raw_pattern & 0x87)       |        /* bxxx xbbb */
+                                     ((raw_pattern & 0x08) << 2) |        /* xxbx xxxx */
+                                     ((raw_pattern & 0x10) >> 1) |        /* xxxx bxxx */
+                                     ((raw_pattern & 0x20) << 1) |        /* xbxx xxxx */
+                                     ((raw_pattern & 0x40) >> 2);         /* xxxb xxxx */
+
+	  response_byte = z80_written_byte;
 
 	  /* Wait for the IO request to complete */
-	  while( (gpio_get_all() & (IORQ_BIT_MASK|WR_BIT_MASK)) == 0 );
+	  while( (gpio_get_all() & IORQ_BIT_MASK) == 0 );
 	}
 
       }
