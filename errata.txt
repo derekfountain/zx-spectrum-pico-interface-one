@@ -40,12 +40,11 @@ of 3 regulators tied together. Separate into 3 supplies.
 : Need to cut 3v3 track to pico3 on current board
 
 Change the level shifter direction control from hardware to
-software. Wire GPIO27 to the data bus level shifter's DIR
+software. Wire GPIO27 of Pico2 as an input for the ROM_READ_INV
+signal, and GPIO28 as an output to the data bus level shifter's DIR
 pin. This will allow the data bus to reverse direction on
 memory reads, and also on IO request reads.
-- Done on board #2, but this is **temporary**. This needs to be
-  done on the second Pico which will be able to see when
-  the MREQ or the IORQ comes in.
+- Done on board #2,
 
 Remove the level shifter U202 which does IORQ, RD and WR.
 These signals are permanently ZX->Pico so don't need shifting.
