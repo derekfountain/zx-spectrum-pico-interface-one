@@ -51,14 +51,8 @@ const uint8_t A5_GP          = 21;
 const uint8_t A6_GP          = 22;
 const uint8_t A7_GP          = 26;
 
-const uint32_t  A0_BIT_MASK  = ((uint32_t)1 <<  A0_GP);
-const uint32_t  A1_BIT_MASK  = ((uint32_t)1 <<  A1_GP);
-const uint32_t  A2_BIT_MASK  = ((uint32_t)1 <<  A2_GP);
-const uint32_t  A3_BIT_MASK  = ((uint32_t)1 <<  A3_GP);
-const uint32_t  A4_BIT_MASK  = ((uint32_t)1 <<  A4_GP);
-const uint32_t  A5_BIT_MASK  = ((uint32_t)1 <<  A5_GP);
-const uint32_t  A6_BIT_MASK  = ((uint32_t)1 <<  A6_GP);
-const uint32_t  A7_BIT_MASK  = ((uint32_t)1 <<  A7_GP);
+/*
+ */
 
 /*
  * Given value i, this calculates the pattern of the GPIOs if
@@ -107,15 +101,7 @@ const uint32_t DBUS_MASK     = ((uint32_t)1 << D0_GP) |
                                ((uint32_t)1 << D6_GP) |
                                ((uint32_t)1 << D7_GP);
 
-const uint8_t  IORQ_GP                  = 8;
-const uint32_t IORQ_BIT_MASK            = ((uint32_t)1 << IORQ_GP);
-
-const uint8_t  RD_GP                    = 9;
-const uint32_t RD_BIT_MASK              = ((uint32_t)1 << RD_GP);
-
-const uint8_t  WR_GP                    = 10;
-const uint32_t WR_BIT_MASK              = ((uint32_t)1 << WR_GP);
-
+/* */
 
 /* ROM read logic input, goes 0 when the MREQ to ROM is happening */
 const uint8_t  ROM_READ_GP              = 27;
@@ -193,98 +179,11 @@ void preconvert_data( void )
   }
 }
 
-uint8_t  write_trigger = 0;
-uint32_t write_gpios   = 0;
-uint8_t  read_trigger  = 0;
 
 void core1_main( void )
 {
   while( 1 )
   {
-    register uint32_t gpios_state = gpio_get_all();
-
-    if( (gpios_state & ROM_READ_BIT_MASK) == 0 )
-    {
-      /* ROM memory read, the other Pico handles the details of this */
-
-      /*
-       * This Pico's responsibility is to switch the data bus level
-       * switcher direction to Pico->ZX
-       */
-      gpio_put( DIR_OUTPUT_GP, 0 );
-
-      /* Wait for the ROM request to complete */
-      while( (gpio_get_all() & ROM_READ_BIT_MASK) == 0 );
-
-      /* Put level shifter direction back to ZX->Pico */
-      gpio_put( DIR_OUTPUT_GP, 1 );
-    }
-
-    else if( (gpios_state & IORQ_BIT_MASK) == 0 )
-    {
-      /* An IO read, this core needs to switch the level shifter direction for our port */
-
-      /* Sort out the port from the address bus */
-      register uint16_t io_address = ((gpios_state >>  A0_GP   ) & 0x01) |
-                                     ((gpios_state >> (A1_GP-1)) & 0x02) |
-                                     ((gpios_state >> (A2_GP-2)) & 0x04) |
-                                     ((gpios_state >> (A3_GP-3)) & 0x08) |
-                                     ((gpios_state >> (A4_GP-4)) & 0x10) |
-                                     ((gpios_state >> (A5_GP-5)) & 0x20) |
-                                     ((gpios_state >> (A6_GP-6)) & 0x40) |
-                                     ((gpios_state >> (A7_GP-7)) & 0x80);
-
-      if( io_address == 223 )
-      {
-#if 0
-	  gpio_put( TEST_OUTPUT_GP, 1 );
-	  __asm volatile ("nop");
-	  __asm volatile ("nop");
-	  __asm volatile ("nop");
-	  __asm volatile ("nop");
-	  gpio_put( TEST_OUTPUT_GP, 0 );
-#endif
-
-	/* It's one for us to worry about */
-
-	if( (gpios_state & RD_BIT_MASK) == 0 )
-	{
-	  gpio_put(LED_PIN, 1);while(1);
-	  /* A Z80 read, an IN instruction. Load a byte onto the data bus */
-
-	  /* Direction needs to be Pico->ZX */
-	  gpio_put( DIR_OUTPUT_GP, 0 );
-
-	  /* Make data bus GPIOs outputs, pointed at the ZX */
-	  gpio_set_dir_out_masked( DBUS_MASK );
-
-	  /*
-	   * The other core will return the data byte to the Z80
-	   */
-	  read_trigger = 1;
-
-	  /* Wait for the IO request to complete */
-	  while( (gpio_get_all() & IORQ_BIT_MASK) == 0 );
-
-	  /* Make the GPIOs inputs again */
-	  gpio_set_dir_in_masked( DBUS_MASK );
-	
-	  /* Put level shifter direction back to ZX->Pico */
-	  gpio_put( DIR_OUTPUT_GP, 1 );
-	}
-	
-	else if( (gpios_state & WR_BIT_MASK) == 0 )
-	{
-
-	  write_gpios = gpios_state;
-	  write_trigger = 1;
-
-	  while( write_trigger );
-	}
-
-      }
-    }
-
   } /* Infinite loop */
 }
 
@@ -293,6 +192,86 @@ void core1_main( void )
 int main()
 {
   bi_decl(bi_program_description("ZX Spectrum Pico IF1 board binary."));
+
+const uint32_t  A0_BIT_MASK  = ((uint32_t)1 <<  A0_GP);
+const uint32_t  A1_BIT_MASK  = ((uint32_t)1 <<  A1_GP);
+const uint32_t  A2_BIT_MASK  = ((uint32_t)1 <<  A2_GP);
+const uint32_t  A3_BIT_MASK  = ((uint32_t)1 <<  A3_GP);
+const uint32_t  A4_BIT_MASK  = ((uint32_t)1 <<  A4_GP);
+const uint32_t  A5_BIT_MASK  = ((uint32_t)1 <<  A5_GP);
+const uint32_t  A6_BIT_MASK  = ((uint32_t)1 <<  A6_GP);
+const uint32_t  A7_BIT_MASK  = ((uint32_t)1 <<  A7_GP);
+
+const uint8_t  IORQ_GP                  = 8;
+const uint32_t IORQ_BIT_MASK            = ((uint32_t)1 << IORQ_GP);
+
+const uint8_t  RD_GP                    = 9;
+const uint32_t RD_BIT_MASK              = ((uint32_t)1 << RD_GP);
+
+const uint8_t  WR_GP                    = 10;
+const uint32_t WR_BIT_MASK              = ((uint32_t)1 << WR_GP);
+
+const uint32_t IF1_IOPORT_ACCESS_BIT_MASK = IORQ_BIT_MASK |
+                                            RD_BIT_MASK |
+                                            WR_BIT_MASK |
+                                            A0_BIT_MASK |
+                                            A1_BIT_MASK |
+                                            A2_BIT_MASK |
+                                            A3_BIT_MASK |
+                                            A4_BIT_MASK |
+                                            A5_BIT_MASK |
+                                            A6_BIT_MASK |
+                                            A7_BIT_MASK;
+
+const uint32_t PORT_E7_READ =  ((uint32_t)0 << IORQ_GP) |
+                               ((uint32_t)0 << RD_GP)   |
+                               ((uint32_t)1 << WR_GP)   |
+                               ((uint32_t)1 << A0_GP)   |
+                               ((uint32_t)1 << A1_GP)   |
+                               ((uint32_t)1 << A2_GP)   |
+                               ((uint32_t)0 << A3_GP)   |
+                               ((uint32_t)0 << A4_GP)   |
+                               ((uint32_t)1 << A5_GP)   |
+                               ((uint32_t)1 << A6_GP)   |
+                               ((uint32_t)1 << A7_GP);
+
+const uint32_t PORT_EF_READ =  ((uint32_t)0 << IORQ_GP) |
+                               ((uint32_t)0 << RD_GP)   |
+                               ((uint32_t)1 << WR_GP)   |
+                               ((uint32_t)1 << A0_GP)   |
+                               ((uint32_t)1 << A1_GP)   |
+                               ((uint32_t)1 << A2_GP)   |
+                               ((uint32_t)1 << A3_GP)   |
+                               ((uint32_t)0 << A4_GP)   |
+                               ((uint32_t)1 << A5_GP)   |
+                               ((uint32_t)1 << A6_GP)   |
+                               ((uint32_t)1 << A7_GP);
+
+const uint32_t PORT_E7_WRITE = ((uint32_t)0 << IORQ_GP) |
+                               ((uint32_t)1 << RD_GP)   |
+                               ((uint32_t)0 << WR_GP)   |
+                               ((uint32_t)1 << A0_GP)   |
+                               ((uint32_t)1 << A1_GP)   |
+                               ((uint32_t)1 << A2_GP)   |
+                               ((uint32_t)0 << A3_GP)   |
+                               ((uint32_t)0 << A4_GP)   |
+                               ((uint32_t)1 << A5_GP)   |
+                               ((uint32_t)1 << A6_GP)   |
+                               ((uint32_t)1 << A7_GP);
+
+const uint32_t PORT_EF_WRITE = ((uint32_t)0 << IORQ_GP) |
+                               ((uint32_t)1 << RD_GP)   |
+                               ((uint32_t)0 << WR_GP)   |
+                               ((uint32_t)1 << A0_GP)   |
+                               ((uint32_t)1 << A1_GP)   |
+                               ((uint32_t)1 << A2_GP)   |
+                               ((uint32_t)1 << A3_GP)   |
+                               ((uint32_t)0 << A4_GP)   |
+                               ((uint32_t)1 << A5_GP)   |
+                               ((uint32_t)1 << A6_GP)   |
+                               ((uint32_t)1 << A7_GP);
+
+const uint32_t ADDR_223_GPIOS          = 0x00D07800;
 
   /* All interrupts off */
   irq_set_mask_enabled( 0xFFFFFFFF, 0 );
@@ -363,67 +342,140 @@ int main()
     busy_wait_us_32(250000);
   }
 
+#if 0
   /* Init complete, run 2nd core code */
   multicore_launch_core1( core1_main ); 
-
+#endif
 
   uint8_t response_byte = 0;
 
   gpio_set_dir_in_masked( DBUS_MASK );
   while( 1 )
   {
-    while( (read_trigger == 0) && (write_trigger == 0) );
+    register uint32_t gpios_state = gpio_get_all();
 
-    if( read_trigger )
+    if( (gpios_state & ROM_READ_BIT_MASK) == 0 )
     {
-      gpio_put(LED_PIN, 1);while(1);
-      /* A Z80 read, an IN instruction. Load a byte onto the data bus */
+      /* ROM memory read, the other Pico handles the details of this */
 
-      gpio_put_masked( DBUS_MASK, preconverted_data[response_byte] );
-      read_trigger = 0;
+      /*
+       * This Pico's responsibility is to switch the data bus level
+       * switcher direction to Pico->ZX
+       */
+      gpio_put( DIR_OUTPUT_GP, 0 );
+
+      /* Wait for the ROM request to complete */
+      while( (gpio_get_all() & ROM_READ_BIT_MASK) == 0 );
+
+      /* Put level shifter direction back to ZX->Pico */
+      gpio_put( DIR_OUTPUT_GP, 1 );
     }
 
-    else
+#if 1
+//use this to work out bit patterns for 0xEF and 0xE7
+//then it can go
+//    else if( (gpios_state & IF1_IOPORT_ACCESS_BIT_MASK) == 0x4603100)
+    else if( (gpios_state & IF1_IOPORT_ACCESS_BIT_MASK) == PORT_E7_WRITE )
     {
-      /* A Z80 write, an OUT instruction. Fetch the byte from the data bus */
-
-#if 0
-      /* Pick up the pattern of bits from the jumbled data bus GPIOs */
-      register uint32_t gpio_state = write_gpios;
-      uint32_t raw_pattern = (gpio_state & DBUS_MASK);
-
-      /* Sort those bits out into the value which the Z80 originally wrote */
-      uint32_t z80_written_byte =  (raw_pattern & 0x87)       |        /* bxxx xbbb */
-                                  ((raw_pattern & 0x08) << 2) |        /* xxbx xxxx */
-                                  ((raw_pattern & 0x10) >> 1) |        /* xxxx bxxx */
-                                  ((raw_pattern & 0x20) << 1) |        /* xbxx xxxx */
-                                  ((raw_pattern & 0x40) >> 2);         /* xxxb xxxx */
-
-      response_byte = (uint8_t)(z80_written_byte & 0xFF);
-#endif
-      write_trigger = 0;
-
-      /* Wait for the IO request to complete */
-      while( (gpio_get_all() & IORQ_BIT_MASK) == 0 );
-#if 0
-  int signal;
-  for( signal=0; signal<response_byte; signal++ )
-  {
-    gpio_put(LED_PIN, 1);
-    busy_wait_us_32(250000);
-    gpio_put(LED_PIN, 0);
-    busy_wait_us_32(250000);
-  }
-  for( signal=0; signal<5; signal++ )
-  {
-    gpio_put(LED_PIN, 1);
-    busy_wait_us_32(25000);
-    gpio_put(LED_PIN, 0);
-    busy_wait_us_32(25000);
-  }
-#endif
     }
+    else if( (gpios_state & IF1_IOPORT_ACCESS_BIT_MASK) == PORT_EF_WRITE )
+    {
+    }
+    else if( (gpios_state & IF1_IOPORT_ACCESS_BIT_MASK) == PORT_E7_READ )
+    {
+    }
+    else if( (gpios_state & IF1_IOPORT_ACCESS_BIT_MASK) == PORT_EF_READ )
+    {
+      /* An IO read, this core needs to switch the level shifter direction for our port */
 
+      /* Sort out the port from the address bus */
+      register uint16_t io_address = ((gpios_state >>  A0_GP   ) & 0x01) |
+                                     ((gpios_state >> (A1_GP-1)) & 0x02) |
+                                     ((gpios_state >> (A2_GP-2)) & 0x04) |
+                                     ((gpios_state >> (A3_GP-3)) & 0x08) |
+                                     ((gpios_state >> (A4_GP-4)) & 0x10) |
+                                     ((gpios_state >> (A5_GP-5)) & 0x20) |
+                                     ((gpios_state >> (A6_GP-6)) & 0x40) |
+                                     ((gpios_state >> (A7_GP-7)) & 0x80);
+
+      if( io_address == 0xEF )
+      {
+         gpio_put( TEST_OUTPUT_GP, 1 );
+         __asm volatile ("nop");
+         __asm volatile ("nop");
+         __asm volatile ("nop");
+         __asm volatile ("nop");
+	 uint32_t t = IF1_IOPORT_ACCESS_BIT_MASK;
+	 gpio_put( TEST_OUTPUT_GP, (t & 0x01) );
+	 gpio_put( TEST_OUTPUT_GP, (gpios_state & 0x01) );
+      }
+    }
+#endif
+
+#if 0
+    else if( ((gpios_state & IOPORT_BIT_MASK)) == ADDR_223_GPIOS )
+    {
+    gpio_put(LED_PIN, 1);
+      /* An IO request */
+	  gpio_put( TEST_OUTPUT_GP, 1 );
+	  __asm volatile ("nop");
+	  __asm volatile ("nop");
+	  __asm volatile ("nop");
+	  __asm volatile ("nop");
+	  gpio_put( TEST_OUTPUT_GP, (gpios_state & 0x01) );
+	  uint32_t t = IOPORT_BIT_MASK;
+	  gpio_put( TEST_OUTPUT_GP, (t & 0x01) );
+
+#if 0
+
+
+	/* It's one for us to worry about */
+
+	if( (gpios_state & RD_BIT_MASK) == 0 )
+	{
+	  /* A Z80 read, an IN instruction. Load a byte onto the data bus */
+
+	  /* Direction needs to be Pico->ZX */
+	  gpio_put( DIR_OUTPUT_GP, 0 );
+
+	  /* Make data bus GPIOs outputs, pointed at the ZX */
+	  gpio_set_dir_out_masked( DBUS_MASK );
+
+	  gpio_put_masked( DBUS_MASK, preconverted_data[response_byte] );
+
+	  /* Wait for the IO request to complete */
+	  while( (gpio_get_all() & IORQ_BIT_MASK) == 0 );
+
+	  /* Make the GPIOs inputs again */
+	  gpio_set_dir_in_masked( DBUS_MASK );
+	
+	  /* Put level shifter direction back to ZX->Pico */
+	  gpio_put( DIR_OUTPUT_GP, 1 );
+	}
+
+	else if( (gpios_state & WR_BIT_MASK) == 0 )
+	{
+	  /* A Z80 write, an OUT instruction. Fetch the byte from the data bus */
+
+	  /* Pick up the pattern of bits from the jumbled data bus GPIOs */
+	  uint32_t raw_pattern = (gpios_state & DBUS_MASK);
+
+	  /* Sort those bits out into the value which the Z80 originally wrote */
+	  uint32_t z80_written_byte =  (raw_pattern & 0x87)       |        /* bxxx xbbb */
+                                      ((raw_pattern & 0x08) << 2) |        /* xxbx xxxx */
+                                      ((raw_pattern & 0x10) >> 1) |        /* xxxx bxxx */
+                                      ((raw_pattern & 0x20) << 1) |        /* xbxx xxxx */
+                                      ((raw_pattern & 0x40) >> 2);         /* xxxb xxxx */
+
+	  response_byte = (uint8_t)(z80_written_byte & 0xFF);
+
+	  /* Wait for the IO request to complete */
+	  while( (gpio_get_all() & IORQ_BIT_MASK) == 0 );
+	}
+#endif
+
+    }
+#endif
 
   } /* Infinite loop */
 

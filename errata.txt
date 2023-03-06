@@ -49,3 +49,20 @@ memory reads, and also on IO request reads.
 Remove the level shifter U202 which does IORQ, RD and WR.
 These signals are permanently ZX->Pico so don't need shifting.
 - Bridged on board #1
+
+Untangle the bus pins on all the Picos. Make databus D0 to D7
+in sequence, then address lines, then control bus lines. I
+thought simplifying the layout process would make things easier,
+but actually, keeping the software simple and fast has more
+benefit.
+: Needs doing
+: Won't be doing this on board #1
+
+
+Connect the last GPIO #27 on the ROM pico to the level shifter's
+DIR pin. This is so I can drive the direction with a PIO when the
+ROM is read. Not sure if theis will work, so make sure it's easy
+to cut.
+: Needs doing
+
+
