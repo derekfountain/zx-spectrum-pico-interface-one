@@ -260,10 +260,14 @@ libspectrum_microdrive_mdr_read( libspectrum_microdrive *microdrive,
   if( length < LIBSPECTRUM_MICRODRIVE_BLOCK_LEN * 10 ||
      ( length % LIBSPECTRUM_MICRODRIVE_BLOCK_LEN ) > 1 ||
        length > MDR_LENGTH ) {
+
+#if 0
     libspectrum_print_error(
       LIBSPECTRUM_ERROR_CORRUPT,
       "libspectrum_microdrive_mdr_read: not enough data in buffer"
     );
+#endif
+
     return LIBSPECTRUM_ERROR_CORRUPT;
   }
 

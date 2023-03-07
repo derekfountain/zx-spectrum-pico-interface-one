@@ -27,6 +27,8 @@
 
 #include "libspectrum.h"
 
+libspectrum_byte port_ctr_in( void );
+
 /* IF1 */
 extern int if1_active;
 extern int if1_available;

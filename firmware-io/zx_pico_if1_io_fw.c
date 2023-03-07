@@ -268,7 +268,7 @@ typedef enum
 {
   HANDLED_DATA,
   NEW_INPUT_FROM_Z80,
-  Z80_WANTS_DATA,
+  DATA_WAITING_FOR_Z80,
 }
 QUEUE_FLAG;
 
@@ -287,30 +287,35 @@ PORT_QUEUE port_ef_output_to_z80;  /* Read from status */
 
 void core1_main( void )
 {
+  /* Insert the test image (no filename as yet) into Microdrive 0 */
+  if1_mdr_insert( 0, NULL );
+
   while( 1 )
   {
     if( port_e7_input_from_z80.flag == NEW_INPUT_FROM_Z80 )
     {
-      /* Z80 has written microdrive data to us */
+      /* Z80 has written microdrive data to us, call the handler which knows what to do with it */
 
-      /* Call the handler which knows what to do with it */
     }
 
-    if( port_e7_output_to_z80.flag == Z80_WANTS_DATA )
+    if( port_e7_output_to_z80.flag == HANDLED_DATA )
     {
-      /* This microdrive emulation has a data byte for the Z80 */
+      /* Emulate the microdrive, find the next byte we need to give it when it next asks */
+
+      port_e7_output_to_z80.flag = DATA_WAITING_FOR_Z80;
     }
 
     if( port_ef_input_from_z80.flag == NEW_INPUT_FROM_Z80 )
     {
-      /* Z80 has written a microdrive control byte to us */
-
-      /* Call the handler which knows what to do with it */
+      /* Z80 has written a microdrive control byte to us, call the handler which knows what to do with it */
     }
 
-    if( port_ef_output_to_z80.flag == Z80_WANTS_DATA )
+    if( port_ef_output_to_z80.flag == HANDLED_DATA )
     {
-      /* This microdrive emulation has a status byte for the Z80 */
+      /* Work out status byte we need to give the Z80 next time it asks */
+
+      port_ef_output_to_z80.byte = port_ctr_in();
+      port_ef_output_to_z80.flag = DATA_WAITING_FOR_Z80;
     }
     
 
@@ -390,6 +395,8 @@ int main()
     gpio_put(LED_PIN, 0);
     busy_wait_us_32(250000);
   }
+
+  port_ef_output_to_z80.flag = HANDLED_DATA;
 
   /* Init complete, run 2nd core code which does the MD emulation */
   multicore_launch_core1( core1_main ); 
@@ -503,6 +510,12 @@ int main()
 	  
       /* Put level shifter direction back to ZX->Pico */
       gpio_put( DIR_OUTPUT_GP, 1 );
+
+      /*
+       * Mark the control/status port queue as needing to be refreshed.
+       * The other core will do it in due course
+       */
+      port_ef_output_to_z80.flag = HANDLED_DATA;
     }
 
   } /* Infinite loop */
