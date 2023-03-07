@@ -27,6 +27,7 @@
 #include "pico/multicore.h"
 #include "hardware/timer.h"
 
+#include "if1.h"
 
 /* 1 instruction on the 133MHz microprocessor is 7.5ns */
 /* 1 instruction on the 140MHz microprocessor is 7.1ns */
@@ -253,14 +254,68 @@ void preconvert_data( void )
 }
 
 
-#if 0
+/*
+ * Try to clarify the terminology here:
+ *
+ * "Input" in this code means the Z80 has written to us. The Z80 has done an OUT.
+ * It does this when it wants to to write the control register or to the MD tape.
+ *
+ * "Output" in this code means the Z80 has read from us. The Z80 has done an IN.
+ * It does this when it wants to read the status register, or from the MD tape.
+ */
+
+typedef enum
+{
+  HANDLED_DATA,
+  NEW_INPUT_FROM_Z80,
+  Z80_WANTS_DATA,
+}
+QUEUE_FLAG;
+
+typedef struct _port_queue
+{
+  QUEUE_FLAG flag;        /* Flag */
+  uint8_t    byte;        /* Data byte, either input or output */
+}
+PORT_QUEUE;
+
+PORT_QUEUE port_e7_input_from_z80; /* Write to MD data stream */
+PORT_QUEUE port_e7_output_to_z80;  /* Read from MD data stream */
+PORT_QUEUE port_ef_input_from_z80; /* Write to control register */
+PORT_QUEUE port_ef_output_to_z80;  /* Read from status */
+
+
 void core1_main( void )
 {
   while( 1 )
   {
+    if( port_e7_input_from_z80.flag == NEW_INPUT_FROM_Z80 )
+    {
+      /* Z80 has written microdrive data to us */
+
+      /* Call the handler which knows what to do with it */
+    }
+
+    if( port_e7_output_to_z80.flag == Z80_WANTS_DATA )
+    {
+      /* This microdrive emulation has a data byte for the Z80 */
+    }
+
+    if( port_ef_input_from_z80.flag == NEW_INPUT_FROM_Z80 )
+    {
+      /* Z80 has written a microdrive control byte to us */
+
+      /* Call the handler which knows what to do with it */
+    }
+
+    if( port_ef_output_to_z80.flag == Z80_WANTS_DATA )
+    {
+      /* This microdrive emulation has a status byte for the Z80 */
+    }
+    
+
   } /* Infinite loop */
 }
-#endif
 
 
 int main()
@@ -336,12 +391,8 @@ int main()
     busy_wait_us_32(250000);
   }
 
-#if 0
-  /* Init complete, run 2nd core code */
+  /* Init complete, run 2nd core code which does the MD emulation */
   multicore_launch_core1( core1_main ); 
-#endif
-
-  uint8_t response_byte = 0;
 
   while( 1 )
   {
@@ -367,7 +418,7 @@ int main()
       /* Z80 write (OUT instruction) to port 0xE7 (231), microdrive data */
 
       /* Pick up the pattern of bits from the jumbled data bus GPIOs */
-      uint32_t raw_pattern = (gpios_state & DBUS_MASK);
+      register uint32_t raw_pattern = (gpios_state & DBUS_MASK);
 
       /* Sort those bits out into the value which the Z80 originally wrote */
       uint32_t z80_written_byte =  (raw_pattern & 0x87)       |        /* bxxx xbbb */
@@ -376,7 +427,8 @@ int main()
                                   ((raw_pattern & 0x20) << 1) |        /* xbxx xxxx */
                                   ((raw_pattern & 0x40) >> 2);         /* xxxb xxxx */
 
-      response_byte = (uint8_t)(z80_written_byte & 0xFF);
+      port_e7_input_from_z80.byte = (uint8_t)(z80_written_byte & 0xFF);
+      port_e7_input_from_z80.flag = NEW_INPUT_FROM_Z80;
 
       /* Wait for the IO request to complete */
       while( (gpio_get_all() & IORQ_BIT_MASK) == 0 );
@@ -386,7 +438,21 @@ int main()
     {
       /* Z80 write (OUT instruction) to port 0xEF (239), microdrive control */
 
+      /* Pick up the pattern of bits from the jumbled data bus GPIOs */
+      register uint32_t raw_pattern = (gpios_state & DBUS_MASK);
 
+      /* Sort those bits out into the value which the Z80 originally wrote */
+      uint32_t z80_written_byte =  (raw_pattern & 0x87)       |        /* bxxx xbbb */
+                                  ((raw_pattern & 0x08) << 2) |        /* xxbx xxxx */
+                                  ((raw_pattern & 0x10) >> 1) |        /* xxxx bxxx */
+                                  ((raw_pattern & 0x20) << 1) |        /* xbxx xxxx */
+                                  ((raw_pattern & 0x40) >> 2);         /* xxxb xxxx */
+
+      port_ef_input_from_z80.byte = (uint8_t)(z80_written_byte & 0xFF);
+      port_ef_input_from_z80.flag = NEW_INPUT_FROM_Z80;
+
+      /* Wait for the IO request to complete */
+      while( (gpio_get_all() & IORQ_BIT_MASK) == 0 );
     }
 
     else if( (gpios_state & IF1_IOPORT_ACCESS_BIT_MASK) == PORT_E7_READ )
@@ -401,7 +467,8 @@ int main()
       /* Make data bus GPIOs outputs, pointed at the ZX */
       gpio_set_dir_out_masked( DBUS_MASK );
 
-      gpio_put_masked( DBUS_MASK, preconverted_data[response_byte] );
+      /* New or old? Doesn't matter, just return it */
+      gpio_put_masked( DBUS_MASK, preconverted_data[port_e7_output_to_z80.byte] );
 
       /* Wait for the IO request to complete */
       while( (gpio_get_all() & IORQ_BIT_MASK) == 0 );
@@ -417,7 +484,25 @@ int main()
     {
       /* Z80 read from port 0xEF (239), microdrive status */
 
+      /* A Z80 read, this core needs to switch the level shifter direction for our port */
 
+      /* Direction needs to be Pico->ZX */
+      gpio_put( DIR_OUTPUT_GP, 0 );
+
+      /* Make data bus GPIOs outputs, pointed at the ZX */
+      gpio_set_dir_out_masked( DBUS_MASK );
+
+      /* New or old? Doesn't matter, just return it */
+      gpio_put_masked( DBUS_MASK, preconverted_data[port_ef_output_to_z80.byte] );
+
+      /* Wait for the IO request to complete */
+      while( (gpio_get_all() & IORQ_BIT_MASK) == 0 );
+
+      /* Make the GPIOs inputs again */
+      gpio_set_dir_in_masked( DBUS_MASK );
+	  
+      /* Put level shifter direction back to ZX->Pico */
+      gpio_put( DIR_OUTPUT_GP, 1 );
     }
 
   } /* Infinite loop */

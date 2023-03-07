@@ -18,6 +18,8 @@ if (TARGET tinyusb_device)
 
   add_executable(zx_pico_if1_io_fw
     zx_pico_if1_io_fw.c
+    microdrive.c
+    if1.c
   )
 
   target_link_libraries(zx_pico_if1_io_fw pico_stdlib pico_mem_ops pico_multicore)
