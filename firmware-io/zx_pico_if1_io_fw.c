@@ -341,9 +341,6 @@ int main()
   multicore_launch_core1( core1_main ); 
 #endif
 
-  while( (gpio_get_all() & IORQ_BIT_MASK) == 1 );
-  while( (gpio_get_all() & IORQ_BIT_MASK) == 0 );
-
   uint8_t response_byte = 0;
 
   while( 1 )
@@ -367,14 +364,7 @@ int main()
 
     else if( (gpios_state & IF1_IOPORT_ACCESS_BIT_MASK) == PORT_E7_WRITE )
     {
-gpio_put( TEST_OUTPUT_GP, 1 );
-__asm volatile ("nop");
-__asm volatile ("nop");
-__asm volatile ("nop");
-__asm volatile ("nop");
-gpio_put( TEST_OUTPUT_GP, 0 );
       /* Z80 write (OUT instruction) to port 0xE7 (231), microdrive data */
-gpio_put(LED_PIN, 1);
 
       /* Pick up the pattern of bits from the jumbled data bus GPIOs */
       uint32_t raw_pattern = (gpios_state & DBUS_MASK);
@@ -402,7 +392,6 @@ gpio_put(LED_PIN, 1);
     else if( (gpios_state & IF1_IOPORT_ACCESS_BIT_MASK) == PORT_E7_READ )
     {
       /* Z80 read from port 0xE7 (231), microdrive data */
-gpio_put(LED_PIN, 0);
 
       /* A Z80 read, this core needs to switch the level shifter direction for our port */
 
