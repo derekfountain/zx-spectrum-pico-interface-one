@@ -336,3 +336,6 @@ gpios_state when broken on OUT 223,0     0x1C507A00
          7654       321 0RDO
                            R
                   
+
+One clock cycle on 3.5MHz Z80 is 285ns. IORQ is down for 2.5 clocks, which is
+about 715ns. That lines up perfectly with the scope trace.

@@ -6,6 +6,12 @@ project(zx_pico_if1_project C CXX ASM)
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_CXX_STANDARD 17)
 
+# Run from RAM. If the program runs from flash, the first time it goes
+# down the IORQ code path it runs slowly and the IO is missed. This
+# fetches the code into fast RAM from the start
+#
+set(PICO_COPY_TO_RAM 1)
+
 pico_sdk_init()
 
 if (TARGET tinyusb_device)
