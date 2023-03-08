@@ -63,7 +63,10 @@ typedef struct if1_ula_t {
   int busy;	/* Indicate busy; if1 software never poll it ... */
 } if1_ula_t;
 
-static microdrive_t microdrive[8];		/* We have 8 microdrive */
+/* Pico only has memory for 1 microdrive, the structure is 135KB */
+#define NUM_MICRODRIVES 1
+
+static microdrive_t microdrive[NUM_MICRODRIVES];		/* We have 8 microdrive */
 static if1_ula_t if1_ula;
 
 #define MDR_IN(m) microdrive[m - 1].inserted
@@ -91,7 +94,7 @@ if1_init( void *context )
   if1_ula.esc_in = 0; /* empty */
 #endif
 
-  for( m = 0; m < 8; m++ ) {
+  for( m = 0; m < NUM_MICRODRIVES; m++ ) {
     microdrive[m].cartridge = libspectrum_microdrive_alloc();
     microdrive[m].inserted = 0;
     microdrive[m].modified = 0;
@@ -137,7 +140,7 @@ if1_mdr_insert( int which, const char *filename )
   int m, i;
 
   if( which == -1 ) {	/* find an empty one */
-    for( m = 0; m < 8; m++ ) {
+    for( m = 0; m < NUM_MICRODRIVES; m++ ) {
       if( !microdrive[m].inserted ) {
         which = m;
 	break;
@@ -154,7 +157,7 @@ if1_mdr_insert( int which, const char *filename )
     return 1;
   }
 
-  if( which >= 8 ) {
+  if( which >= NUM_MICRODRIVES ) {
 #if 0
     ui_error( UI_ERROR_ERROR, "if1_mdr_insert: unknown drive %d", which );
 #endif
@@ -233,7 +236,7 @@ microdrives_restart( void )
 {
   int m;
 
-  for( m = 0; m < 8; m++ ) {
+  for( m = 0; m < NUM_MICRODRIVES; m++ ) {
     while( ( microdrive[m].head_pos % LIBSPECTRUM_MICRODRIVE_BLOCK_LEN ) != 0  &&
            ( microdrive[m].head_pos % LIBSPECTRUM_MICRODRIVE_BLOCK_LEN ) != LIBSPECTRUM_MICRODRIVE_HEAD_LEN )
       increment_head( m ); /* put head in the start of a block */
@@ -260,7 +263,7 @@ port_ctr_in( void )
   libspectrum_byte ret = 0xff;
   int m, block;
 
-  for( m = 0; m < 8; m++ ) {
+  for( m = 0; m < NUM_MICRODRIVES; m++ ) {
 
     microdrive_t *mdr = &microdrive[ m ];
 
@@ -302,7 +305,7 @@ port_ctr_out( libspectrum_byte val )
 
   if( !( val & 0x02 ) && ( if1_ula.comms_clk ) ) {	/* ~~\__ */
 
-    for( m = 7; m > 0; m-- ) {
+    for( m = NUM_MICRODRIVES-1; m > 0; m-- ) {
       /* Rotate one drive */
       microdrive[m].motor_on = microdrive[m - 1].motor_on;
     }
@@ -381,4 +384,73 @@ port_ctr_out( libspectrum_byte val )
 #endif
 
   microdrives_restart();
+}
+
+
+
+libspectrum_byte
+port_mdr_in( void )
+{
+  libspectrum_byte ret = 0xff;
+  int m;
+
+  for( m = 0; m < NUM_MICRODRIVES; m++ ) {
+
+    microdrive_t *mdr = &microdrive[ m ];
+
+    if( mdr->motor_on && mdr->inserted ) {
+
+      if( mdr->transfered < mdr->max_bytes ) {
+	mdr->last = libspectrum_microdrive_data( mdr->cartridge,
+						   mdr->head_pos );
+	increment_head( m );
+      }
+
+      mdr->transfered++;
+      ret &= mdr->last;  /* I assume negative logic, but how know? */
+    }
+
+  }
+
+  return ret;
+}
+
+
+
+void
+port_mdr_out( libspectrum_byte val )
+{
+  int m, block;
+
+  /* allow access to the port only if motor 1 is ON and there's a file open */
+  for( m = 0; m < NUM_MICRODRIVES; m++ ) {
+
+    microdrive_t *mdr = &microdrive[ m ];
+ 
+    if( mdr->motor_on && mdr->inserted ) {
+#ifdef IF1_DEBUG_MDR
+      fprintf(stderr, "#%05d  %03d(%03d): 0x%02x\n",
+    			mdr->head_pos, mdr->transfered, mdr->max_bytes, val );
+#endif
+      block = mdr->head_pos / 543 + ( mdr->max_bytes == 15 ? 0 : 256 );
+      if( mdr->transfered == 0 && val == 0x00 ) {	/* start pream */
+        mdr->pream[block] = 1;
+      } else if( mdr->transfered > 0 && mdr->transfered < 10 && val == 0x00 ) {
+        mdr->pream[block]++;
+      } else if( mdr->transfered > 9 && mdr->transfered < 12 && val == 0xff ) {
+        mdr->pream[block]++;
+      } else if( mdr->transfered == 12 && mdr->pream[block] == 12 ) {
+        mdr->pream[block] = SYNC_OK;
+      }
+      if( mdr->transfered > 11 &&
+	  mdr->transfered < mdr->max_bytes + 12 ) {
+ 
+	libspectrum_microdrive_set_data( mdr->cartridge, mdr->head_pos,
+ 					 val );
+ 	increment_head( m );
+	mdr->modified = 1;
+      }
+      mdr->transfered++;
+    }
+  }
 }

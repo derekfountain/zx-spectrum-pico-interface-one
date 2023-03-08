@@ -298,12 +298,15 @@ void core1_main( void )
     {
       /* Z80 has written microdrive data to us, call the handler which knows what to do with it */
 
+      port_mdr_out( port_e7_input_from_z80.byte );
+      port_e7_input_from_z80.flag = HANDLED_DATA;
     }
 
     if( port_e7_output_to_z80.flag == HANDLED_DATA )
     {
-      /* Emulate the microdrive, find the next byte we need to give it when it next asks */
+      /* Emulate the microdrive, find the next byte we need to give the Z80 when it next asks */
 
+      port_e7_output_to_z80.byte = port_mdr_in();
       port_e7_output_to_z80.flag = DATA_WAITING_FOR_Z80;
     }
 
@@ -469,7 +472,7 @@ int main()
 
     else if( (gpios_state & IF1_IOPORT_ACCESS_BIT_MASK) == PORT_E7_READ )
     {
-      /* Z80 read from port 0xE7 (231), microdrive data */
+      /* Z80 read from port 0xE7 (231), Z80 wants a microdrive data byte */
 
       /* A Z80 read, this core needs to switch the level shifter direction for our port */
 
@@ -481,6 +484,12 @@ int main()
 
       /* New or old? Doesn't matter, just return it */
       gpio_put_masked( DBUS_MASK, preconverted_data[port_e7_output_to_z80.byte] );
+
+      /*
+       * Mark the data port queue as needing to be refreshed.
+       * The other core will do it in due course
+       */
+      port_e7_output_to_z80.flag = HANDLED_DATA;
 
       /* Wait for the IO request to complete */
       while( (gpio_get_all() & IORQ_BIT_MASK) == 0 );
