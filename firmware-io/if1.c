@@ -259,7 +259,7 @@ microdrives_restart( void )
 /*
  * Handler for control byte input from microdrives.
  *
- * This produces the status byte for reading port 0xEF (239) - the gap, sync and write protect flags..
+ * This produces the status byte for reading port 0xEF (239) - the gap, sync and write protect flags.
  */
 libspectrum_byte
 port_ctr_in( void )
@@ -292,7 +292,12 @@ port_ctr_in( void )
 	ret &= 0xfe; /* active bit */
     }
   }
-  microdrives_restart();
+
+// Still don't understand what this is doing here, but I can't reset
+// everything now that this routine is called constantly
+// Not sure this is going to work out...
+//
+//  microdrives_restart();
 
   return ret;
 }

@@ -345,20 +345,21 @@ void core1_main( void )
       port_e7_output_to_z80.byte = port_mdr_in();
       port_e7_output_to_z80.flag = DATA_WAITING_FOR_Z80;
 
-//      ADD_IOTRACE(CORE1_PREPARE_PORT_E7_Z80_IN, port_e7_output_to_z80.byte);
+      ADD_IOTRACE(CORE1_PREPARE_PORT_E7_Z80_IN, port_e7_output_to_z80.byte);
     }
 
     if( port_ef_input_from_z80.flag == NEW_INPUT_FROM_Z80 )
     {
       /* Z80 has written a microdrive control byte to us, call the handler which knows what to do with it */
 
-//      ADD_IOTRACE(CORE1_HANDLE_PORT_EF_Z80_OUT, port_ef_input_from_z80.byte);
+      ADD_IOTRACE(CORE1_HANDLE_PORT_EF_Z80_OUT, port_ef_input_from_z80.byte);
 
       port_ctr_out( port_ef_input_from_z80.byte );
       port_ef_input_from_z80.flag = HANDLED_DATA;
     }
 
-    if( port_ef_output_to_z80.flag == HANDLED_DATA )
+
+    /* Each time round this loop, work out the status byte ready for next time IF1 asks for it */
     {
       /* Work out status byte we need to give the Z80 next time it asks */
 
@@ -367,7 +368,6 @@ void core1_main( void )
 
 //      ADD_IOTRACE(CORE1_PREPARE_PORT_EF_Z80_IN, port_ef_output_to_z80.byte);
     }
-    
 
   } /* Infinite loop */
 }
@@ -518,7 +518,7 @@ int main()
       port_ef_input_from_z80.byte = (uint8_t)(z80_written_byte & 0xFF);
       port_ef_input_from_z80.flag = NEW_INPUT_FROM_Z80;
 
-      ADD_IOTRACE(CORE0_PORT_EF_Z80_OUT, port_ef_input_from_z80.byte);
+//      ADD_IOTRACE(CORE0_PORT_EF_Z80_OUT, port_ef_input_from_z80.byte);
 
       /* Wait for the IO request to complete */
       while( (gpio_get_all() & IORQ_BIT_MASK) == 0 );
@@ -572,7 +572,7 @@ int main()
       /* New or old? Doesn't matter, just return it */
       gpio_put_masked( DBUS_MASK, preconverted_data[port_ef_output_to_z80.byte] );
 
-//      ADD_IOTRACE(CORE0_PORT_EF_Z80_IN, port_ef_output_to_z80.byte);
+      ADD_IOTRACE(CORE0_PORT_EF_Z80_IN, port_ef_output_to_z80.byte);
 
       /* Wait for the IO request to complete */
       while( (gpio_get_all() & IORQ_BIT_MASK) == 0 );
