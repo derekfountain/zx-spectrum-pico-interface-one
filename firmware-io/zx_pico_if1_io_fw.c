@@ -253,6 +253,40 @@ void preconvert_data( void )
   }
 }
 
+/*
+ * Tracing. I'm hoping the race condition in the entry (port then data isn't atomic)
+ * won't cause a problem.
+ * The trace enum matches what the Z80 does, OUT instructions get a Z80_OUT entry,
+ * IN instructions get a Z80_IN entry.
+ */
+typedef enum
+{
+  NULL_ENTRY,
+  CORE0_PORT_E7_Z80_OUT,
+  CORE0_PORT_E7_Z80_IN,
+  CORE0_PORT_EF_Z80_OUT,
+  CORE0_PORT_EF_Z80_IN,
+  CORE1_HANDLE_PORT_E7_Z80_OUT,
+  CORE1_PREPARE_PORT_E7_Z80_IN,
+  CORE1_HANDLE_PORT_EF_Z80_OUT,
+  CORE1_PREPARE_PORT_EF_Z80_IN,
+}
+IOTRACE_TYPE;
+
+typedef struct _iotrace_entry
+{
+  IOTRACE_TYPE type;
+  uint8_t      byte;
+}
+IOTRACE_ENTRY;
+
+#define IOTRACE_SIZE 1024
+IOTRACE_ENTRY iotrace[IOTRACE_SIZE];
+uint32_t iotrace_wraps = 0;
+uint16_t iotrace_index = 0;
+
+#define ADD_IOTRACE(t,b) {iotrace[iotrace_index].type=t;iotrace[iotrace_index].byte=b;\
+    if(++iotrace_index==IOTRACE_SIZE){iotrace_index=0;iotrace_wraps++;}}
 
 /*
  * Try to clarify the terminology here:
@@ -275,7 +309,7 @@ QUEUE_FLAG;
 typedef struct _port_queue
 {
   QUEUE_FLAG flag;        /* Flag */
-  uint8_t    byte;        /* Data byte, either input or output */
+  uint8_t    byte;        /* Data byte, either input from Z80 or output to it */
 }
 PORT_QUEUE;
 
@@ -298,6 +332,8 @@ void core1_main( void )
     {
       /* Z80 has written microdrive data to us, call the handler which knows what to do with it */
 
+//      ADD_IOTRACE(CORE1_HANDLE_PORT_E7_Z80_OUT, port_e7_input_from_z80.byte);
+
       port_mdr_out( port_e7_input_from_z80.byte );
       port_e7_input_from_z80.flag = HANDLED_DATA;
     }
@@ -308,11 +344,15 @@ void core1_main( void )
 
       port_e7_output_to_z80.byte = port_mdr_in();
       port_e7_output_to_z80.flag = DATA_WAITING_FOR_Z80;
+
+//      ADD_IOTRACE(CORE1_PREPARE_PORT_E7_Z80_IN, port_e7_output_to_z80.byte);
     }
 
     if( port_ef_input_from_z80.flag == NEW_INPUT_FROM_Z80 )
     {
       /* Z80 has written a microdrive control byte to us, call the handler which knows what to do with it */
+
+//      ADD_IOTRACE(CORE1_HANDLE_PORT_EF_Z80_OUT, port_ef_input_from_z80.byte);
 
       port_ctr_out( port_ef_input_from_z80.byte );
       port_ef_input_from_z80.flag = HANDLED_DATA;
@@ -324,6 +364,8 @@ void core1_main( void )
 
       port_ef_output_to_z80.byte = port_ctr_in();
       port_ef_output_to_z80.flag = DATA_WAITING_FOR_Z80;
+
+//      ADD_IOTRACE(CORE1_PREPARE_PORT_EF_Z80_IN, port_ef_output_to_z80.byte);
     }
     
 
@@ -404,7 +446,15 @@ int main()
     busy_wait_us_32(250000);
   }
 
-  port_ef_output_to_z80.flag = HANDLED_DATA;
+  /*
+   * Set up ports to have no data from Z80 heading to them, and to
+   * make them prime their first data byte ready for when the
+   * Z80 asks for it
+   */
+  port_ef_output_to_z80.flag  = HANDLED_DATA;
+  port_e7_output_to_z80.flag  = HANDLED_DATA;
+  port_e7_input_from_z80.flag = HANDLED_DATA;
+  port_ef_input_from_z80.flag = HANDLED_DATA;
 
   /* Init complete, run 2nd core code which does the MD emulation */
   multicore_launch_core1( core1_main ); 
@@ -445,6 +495,8 @@ int main()
       port_e7_input_from_z80.byte = (uint8_t)(z80_written_byte & 0xFF);
       port_e7_input_from_z80.flag = NEW_INPUT_FROM_Z80;
 
+//      ADD_IOTRACE(CORE0_PORT_E7_Z80_OUT, port_e7_input_from_z80.byte);
+
       /* Wait for the IO request to complete */
       while( (gpio_get_all() & IORQ_BIT_MASK) == 0 );
     }
@@ -466,6 +518,8 @@ int main()
       port_ef_input_from_z80.byte = (uint8_t)(z80_written_byte & 0xFF);
       port_ef_input_from_z80.flag = NEW_INPUT_FROM_Z80;
 
+      ADD_IOTRACE(CORE0_PORT_EF_Z80_OUT, port_ef_input_from_z80.byte);
+
       /* Wait for the IO request to complete */
       while( (gpio_get_all() & IORQ_BIT_MASK) == 0 );
     }
@@ -485,11 +539,7 @@ int main()
       /* New or old? Doesn't matter, just return it */
       gpio_put_masked( DBUS_MASK, preconverted_data[port_e7_output_to_z80.byte] );
 
-      /*
-       * Mark the data port queue as needing to be refreshed.
-       * The other core will do it in due course
-       */
-      port_e7_output_to_z80.flag = HANDLED_DATA;
+//      ADD_IOTRACE(CORE0_PORT_E7_Z80_IN, port_e7_output_to_z80.byte);
 
       /* Wait for the IO request to complete */
       while( (gpio_get_all() & IORQ_BIT_MASK) == 0 );
@@ -499,6 +549,12 @@ int main()
 	  
       /* Put level shifter direction back to ZX->Pico */
       gpio_put( DIR_OUTPUT_GP, 1 );
+
+      /*
+       * Mark the data port queue as needing to be refreshed.
+       * The other core will do it in due course
+       */
+      port_e7_output_to_z80.flag = HANDLED_DATA;
     }
 
     else if( (gpios_state & IF1_IOPORT_ACCESS_BIT_MASK) == PORT_EF_READ )
@@ -515,6 +571,8 @@ int main()
 
       /* New or old? Doesn't matter, just return it */
       gpio_put_masked( DBUS_MASK, preconverted_data[port_ef_output_to_z80.byte] );
+
+//      ADD_IOTRACE(CORE0_PORT_EF_Z80_IN, port_ef_output_to_z80.byte);
 
       /* Wait for the IO request to complete */
       while( (gpio_get_all() & IORQ_BIT_MASK) == 0 );

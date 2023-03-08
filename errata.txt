@@ -61,7 +61,7 @@ benefit.
 
 Connect the last GPIO #27 on the ROM pico to the level shifter's
 DIR pin. This is so I can drive the direction with a PIO when the
-ROM is read. Not sure if theis will work, so make sure it's easy
+ROM is read. Not sure if this will work, so make sure it's easy
 to cut.
 : Needs doing
 

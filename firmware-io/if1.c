@@ -1,7 +1,11 @@
+#include "hardware/gpio.h"
+
 #include "libspectrum.h"
 #include "if1.h"
 
 #include "test_image.h"
+
+extern const uint8_t LED_PIN;
 
 typedef struct utils_file {
 
@@ -63,7 +67,7 @@ typedef struct if1_ula_t {
   int busy;	/* Indicate busy; if1 software never poll it ... */
 } if1_ula_t;
 
-/* Pico only has memory for 1 microdrive, the structure is 135KB */
+/* Pico only has memory for 1 microdrive, the structure is 135KB. I can use a smaller image */
 #define NUM_MICRODRIVES 1
 
 static microdrive_t microdrive[NUM_MICRODRIVES];		/* We have 8 microdrive */
@@ -198,8 +202,8 @@ if1_mdr_insert( int which, const char *filename )
   utils_close_file( &mdr->file );
 #endif
 
-  mdr->file.buffer = ___resources_test_image_mdr;
-  mdr->file.length = ___resources_test_image_mdr_len;
+  mdr->file.buffer = test_image_32blk_mdr;
+  mdr->file.length = test_image_32blk_mdr_len;
   libspectrum_microdrive_mdr_read( mdr->cartridge,
 				   mdr->file.buffer,
 				   mdr->file.length );
@@ -310,6 +314,16 @@ port_ctr_out( libspectrum_byte val )
       microdrive[m].motor_on = microdrive[m - 1].motor_on;
     }
     microdrive[0].motor_on = (val & 0x01) ? 0 : 1;
+
+    if( microdrive[0].motor_on )
+    {
+      gpio_put(LED_PIN, 1);
+    }
+    else
+    {
+      gpio_put(LED_PIN, 0);
+    }
+
 
 #if 0
     if( microdrive[0].motor_on || microdrive[1].motor_on || 
