@@ -287,6 +287,8 @@ PORT_QUEUE port_ef_output_to_z80;  /* Read from status */
 
 void core1_main( void )
 {
+  if1_init( NULL );
+
   /* Insert the test image (no filename as yet) into Microdrive 0 */
   if1_mdr_insert( 0, NULL );
 
@@ -308,6 +310,9 @@ void core1_main( void )
     if( port_ef_input_from_z80.flag == NEW_INPUT_FROM_Z80 )
     {
       /* Z80 has written a microdrive control byte to us, call the handler which knows what to do with it */
+
+      port_ctr_out( port_ef_input_from_z80.byte );
+      port_ef_input_from_z80.flag = HANDLED_DATA;
     }
 
     if( port_ef_output_to_z80.flag == HANDLED_DATA )

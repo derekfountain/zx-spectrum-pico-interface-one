@@ -70,6 +70,66 @@ static if1_ula_t if1_ula;
 #define MDR_WP(m) libspectrum_microdrive_write_protect( microdrive[m - 1].cartridge )
 
 
+
+int
+if1_init( void *context )
+{
+  int m, i;
+
+#if 0
+  if1_ula.fd_r = -1;
+  if1_ula.fd_t = -1;
+  if1_ula.dtr = 0;		/* No data terminal yet */
+  if1_ula.cts = 2;		/* force to emit first cts status */
+#endif
+  if1_ula.comms_clk = 0;
+  if1_ula.comms_data = 0; /* really? */
+#if 0
+  if1_ula.fd_net = -1;
+  if1_ula.s_net_mode = 1;
+  if1_ula.net = 0;
+  if1_ula.esc_in = 0; /* empty */
+#endif
+
+  for( m = 0; m < 8; m++ ) {
+    microdrive[m].cartridge = libspectrum_microdrive_alloc();
+    microdrive[m].inserted = 0;
+    microdrive[m].modified = 0;
+  }
+
+#if 0  
+  if( settings_current.rs232_rx ) {
+    if1_plug( settings_current.rs232_rx, 1 );
+    libspectrum_free( settings_current.rs232_rx );
+    settings_current.rs232_rx = NULL;
+  }
+
+  if( settings_current.rs232_tx ) {
+    if1_plug( settings_current.rs232_tx, 2 );
+    libspectrum_free( settings_current.rs232_tx );
+    settings_current.rs232_tx = NULL;
+  }
+
+  if( settings_current.snet ) {
+    if1_plug( settings_current.snet, 3 );
+    libspectrum_free( settings_current.snet );
+    settings_current.snet = NULL;
+  }
+
+  module_register( &if1_module_info );
+
+  if1_memory_source = memory_source_register( "If1" );
+  for( i = 0; i < MEMORY_PAGES_IN_8K; i++ )
+    if1_memory_map_romcs[i].source = if1_memory_source;
+
+  periph_register( PERIPH_TYPE_INTERFACE1, &if1_periph );
+  periph_register_paging_events( event_type_string, &page_event,
+				 &unpage_event );
+#endif
+
+  return 0;
+}
+
 int
 if1_mdr_insert( int which, const char *filename )
 {
@@ -188,6 +248,12 @@ microdrives_restart( void )
   }	
 }
 
+
+/*
+ * Handler for control byte input from microdrives.
+ *
+ * This produces the status byte for reading port 0xEF (239) - the gap, sync and write protect flags..
+ */
 libspectrum_byte
 port_ctr_in( void )
 {
@@ -222,4 +288,97 @@ port_ctr_in( void )
   microdrives_restart();
 
   return ret;
+}
+
+
+/*
+ * Handler for control byte output from Z80 to IF1, a write to port 0xEF (239).
+ * Carries CLK, ERASE and R/W.
+ */
+void
+port_ctr_out( libspectrum_byte val )
+{
+  int m;
+
+  if( !( val & 0x02 ) && ( if1_ula.comms_clk ) ) {	/* ~~\__ */
+
+    for( m = 7; m > 0; m-- ) {
+      /* Rotate one drive */
+      microdrive[m].motor_on = microdrive[m - 1].motor_on;
+    }
+    microdrive[0].motor_on = (val & 0x01) ? 0 : 1;
+
+#if 0
+    if( microdrive[0].motor_on || microdrive[1].motor_on || 
+	microdrive[2].motor_on || microdrive[3].motor_on ||
+	microdrive[4].motor_on || microdrive[5].motor_on ||
+	microdrive[6].motor_on || microdrive[7].motor_on ) {
+      if( !if1_mdr_status ) {
+	ui_statusbar_update( UI_STATUSBAR_ITEM_MICRODRIVE,
+	                     UI_STATUSBAR_STATE_ACTIVE );
+	if1_mdr_status = 1;
+      }
+    } else if ( if1_mdr_status ) {
+      ui_statusbar_update( UI_STATUSBAR_ITEM_MICRODRIVE,
+			   UI_STATUSBAR_STATE_INACTIVE );
+      if1_mdr_status = 0;
+    }
+#endif
+  }
+
+#if 0
+  if( val & 0x01 ) {	/* comms_data == 1 */
+    /* Interface 1 service manual p.:1.4 par.: 1.5.1
+       The same pin on IC1 (if1 ULA), pin 33, is used for the network
+       transmit data and for the RS232 transmit data. In order to select
+       the required function IC1 uses its COMMS_OUT (pin 30) signal,
+       borrowed from the microdrive control when the microdrive is not
+       being used (I do not know what it is exactly meaning. It is a
+       hardware not being used, or a software should not use..?) This signal
+       is routed from pin 30 to the emitter of transistor Q3 (RX DATA) and
+       via resistor R4, to the base of transistor Q1 (NET). When COMMS_OUT
+       is high Q3 is enabled this selecting RS232, and when it is low
+       Q1 is enabled selecting the network.
+	 
+       OK, the schematics offer a different interpretation, because if
+       COMMS_OUT pin level high (>+3V) then Q3 is off (the basis cannot
+       be more higher potential then emitter (NPN transistor), so whatever
+       is on the IC1 RX DATA (pin 33) the basis of Q4 is always on +12V,
+       so the collector of Q4 (PNP transistor) always on -12V.
+       If COMMS_OUT pin level goes low (~0V), then Q3 basis (connected
+       to IC1 RX DATA pin) can be higher level (>+3V) than emitter, so
+       the basis potential of Q4 depend on IC1 RX DATA.
+	 
+       OK, Summa summarum I assume that, the COMMS OUT pin is a
+       negated output of the if1 ULA CTR register's COMMS DATA bit. 
+    */
+    /* C_DATA = 1 */
+    if( if1_ula.comms_data == 0 ) {
+      if1_ula.count_out = 0;
+      if1_ula.data_out = 0;
+      if1_ula.count_in = 0;
+      if1_ula.data_in = 0;
+    }
+  }
+  if1_ula.wait = ( val & 0x20 ) ? 1 : 0;
+  if1_ula.comms_data = ( val & 0x01 ) ? 1 : 0;
+#endif
+  if1_ula.comms_clk = ( val & 0x02 ) ? 1 : 0;
+#if 0
+  val = ( val & 0x10 ) ? 1 : 0;
+  if( settings_current.rs232_handshake && 
+      if1_ula.fd_t != -1 && if1_ula.cts != val ) {
+    char data = val ? 0x03 : 0x02;
+    do {} while( write( if1_ula.fd_t, "", 1 ) != 1 );
+    do {} while( write( if1_ula.fd_t, &data, 1 ) != 1 );
+  }
+  if1_ula.cts = val;
+    
+#ifdef IF1_DEBUG_NET
+  fprintf( stderr, "Set CTS to %d, set WAIT to %d and COMMS_DATA to %d\n",
+	   if1_ula.cts, if1_ula.wait, if1_ula.comms_data );
+#endif
+#endif
+
+  microdrives_restart();
 }

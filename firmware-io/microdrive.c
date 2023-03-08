@@ -24,6 +24,8 @@
 // #include "config.h"
 
 #include <string.h>
+#include <stdlib.h>
+#include "pico/stdlib.h"
 
 #include "internals.h"
 
@@ -64,14 +66,19 @@ static const size_t MDR_LENGTH = LIBSPECTRUM_MICRODRIVE_CARTRIDGE_LENGTH + 1;
 libspectrum_microdrive*
 libspectrum_microdrive_alloc( void )
 {
+  return (libspectrum_microdrive*)malloc( sizeof(libspectrum_microdrive) );
+#if 0
   return libspectrum_new( libspectrum_microdrive, 1 );
+#endif
 }
 
 /* Free a microdrive image */
 libspectrum_error
 libspectrum_microdrive_free( libspectrum_microdrive *microdrive )
 {
+#if 0
   libspectrum_free( microdrive );
+#endif
 
   return LIBSPECTRUM_ERROR_NONE;
 }
