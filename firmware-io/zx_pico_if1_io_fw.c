@@ -319,7 +319,7 @@ PORT_QUEUE port_ef_input_from_z80; /* Write to control register */
 PORT_QUEUE port_ef_output_to_z80;  /* Read from status */
 
 
-void precalculate_port_ctr_in( void );
+libspectrum_byte precalculate_port_ctr_in( void );
 
 void core1_main( void )
 {
@@ -467,8 +467,14 @@ int main()
   port_e7_input_from_z80.flag = HANDLED_DATA;
   port_ef_input_from_z80.flag = HANDLED_DATA;
 
+  if1_init( NULL );
+
+  /* Insert the test image (no filename as yet) into Microdrive 0 */
+  /* Single stepped... 32 blocks, 17376 bytes, plus one more saying RW. Looks fine.*/
+  if1_mdr_insert( 0, NULL );
+
   /* Init complete, run 2nd core code which does the MD emulation */
-  multicore_launch_core1( core1_main ); 
+//  multicore_launch_core1( core1_main ); 
 
   while( 1 )
   {
@@ -597,7 +603,7 @@ gpio_put( TEST_OUTPUT_GP, 0 );
       gpio_set_dir_out_masked( DBUS_MASK );
 
       /* New or old? Doesn't matter, just return it */
-      gpio_put_masked( DBUS_MASK, preconverted_data[port_ctr_in()] );
+      gpio_put_masked( DBUS_MASK, preconverted_data[precalculate_port_ctr_in()] );
 // Tested - this goes low 300ns before IORQ goes high, plenty of time
 //gpio_put( TEST_OUTPUT_GP, 0 );
 

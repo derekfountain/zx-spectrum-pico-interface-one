@@ -162,7 +162,7 @@ microdrives_restart( void )
  */
 static libspectrum_byte precalculated_status = 0xff;
 
-void
+libspectrum_byte
 precalculate_port_ctr_in( void )
 {
   libspectrum_byte ret = 0xff;
@@ -256,9 +256,9 @@ precalculate_port_ctr_in( void )
   microdrives_restart();
 
   /* Return precalculated value */
-  precalculated_status = ret;
+  return ret;
 
-  return;
+//  return;
 }
 
 
