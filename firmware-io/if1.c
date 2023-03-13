@@ -82,7 +82,7 @@ if1_init( void *context )
   if1_ula.comms_clk = 0;
   if1_ula.comms_data = 0; /* really? */
 
-  microdrive.cartridge = libspectrum_microdrive_alloc();
+  microdrive.cartridge = (void*)test_image_mdr;
   microdrive.inserted = 0;
   microdrive.modified = 0;
 
@@ -97,8 +97,8 @@ if1_mdr_insert( int which, const char *filename )
 
   mdr = &microdrive;
 
-  mdr->file.buffer = test_image_32blk_mdr;
-  mdr->file.length = test_image_32blk_mdr_len;
+  mdr->file.buffer = test_image_mdr;
+  mdr->file.length = test_image_mdr_len;
   libspectrum_microdrive_mdr_read( mdr->cartridge,
 				   mdr->file.buffer,
 				   mdr->file.length );
@@ -286,6 +286,7 @@ port_ctr_out( libspectrum_byte val )
   if( !( val & 0x02 ) && ( if1_ula.comms_clk ) ) {	/* ~~\__ */
 
     microdrive.motor_on = (val & 0x01) ? 0 : 1;
+    gpio_put( LED_PIN, microdrive.motor_on );
   }
 
   /* Note the level of the CLK line so we can see what it's done next time */
