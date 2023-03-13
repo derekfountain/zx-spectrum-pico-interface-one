@@ -35,7 +35,7 @@ struct libspectrum_microdrive {
 
   libspectrum_byte data[ LIBSPECTRUM_MICRODRIVE_CARTRIDGE_LENGTH ];
   int write_protect;
-  libspectrum_byte cartridge_len;
+  libspectrum_byte cartridge_len;    /* Cartridge length in blocks */
 
 };
 
