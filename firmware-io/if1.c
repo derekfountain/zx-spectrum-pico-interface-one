@@ -38,37 +38,8 @@ typedef struct microdrive_t {
 } microdrive_t;
 
 typedef struct if1_ula_t {
-  int fd_r;	/* file descriptor for reading bytes or bits RS232 */
-  int fd_t;	/* file descriptor for writing bytes or bits RS232 */
-  int fd_net;	/* file descriptor for rw bytes or bits SinclairNET */
-  int rs232_buffer;	/* read buffer */
-  int s_net_mode;
-  int status;	/* if1_ula/SinclairNET */
-  int comms_data;	/* the previous data comms state */
   int comms_clk;	/* the previous data comms state */
-  int cts;	/* CTS of peripheral */
-  int dtr;	/* DTR of peripheral */
-  int tx;	/* TxD the name is very kind, because this is the read end of
-                   the TxD wire of DATA machine (really RxD the view of
-		   spectrum */
-  int rx;	/* RxD the name is very kind, because this is the write end of
-                   the RxD wire of DATA machine (really TxD the view of
-		   spectrum */
-  int data_in;	/* interpreted incoming data */
-  int count_in;
-  int data_out; /* interpreted outgoing data */
-  int count_out;
-  int esc_in;	/* if we compose an escape seq */
-  
-  int net;	/* Network in/out (really 1 wire bus :-) */
-  int net_data;	/* Interpreted network data */
-  int net_state;	/* Interpreted network data */
-  int wait;	/* Wait state */
-  int busy;	/* Indicate busy; if1 software never poll it ... */
 } if1_ula_t;
-
-/* Pico only has memory for 1 microdrive, the structure is 135KB. I can use a smaller image */
-#define NUM_MICRODRIVES 1
 
 static microdrive_t microdrive;
 static if1_ula_t if1_ula;
@@ -80,9 +51,15 @@ if1_init( void *context )
   int m, i;
 
   if1_ula.comms_clk = 0;
-  if1_ula.comms_data = 0; /* really? */
 
+  /* 
+   * For now the cartridge is the test image. The insert routine will
+   * copy over it probably from a flash image or something at which point
+   * this will become an alloc().
+   */
   microdrive.cartridge = (void*)test_image_mdr;
+//  (microdrive.cartridge)->write_protect = 0;
+
   microdrive.inserted = 0;
   microdrive.modified = 0;
 
@@ -92,19 +69,15 @@ if1_init( void *context )
 int
 if1_mdr_insert( int which, const char *filename )
 {
-  microdrive_t *mdr;
-  int m, i;
+  int i;
 
-  mdr = &microdrive;
+  libspectrum_microdrive_mdr_read( microdrive.cartridge,
+				   test_image_mdr,
+				   test_image_mdr_len );
+//  libspectrum_microdrive_set_write_protect( microdrive.cartridge, 0 );
 
-  mdr->file.buffer = test_image_mdr;
-  mdr->file.length = test_image_mdr_len;
-  libspectrum_microdrive_mdr_read( mdr->cartridge,
-				   mdr->file.buffer,
-				   mdr->file.length );
-
-  mdr->inserted = 1;
-  mdr->modified = 0;
+  microdrive.inserted = 1;
+  microdrive.modified = 0;
 
   /*
    * pream is 512 bytes in the microdrive_t structure, the one in this
@@ -115,9 +88,8 @@ if1_mdr_insert( int which, const char *filename )
    */
 
   /* we assume formatted cartridges */
-  for( i = libspectrum_microdrive_cartridge_len( mdr->cartridge );
-	i > 0; i-- )
-    mdr->pream[255 + i] = mdr->pream[i-1] = SYNC_OK;
+  for( i = libspectrum_microdrive_cartridge_len( microdrive.cartridge ); i > 0; i-- )
+    microdrive.pream[255 + i] = microdrive.pream[i-1] = SYNC_OK;
 
   return 0;
 }
@@ -126,10 +98,10 @@ static void
 increment_head( void )
 {
   microdrive.head_pos++;
-  if( microdrive.head_pos >=
-      libspectrum_microdrive_cartridge_len( microdrive.cartridge ) *
-      LIBSPECTRUM_MICRODRIVE_BLOCK_LEN )
+  if( microdrive.head_pos >= (libspectrum_microdrive_cartridge_len( microdrive.cartridge ) * LIBSPECTRUM_MICRODRIVE_BLOCK_LEN) )
+  {
     microdrive.head_pos = 0;
+  }
 }
 
 /*
@@ -144,26 +116,25 @@ microdrives_restart( void )
 {
   while( ( microdrive.head_pos % LIBSPECTRUM_MICRODRIVE_BLOCK_LEN ) != 0  &&
 	 ( microdrive.head_pos % LIBSPECTRUM_MICRODRIVE_BLOCK_LEN ) != LIBSPECTRUM_MICRODRIVE_HEAD_LEN )
+  {
     increment_head(); /* put head in the start of a block */
+  }
 	
-    microdrive.transfered = 0; /* reset current number of bytes written */
+  microdrive.transfered = 0; /* reset current number of bytes written */
 
-    if( ( microdrive.head_pos % LIBSPECTRUM_MICRODRIVE_BLOCK_LEN ) == 0 ) {
-      microdrive.max_bytes = LIBSPECTRUM_MICRODRIVE_HEAD_LEN; /* up to 15 bytes for header blocks */
-    } else {
-      microdrive.max_bytes = LIBSPECTRUM_MICRODRIVE_HEAD_LEN + LIBSPECTRUM_MICRODRIVE_DATA_LEN + 1; /* up to 528 bytes for data blocks */
-    }
+  if( ( microdrive.head_pos % LIBSPECTRUM_MICRODRIVE_BLOCK_LEN ) == 0 )
+  {
+    microdrive.max_bytes = LIBSPECTRUM_MICRODRIVE_HEAD_LEN; /* up to 15 bytes for header blocks */
+  }
+  else
+  {
+    microdrive.max_bytes = LIBSPECTRUM_MICRODRIVE_HEAD_LEN + LIBSPECTRUM_MICRODRIVE_DATA_LEN + 1; /* up to 528 bytes for data blocks */
+  }
 }
 
 
-/*
- * Work out the status byte value ready for next time
- * the Z80 asks for it. Pre-calculation seems OK so far.
- */
-static libspectrum_byte precalculated_status = 0xff;
-
 libspectrum_byte
-precalculate_port_ctr_in( void )
+port_ctr_in( void )
 {
   libspectrum_byte ret = 0xff;
   int block;
@@ -255,21 +226,7 @@ precalculate_port_ctr_in( void )
    */
   microdrives_restart();
 
-  /* Return precalculated value */
   return ret;
-
-//  return;
-}
-
-
-/*
- * Control register in, this is the Z80 reading status.
- * Fast path, just return the pre-calculated byte
- */
-libspectrum_byte
-port_ctr_in( void )
-{
-  return precalculated_status;
 }
 
 
@@ -304,7 +261,6 @@ port_ctr_out( libspectrum_byte val )
  * Byte is taken from the data block of the running microdrive
  * cartridge
  */
-/* This is the tricky one. I can hand back the byte as soon as ret is populated, might need to */
 libspectrum_byte
 port_mdr_in( void )
 {

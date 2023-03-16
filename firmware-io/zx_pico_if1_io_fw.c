@@ -319,71 +319,6 @@ PORT_QUEUE port_ef_input_from_z80; /* Write to control register */
 PORT_QUEUE port_ef_output_to_z80;  /* Read from status */
 
 
-libspectrum_byte precalculate_port_ctr_in( void );
-
-void core1_main( void )
-{
-  if1_init( NULL );
-
-  /* Insert the test image (no filename as yet) into Microdrive 0 */
-  /* Single stepped... 32 blocks, 17376 bytes, plus one more saying RW. Looks fine.*/
-  if1_mdr_insert( 0, NULL );
-
-  while( 1 )
-  {
-#define WRITES 0
-#if WRITES
-    if( port_e7_input_from_z80.flag == NEW_INPUT_FROM_Z80 )
-    {
-      /* Z80 has written microdrive data to us, call the handler which knows what to do with it */
-
-//      ADD_IOTRACE(CORE1_HANDLE_PORT_E7_Z80_OUT, port_e7_input_from_z80.byte);
-
-// Currently not implemented in if1 code
-      port_mdr_out( port_e7_input_from_z80.byte );
-      port_e7_input_from_z80.flag = HANDLED_DATA;
-    }
-#endif
-
-#if 0
-// I need this one
-    if( port_e7_output_to_z80.flag == HANDLED_DATA )
-    {
-      /* Emulate the microdrive read, find the next byte we need to give the Z80 when it next asks */
-
-      port_e7_output_to_z80.byte = port_mdr_in();
-      port_e7_output_to_z80.flag = DATA_WAITING_FOR_Z80;
-
-//      ADD_IOTRACE(CORE1_PREPARE_PORT_E7_Z80_IN, port_e7_output_to_z80.byte);
-    }
-#endif
-
-#if 0
-    if( port_ef_input_from_z80.flag == NEW_INPUT_FROM_Z80 )
-    {
-      /* Z80 has written a microdrive control byte to us, call the handler which knows what to do with it */
-
-//      ADD_IOTRACE(CORE1_HANDLE_PORT_EF_Z80_OUT, port_ef_input_from_z80.byte);
-
-      // This one's really slow, it needs to be in this core
-      port_ctr_out( port_ef_input_from_z80.byte );
-      port_ef_input_from_z80.flag = HANDLED_DATA;
-    }
-#endif
-
-// Tested, this one's fine    
-    if( port_ef_output_to_z80.flag == HANDLED_DATA )
-    {
-      precalculate_port_ctr_in();
-      port_ef_output_to_z80.flag = DATA_WAITING_FOR_Z80;
-
-//      ADD_IOTRACE(CORE1_PREPARE_PORT_EF_Z80_IN, port_ef_output_to_z80.byte);
-    }
-
-  } /* Infinite loop */
-}
-
-
 int main()
 {
   bi_decl(bi_program_description("ZX Spectrum Pico IF1 board binary."));
@@ -474,7 +409,7 @@ int main()
   if1_mdr_insert( 0, NULL );
 
   /* Init complete, run 2nd core code which does the MD emulation */
-//  multicore_launch_core1( core1_main ); 
+//multicore_launch_core1( core1_main ); 
 
   while( 1 )
   {
@@ -495,10 +430,9 @@ int main()
       gpio_put( DIR_OUTPUT_GP, 1 );
     }
 
-#if 0
-//disable writes for now
     else if( (gpios_state & IF1_IOPORT_ACCESS_BIT_MASK) == PORT_E7_WRITE )
     {
+#if 0
       /* Z80 write (OUT instruction) to port 0xE7 (231), microdrive data */
 
       /* Pick up the pattern of bits from the jumbled data bus GPIOs */
@@ -511,40 +445,32 @@ int main()
                                   ((raw_pattern & 0x20) << 1) |        /* xbxx xxxx */
                                   ((raw_pattern & 0x40) >> 2);         /* xxxb xxxx */
 
-      port_e7_input_from_z80.byte = (uint8_t)(z80_written_byte & 0xFF);
-      port_e7_input_from_z80.flag = NEW_INPUT_FROM_Z80;
+      port_mdr_out( (uint8_t)(z80_written_byte & 0xFF) );
 
-      ADD_IOTRACE(CORE0_PORT_E7_Z80_OUT, port_e7_input_from_z80.byte);
+//      ADD_IOTRACE(CORE0_PORT_E7_Z80_OUT, port_e7_input_from_z80.byte);
+#endif
 
       /* Wait for the IO request to complete */
       while( (gpio_get_all() & IORQ_BIT_MASK) == 0 );
     }
-#endif
 
     else if( (gpios_state & IF1_IOPORT_ACCESS_BIT_MASK) == PORT_EF_WRITE )
     {
       /* Z80 write (OUT instruction) to port 0xEF (239), microdrive control */
+      /* All this does is turn on the motor */
 
       /* Pick up the pattern of bits from the jumbled data bus GPIOs */
       register uint32_t raw_pattern = (gpios_state & DBUS_MASK);
 
-// Tested OK
       /* Sort those bits out into the value which the Z80 originally wrote */
-//gpio_put( TEST_OUTPUT_GP, 1 );
-      port_ctr_out( (raw_pattern & 0x87)       |         /* bxxx xbbb */
+      port_ctr_out(  (raw_pattern & 0x87)       |        /* bxxx xbbb */
 		    ((raw_pattern & 0x08) << 2) |        /* xxbx xxxx */
 		    ((raw_pattern & 0x10) >> 1) |        /* xxxx bxxx */
 		    ((raw_pattern & 0x20) << 1) |        /* xbxx xxxx */
 		    ((raw_pattern & 0x40) >> 2) );       /* xxxb xxxx */
-//gpio_put( TEST_OUTPUT_GP, 0 );
 
-//      port_ef_input_from_z80.byte = (uint8_t)(z80_written_byte & 0xFF);
-//      port_ef_input_from_z80.flag = NEW_INPUT_FROM_Z80;
+//    ADD_IOTRACE(CORE0_PORT_EF_Z80_OUT, port_ef_input_from_z80.byte);
 
-//      ADD_IOTRACE(CORE0_PORT_EF_Z80_OUT, port_ef_input_from_z80.byte);
-
-// At 200MHz this is still too slow, the test output goes down just as the
-// IORQ goes low. At 270MHz it seems fast enough?
       /* Wait for the IO request to complete */
       while( (gpio_get_all() & IORQ_BIT_MASK) == 0 );
     }
@@ -555,20 +481,15 @@ int main()
 
       /* A Z80 read, this core needs to switch the level shifter direction for our port */
 
-gpio_put( TEST_OUTPUT_GP, 1 );
       /* Direction needs to be Pico->ZX */
       gpio_put( DIR_OUTPUT_GP, 0 );
 
       /* Make data bus GPIOs outputs, pointed at the ZX */
       gpio_set_dir_out_masked( DBUS_MASK );
 
-      /* New or old? Doesn't matter, just return it */
-
       gpio_put_masked( DBUS_MASK, preconverted_data[port_mdr_in()] );
-//      gpio_put_masked( DBUS_MASK, preconverted_data[port_e7_output_to_z80.byte] );
-gpio_put( TEST_OUTPUT_GP, 0 );
 
-//      ADD_IOTRACE(CORE0_PORT_E7_Z80_IN, port_e7_output_to_z80.byte);
+//    ADD_IOTRACE(CORE0_PORT_E7_Z80_IN, port_e7_output_to_z80.byte);
 
       /* Wait for the IO request to complete */
       while( (gpio_get_all() & IORQ_BIT_MASK) == 0 );
@@ -578,12 +499,6 @@ gpio_put( TEST_OUTPUT_GP, 0 );
 	  
       /* Put level shifter direction back to ZX->Pico */
       gpio_put( DIR_OUTPUT_GP, 1 );
-
-      /*
-       * Mark the data port queue as needing to be refreshed.
-       * The other core will do it in due course
-       */
-      port_e7_output_to_z80.flag = HANDLED_DATA;
     }
 
     else if( (gpios_state & IF1_IOPORT_ACCESS_BIT_MASK) == PORT_EF_READ )
@@ -592,22 +507,27 @@ gpio_put( TEST_OUTPUT_GP, 0 );
 
       /* A Z80 read, this core needs to switch the level shifter direction for our port */
 
-// Tested OK
-// Tested - this goes up 200ns after IORQ goes low, plenty of time
-//gpio_put( TEST_OUTPUT_GP, 1 );
-
       /* Direction needs to be Pico->ZX */
       gpio_put( DIR_OUTPUT_GP, 0 );
 
       /* Make data bus GPIOs outputs, pointed at the ZX */
       gpio_set_dir_out_masked( DBUS_MASK );
 
-      /* New or old? Doesn't matter, just return it */
-      gpio_put_masked( DBUS_MASK, preconverted_data[precalculate_port_ctr_in()] );
-// Tested - this goes low 300ns before IORQ goes high, plenty of time
-//gpio_put( TEST_OUTPUT_GP, 0 );
+gpio_put( TEST_OUTPUT_GP, 1 );
+__asm volatile ("nop");
+__asm volatile ("nop");
+__asm volatile ("nop");
+__asm volatile ("nop");
+gpio_put( TEST_OUTPUT_GP, 0 );
+      gpio_put_masked( DBUS_MASK, preconverted_data[port_ctr_in()] );
+gpio_put( TEST_OUTPUT_GP, 1 );
+__asm volatile ("nop");
+__asm volatile ("nop");
+__asm volatile ("nop");
+__asm volatile ("nop");
+gpio_put( TEST_OUTPUT_GP, 0 );
 
-      ADD_IOTRACE(CORE0_PORT_EF_Z80_IN, port_ef_output_to_z80.byte);
+//    ADD_IOTRACE(CORE0_PORT_EF_Z80_IN, port_ef_output_to_z80.byte);
 
       /* Wait for the IO request to complete */
       while( (gpio_get_all() & IORQ_BIT_MASK) == 0 );
@@ -617,12 +537,6 @@ gpio_put( TEST_OUTPUT_GP, 0 );
 	  
       /* Put level shifter direction back to ZX->Pico */
       gpio_put( DIR_OUTPUT_GP, 1 );
-
-      /*
-       * Mark the control/status port queue as needing to be refreshed.
-       * The other core will do it in due course
-       */
-      port_ef_output_to_z80.flag = HANDLED_DATA;
     }
 
   } /* Infinite loop */

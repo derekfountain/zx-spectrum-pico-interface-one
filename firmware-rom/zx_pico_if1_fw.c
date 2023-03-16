@@ -32,8 +32,8 @@
 /* 1 instruction on the 150MHz microprocessor is 6.6ns */
 /* 1 instruction on the 200MHz microprocessor is 5.0ns */
 
-#define OVERCLOCK 150000
-//#define OVERCLOCK 200000
+//#define OVERCLOCK 150000
+#define OVERCLOCK 270000
 
 #include "roms.h"
 
@@ -196,7 +196,6 @@ void preconvert_roms( void )
   }  
 }
 
-
 /*
  * Populate the address bus indirection table.
  */
@@ -250,6 +249,55 @@ int64_t start_z80_alarm_func( alarm_id_t id, void *user_data )
   return 0;
 }
 
+#define RECORDING 1
+#if RECORDING
+
+uint8_t unconverted_byte[ 256 ];
+
+/*
+ * ROM bytes are stored converted into data bus GPIO order. To log
+ * the byte being returned I need to convert it back to the value
+ * in the ROM. This is fast path for the ROM emulation so it needs
+ * to be quick. So store this table of pre-unconverted 8 bit bytes.
+ */
+void create_unconvert_table( void )
+{
+  uint32_t i;
+  
+  for( i=0; i<256; i++ )
+  {
+    unconverted_byte[i] = (i & 0x87)       |        /* bxxx xbbb */
+                         ((i & 0x08) << 2) |        /* xxbx xxxx */
+                         ((i & 0x10) >> 1) |        /* xxxx bxxx */
+                         ((i & 0x20) << 1) |        /* xbxx xxxx */
+                         ((i & 0x40) >> 2);         /* xxxb xxxx */
+  }
+}
+
+typedef struct _recorder
+{
+  uint32_t gpios;
+  uint16_t address;
+  uint8_t  response;
+}
+RECORDER;
+
+#define RECORDER_SIZE 24000
+#define RECORDER_RESET ((uint16_t)65535)
+
+int32_t recorder_index=0;
+
+/*
+ * Print in debugger with
+ *
+ * (gbd) set max-value-size unlimited
+ * (gdb) print -array on -array-indexes -elements 16384 -- /x address_recorder
+ *
+ * where 16384 is recorder_index
+ */
+RECORDER address_recorder[ RECORDER_SIZE ];
+
+#endif
 
 
 int main()
@@ -277,6 +325,8 @@ int main()
 
   /* Switch the bits in the ROM bytes around, this is the data bus optimisation */
   preconvert_roms();
+
+  create_unconvert_table();
 
   /* Pull the buses to zeroes */
   gpio_init( A0_GP  ); gpio_set_dir( A0_GP,  GPIO_IN );  gpio_pull_down( A0_GP  );
@@ -387,6 +437,20 @@ int main()
 	rom_image_ptr = __ROMs_48_original_rom;
 	gpio_put(LED_PIN, 0);
       }
+#if RECORDING
+    /* Log to the recorder buffer the ROM address requested */
+    if( (rom_image_ptr == __ROMs_if1_rom) && (recorder_index >=0) )
+    {
+      address_recorder[ recorder_index ].gpios    = gpios_state;
+      address_recorder[ recorder_index ].address  = rom_address;
+      address_recorder[ recorder_index ].response = unconverted_byte[ (uint8_t)rom_value ];
+      if( ++recorder_index == RECORDER_SIZE )
+      {
+	recorder_index = 0;
+      }
+    }
+#endif
+
     }
 
 
