@@ -19,6 +19,15 @@ enum {
   SYNC_OK = 0xff
 };
 
+// Duplication! Get this in a header
+struct libspectrum_microdrive {
+
+  libspectrum_byte data[ LIBSPECTRUM_MICRODRIVE_CARTRIDGE_LENGTH ];
+  int write_protect;
+  libspectrum_byte cartridge_len;    /* Cartridge length in blocks */
+
+};
+
 typedef struct microdrive_t {
   utils_file file;
   char *filename;		/* old filename */
@@ -58,7 +67,7 @@ if1_init( void *context )
    * this will become an alloc().
    */
   microdrive.cartridge = (void*)test_image_mdr;
-//  (microdrive.cartridge)->write_protect = 0;
+  (microdrive.cartridge)->write_protect = 0;
 
   microdrive.inserted = 0;
   microdrive.modified = 0;
@@ -74,7 +83,7 @@ if1_mdr_insert( int which, const char *filename )
   libspectrum_microdrive_mdr_read( microdrive.cartridge,
 				   test_image_mdr,
 				   test_image_mdr_len );
-//  libspectrum_microdrive_set_write_protect( microdrive.cartridge, 0 );
+  libspectrum_microdrive_set_write_protect( microdrive.cartridge, 0 );
 
   microdrive.inserted = 1;
   microdrive.modified = 0;
@@ -148,8 +157,8 @@ port_ctr_in( void )
   libspectrum_byte ret = 0xff;
   int block;
 
-//  if( microdrive.motor_on && microdrive.inserted )
-//  {
+  if( 1 || (microdrive.motor_on && microdrive.inserted) )
+  {
     /* Calculate the block under the head */
     /* max_bytes is the number of bytes which can be read from the current block */
     block = microdrive.head_pos / 543 + ( microdrive.max_bytes == 15 ? 0 : 256 );
@@ -218,14 +227,16 @@ port_ctr_in( void )
       /* pream[block] is not SYNC_OK, we'll return GAP=1 and SYNC=1 indefinitely */
     }
     
-//    /* if write protected */
-      //  if( libspectrum_microdrive_write_protect( microdrive.cartridge) )
-      // ret &= 0xfe; /* active bit */
-      // }
-      // else
-      // {
-    /* motor isn't running, we'll return GAP=1 and SYNC=1 */
-      //}
+    /* if write protected */
+    if( libspectrum_microdrive_write_protect( microdrive.cartridge) )
+    {
+//      ret &= 0xfe; /* active bit */
+    }
+    else
+    {
+      /* motor isn't running, we'll return GAP=1 and SYNC=1 */
+    }
+  }
 
   /*
    * Position the microdrives at the start of the next block.
@@ -332,8 +343,7 @@ port_mdr_in( void )
 void
 port_mdr_out( libspectrum_byte val )
 {
-#define SUPPORTED_YET 0
-#if SUPPORTED_YET
+#if 0
   int block;
 
   if( microdrive.motor_on && microdrive.inserted )
@@ -382,7 +392,7 @@ port_mdr_out( libspectrum_byte val )
       libspectrum_microdrive_set_data( microdrive.cartridge,
 				       microdrive.head_pos,
 				       val );
-      increment_head( 0 );
+      increment_head();
       microdrive.modified = 1;
     }
 
@@ -390,5 +400,4 @@ port_mdr_out( libspectrum_byte val )
     microdrive.transfered++;
   }
 #endif
-
 }

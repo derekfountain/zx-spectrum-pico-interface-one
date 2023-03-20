@@ -445,7 +445,7 @@ int main()
 
   microdrives_reset();
 
-  /* Init complete, run 2nd core code which does the MD emulation */
+  /* Init complete, run 2nd core code which does the DIR switch */
   multicore_launch_core1( core1_main ); 
 
   while( 1 )
@@ -489,28 +489,10 @@ int main()
 		    ((raw_pattern & 0x20) << 1) |        /* xbxx xxxx */
 		    ((raw_pattern & 0x40) >> 2) );       /* xxxb xxxx */
 
-#if 0
-gpio_put( TEST_OUTPUT_GP, 1 );
-__asm volatile ("nop");
-__asm volatile ("nop");
-__asm volatile ("nop");
-__asm volatile ("nop");
-gpio_put( TEST_OUTPUT_GP, 0 );
-#endif
-
 //    ADD_IOTRACE(CORE0_PORT_EF_Z80_OUT, port_ef_input_from_z80.byte);
 
       /* Wait for the IO request to complete */
       while( (gpio_get_all() & IORQ_BIT_MASK) == 0 );
-
-#if 0
-gpio_put( TEST_OUTPUT_GP, 1 );
-__asm volatile ("nop");
-__asm volatile ("nop");
-__asm volatile ("nop");
-__asm volatile ("nop");
-gpio_put( TEST_OUTPUT_GP, 0 );
-#endif
 
     }
 

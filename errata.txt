@@ -78,6 +78,7 @@ Still not sure I need it for the final version, the Pico should be
 able to manage, but it might take some pressure off the Picos while
 I work issues out. Enable with a solder bridge footprint if possible.
 : Needs doing
+:: Might not need doing
 
 
 Test points required, bring them out to plated holes:
