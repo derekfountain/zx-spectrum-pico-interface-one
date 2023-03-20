@@ -17,6 +17,18 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  */
 
+/*
+ * cmake -DCMAKE_BUILD_TYPE=Debug ..
+ * make -j10
+ * sudo openocd -f interface/picoprobe.cfg -f target/rp2040.cfg -c "program ./zx_pico_if1_io_fw.elf verify reset exit"
+ * sudo openocd -f interface/picoprobe.cfg -f target/rp2040.cfg
+ * gdb-multiarch ./zx_pico_if1_io_fw.elf
+ *  target remote localhost:3333
+ *  load
+ *  monitor reset init
+ *  continue
+ */
+
 #include <stdio.h>
 #include <stdint.h>
 #include <string.h>
@@ -318,6 +330,7 @@ PORT_QUEUE port_e7_output_to_z80;  /* Read from MD data stream */
 PORT_QUEUE port_ef_input_from_z80; /* Write to control register */
 PORT_QUEUE port_ef_output_to_z80;  /* Read from status */
 
+void microdrives_reset( void );
 
 int main()
 {
@@ -405,8 +418,9 @@ int main()
   if1_init( NULL );
 
   /* Insert the test image (no filename as yet) into Microdrive 0 */
-  /* Single stepped... 32 blocks, 17376 bytes, plus one more saying RW. Looks fine.*/
   if1_mdr_insert( 0, NULL );
+
+  microdrives_reset();
 
   /* Init complete, run 2nd core code which does the MD emulation */
 //multicore_launch_core1( core1_main ); 
@@ -430,9 +444,9 @@ int main()
       gpio_put( DIR_OUTPUT_GP, 1 );
     }
 
+#if 0
     else if( (gpios_state & IF1_IOPORT_ACCESS_BIT_MASK) == PORT_E7_WRITE )
     {
-#if 0
       /* Z80 write (OUT instruction) to port 0xE7 (231), microdrive data */
 
       /* Pick up the pattern of bits from the jumbled data bus GPIOs */
@@ -448,11 +462,11 @@ int main()
       port_mdr_out( (uint8_t)(z80_written_byte & 0xFF) );
 
 //      ADD_IOTRACE(CORE0_PORT_E7_Z80_OUT, port_e7_input_from_z80.byte);
-#endif
 
       /* Wait for the IO request to complete */
       while( (gpio_get_all() & IORQ_BIT_MASK) == 0 );
     }
+#endif
 
     else if( (gpios_state & IF1_IOPORT_ACCESS_BIT_MASK) == PORT_EF_WRITE )
     {
@@ -469,10 +483,29 @@ int main()
 		    ((raw_pattern & 0x20) << 1) |        /* xbxx xxxx */
 		    ((raw_pattern & 0x40) >> 2) );       /* xxxb xxxx */
 
+#if 0
+gpio_put( TEST_OUTPUT_GP, 1 );
+__asm volatile ("nop");
+__asm volatile ("nop");
+__asm volatile ("nop");
+__asm volatile ("nop");
+gpio_put( TEST_OUTPUT_GP, 0 );
+#endif
+
 //    ADD_IOTRACE(CORE0_PORT_EF_Z80_OUT, port_ef_input_from_z80.byte);
 
       /* Wait for the IO request to complete */
       while( (gpio_get_all() & IORQ_BIT_MASK) == 0 );
+
+#if 0
+gpio_put( TEST_OUTPUT_GP, 1 );
+__asm volatile ("nop");
+__asm volatile ("nop");
+__asm volatile ("nop");
+__asm volatile ("nop");
+gpio_put( TEST_OUTPUT_GP, 0 );
+#endif
+
     }
 
     else if( (gpios_state & IF1_IOPORT_ACCESS_BIT_MASK) == PORT_E7_READ )
@@ -513,19 +546,7 @@ int main()
       /* Make data bus GPIOs outputs, pointed at the ZX */
       gpio_set_dir_out_masked( DBUS_MASK );
 
-gpio_put( TEST_OUTPUT_GP, 1 );
-__asm volatile ("nop");
-__asm volatile ("nop");
-__asm volatile ("nop");
-__asm volatile ("nop");
-gpio_put( TEST_OUTPUT_GP, 0 );
       gpio_put_masked( DBUS_MASK, preconverted_data[port_ctr_in()] );
-gpio_put( TEST_OUTPUT_GP, 1 );
-__asm volatile ("nop");
-__asm volatile ("nop");
-__asm volatile ("nop");
-__asm volatile ("nop");
-gpio_put( TEST_OUTPUT_GP, 0 );
 
 //    ADD_IOTRACE(CORE0_PORT_EF_Z80_IN, port_ef_output_to_z80.byte);
 
