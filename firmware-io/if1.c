@@ -94,6 +94,16 @@ if1_mdr_insert( int which, const char *filename )
   return 0;
 }
 
+void
+microdrives_reset( void )
+{
+  microdrive.head_pos = 0;
+  microdrive.motor_on = 0; /* motor off */
+  microdrive.gap      = 15;
+  microdrive.sync     = 15;
+  microdrive.transfered = 0;
+}
+
 static void
 increment_head( void )
 {
@@ -132,15 +142,14 @@ microdrives_restart( void )
   }
 }
 
-
 libspectrum_byte
 port_ctr_in( void )
 {
   libspectrum_byte ret = 0xff;
   int block;
 
-  if( microdrive.motor_on && microdrive.inserted )
-  {
+//  if( microdrive.motor_on && microdrive.inserted )
+//  {
     /* Calculate the block under the head */
     /* max_bytes is the number of bytes which can be read from the current block */
     block = microdrive.head_pos / 543 + ( microdrive.max_bytes == 15 ? 0 : 256 );
@@ -191,7 +200,7 @@ port_ctr_in( void )
       }
       else
       {
-	ret &= 0xf9; /* GAP and SYNC low */
+	ret &= 0xf9; /* GAP and SYNC low (both are active low) */
 
 	if( microdrive.sync )
 	{
@@ -209,14 +218,14 @@ port_ctr_in( void )
       /* pream[block] is not SYNC_OK, we'll return GAP=1 and SYNC=1 indefinitely */
     }
     
-    /* if write protected */
-    if( libspectrum_microdrive_write_protect( microdrive.cartridge) )
-      ret &= 0xfe; /* active bit */
-  }
-  else
-  {
+//    /* if write protected */
+      //  if( libspectrum_microdrive_write_protect( microdrive.cartridge) )
+      // ret &= 0xfe; /* active bit */
+      // }
+      // else
+      // {
     /* motor isn't running, we'll return GAP=1 and SYNC=1 */
-  }
+      //}
 
   /*
    * Position the microdrives at the start of the next block.
@@ -226,6 +235,12 @@ port_ctr_in( void )
    */
   microdrives_restart();
 
+  /* If I retrun 0xf9 here, which is GAP and SYNC both low, the tape spins indefinitely */
+  /* If I return 0xfb here, which is GAP=0, SYNC=1, the tape spins indefinitely. Different to emulator?
+   * That seems ok, i think, the ROM code is lloking for the gap */
+  /* Return 0x04 gives it the GAP. It then says MD not present, cos there's no sync */
+
+  /* So it'll spin quite happily until broken into. SO the error must be triggered when this returns valid data */
   return ret;
 }
 

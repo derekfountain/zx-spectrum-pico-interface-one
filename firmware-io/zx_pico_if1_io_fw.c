@@ -332,6 +332,29 @@ PORT_QUEUE port_ef_output_to_z80;  /* Read from status */
 
 void microdrives_reset( void );
 
+void core1_main( void )
+{
+  while( 1 )
+  {
+    register uint32_t gpios_state = gpio_get_all();
+
+    if( (gpios_state & ROM_READ_BIT_MASK) == 0 )
+    {
+      /* ROM memory read, the other Pico handles the details of this.
+       * This Pico's responsibility is just to switch the data bus level
+       * shifter direction to Pico->ZX
+       */
+      gpio_put( DIR_OUTPUT_GP, 0 );
+
+      /* Wait for the ROM request to complete */
+      while( (gpio_get_all() & ROM_READ_BIT_MASK) == 0 );
+
+      /* Put level shifter direction back to ZX->Pico */
+      gpio_put( DIR_OUTPUT_GP, 1 );
+    }
+  } 
+}
+
 int main()
 {
   bi_decl(bi_program_description("ZX Spectrum Pico IF1 board binary."));
@@ -423,29 +446,13 @@ int main()
   microdrives_reset();
 
   /* Init complete, run 2nd core code which does the MD emulation */
-//multicore_launch_core1( core1_main ); 
+  multicore_launch_core1( core1_main ); 
 
   while( 1 )
   {
     register uint32_t gpios_state = gpio_get_all();
 
-    if( (gpios_state & ROM_READ_BIT_MASK) == 0 )
-    {
-      /* ROM memory read, the other Pico handles the details of this.
-       * This Pico's responsibility is just to switch the data bus level
-       * shifter direction to Pico->ZX
-       */
-      gpio_put( DIR_OUTPUT_GP, 0 );
-
-      /* Wait for the ROM request to complete */
-      while( (gpio_get_all() & ROM_READ_BIT_MASK) == 0 );
-
-      /* Put level shifter direction back to ZX->Pico */
-      gpio_put( DIR_OUTPUT_GP, 1 );
-    }
-
-#if 0
-    else if( (gpios_state & IF1_IOPORT_ACCESS_BIT_MASK) == PORT_E7_WRITE )
+    if( (gpios_state & IF1_IOPORT_ACCESS_BIT_MASK) == PORT_E7_WRITE )
     {
       /* Z80 write (OUT instruction) to port 0xE7 (231), microdrive data */
 
@@ -466,7 +473,6 @@ int main()
       /* Wait for the IO request to complete */
       while( (gpio_get_all() & IORQ_BIT_MASK) == 0 );
     }
-#endif
 
     else if( (gpios_state & IF1_IOPORT_ACCESS_BIT_MASK) == PORT_EF_WRITE )
     {
