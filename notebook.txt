@@ -339,3 +339,56 @@ gpios_state when broken on OUT 223,0     0x1C507A00
 
 One clock cycle on 3.5MHz Z80 is 285ns. IORQ is down for 2.5 clocks, which is
 about 715ns. That lines up perfectly with the scope trace.
+
+
+
+Cartridge Loading
+=================
+
+Pico2
+-----
+
+typedef struct _md_flash_slot
+{
+  uint8_t                cartridge_present;
+  libspectrum_microdrive cartridge;
+}
+MD_FLASH_SLOT;
+
+On start up force empty slots. A new installation will set the 8 flash
+slots with cartridge_present=0 and zeroes in the cartridge structure.
+Pico3 can hold persistent MDR data and re-insert the last cartridges
+used if necessary.
+
+Like Fuse, start with everything empty, the UI Pico will need to load
+MDR images, either through the GUI or via an auto-restore thing.
+
+For test purposes, keep an MDR image in Pico2 flash. Load that into
+slot 1 on startup. Need to check the "MD not present" thing works if
+this is skipped, so might need a dummy image for loading into RAM.
+
+On motor_on, load from slot 1 into RAM. For test, only use the first
+slot (MD 1).
+
+New cartridge takes a slot, 1 to 8, do whatever Fuse "Insert new" does.
+I could save a new (unformatted) image in Fuse for this. Probably easier
+to build what it wants in memory.
+
+On motor_on, memcpy() from flash slot into RAM slot.
+On motor_off, memcpy() from RAM back to flash slot.
+
+Pico3->Pico2 protocol
+
+Mimic Fuse.
+
+I don't think I can do automatic Pico2 flash back to Pico3 SD card.
+It'd need doing on every sector write. So that leaves the Fuse model:
+the user will have to choose Save for each cartridge image. Maybe
+add a single button to save all cartridges back to SD.
+
+* Insert new
+* Insert
+* Eject
+* Save to SD card
+* Save As to SD card
+* Write protect enable/disable

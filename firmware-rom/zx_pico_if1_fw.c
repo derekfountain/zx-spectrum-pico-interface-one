@@ -17,6 +17,18 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  */
 
+/*
+ * cmake -DCMAKE_BUILD_TYPE=Debug ..
+ * make -j10
+ * sudo openocd -f interface/picoprobe.cfg -f target/rp2040.cfg -c "program ./zx_pico_if1_fw.elf verify reset exit"
+ * sudo openocd -f interface/picoprobe.cfg -f target/rp2040.cfg
+ * gdb-multiarch ./zx_pico_if1_fw.elf
+ *  target remote localhost:3333
+ *  load
+ *  monitor reset init
+ *  continue
+ */
+
 #include <stdio.h>
 #include <stdint.h>
 #include <string.h>
@@ -32,8 +44,8 @@
 /* 1 instruction on the 150MHz microprocessor is 6.6ns */
 /* 1 instruction on the 200MHz microprocessor is 5.0ns */
 
-//#define OVERCLOCK 150000
-#define OVERCLOCK 270000
+#define OVERCLOCK 150000
+//#define OVERCLOCK 270000
 
 #include "roms.h"
 
@@ -118,6 +130,8 @@ const uint32_t ROM_READ_BIT_MASK        = ((uint32_t)1 << ROM_READ_GP);
 /* Z80's M1 signal, needs to be merged into the IF1 paging logic */
 const uint8_t  M1_GP                    = 15;
 const uint32_t M1_INPUT_BIT_MASK        = ((uint32_t)1 << M1_GP);
+
+const uint8_t  TEST_OUTPUT_GP           = 27;
 
 /* This pin triggers a transistor which shorts the Z80's /RESET to ground */
 const uint8_t  PICO_RESET_Z80_GP        = 28;
@@ -249,7 +263,8 @@ int64_t start_z80_alarm_func( alarm_id_t id, void *user_data )
   return 0;
 }
 
-#define RECORDING 1
+/* Crank up the overclock to 270MHz if this is turned on */
+#define RECORDING 0
 #if RECORDING
 
 uint8_t unconverted_byte[ 256 ];
@@ -282,7 +297,7 @@ typedef struct _recorder
 }
 RECORDER;
 
-#define RECORDER_SIZE 24000
+#define RECORDER_SIZE 20000
 #define RECORDER_RESET ((uint16_t)65535)
 
 int32_t recorder_index=0;
@@ -290,7 +305,7 @@ int32_t recorder_index=0;
 /*
  * Print in debugger with
  *
- * (gbd) set max-value-size unlimited
+ * (gdb) set max-value-size unlimited
  * (gdb) print -array on -array-indexes -elements 16384 -- /x address_recorder
  *
  * where 16384 is recorder_index
@@ -326,7 +341,9 @@ int main()
   /* Switch the bits in the ROM bytes around, this is the data bus optimisation */
   preconvert_roms();
 
+#if RECORDING
   create_unconvert_table();
+#endif
 
   /* Pull the buses to zeroes */
   gpio_init( A0_GP  ); gpio_set_dir( A0_GP,  GPIO_IN );  gpio_pull_down( A0_GP  );
@@ -360,6 +377,10 @@ int main()
   /* M1 signal input */
   gpio_init( M1_GP ); gpio_set_dir( M1_GP, GPIO_IN );
   gpio_pull_up( M1_GP );
+
+  /* Set up test pin as output */
+  gpio_init(TEST_OUTPUT_GP); gpio_set_dir(TEST_OUTPUT_GP, GPIO_OUT);
+  gpio_put(TEST_OUTPUT_GP, 0);
 
   /* Blip LED to show we're running */
   gpio_init(LED_PIN);
@@ -409,11 +430,35 @@ int main()
     gpio_set_dir_out_masked( DBUS_MASK );
     gpio_put_masked( DBUS_MASK, rom_value );
 
+/* This is part of tracking down the RST 38H weirdness I see at this address. Off for now */
+#if 0
+if( (rom_image_ptr == __ROMs_if1_rom) && (rom_address == 0x163C) )
+{
+gpio_put( TEST_OUTPUT_GP, 1 );
+__asm volatile ("nop");
+__asm volatile ("nop");
+__asm volatile ("nop");
+__asm volatile ("nop");
+gpio_put( TEST_OUTPUT_GP, 0 );
+}
+#endif
     /*
      * Spin until the Z80 releases MREQ indicating the read is complete.
      * ROM_READ is active low - if it's 0 then the ROM is still being read.
      */
     while( (gpio_get_all() & ROM_READ_BIT_MASK) == 0 );
+
+#if 0
+if( (rom_image_ptr == __ROMs_if1_rom) && (rom_address == 0x163C) )
+{
+gpio_put( TEST_OUTPUT_GP, 1 );
+__asm volatile ("nop");
+__asm volatile ("nop");
+__asm volatile ("nop");
+__asm volatile ("nop");
+gpio_put( TEST_OUTPUT_GP, 0 );
+}
+#endif
 
     /*
      * Set the data bus GPIOs back to inputs. The level shifter for the data
