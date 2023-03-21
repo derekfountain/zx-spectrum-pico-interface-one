@@ -77,7 +77,9 @@ microdrives_reset( void )
   microdrive.transfered = 0;
 }
 
-static void
+static
+inline
+void
 increment_head( void )
 {
   microdrive.head_pos++;
@@ -115,6 +117,7 @@ microdrives_restart( void )
   }
 }
 
+inline
 libspectrum_byte
 port_ctr_in( void )
 {
@@ -225,6 +228,7 @@ port_ctr_in( void )
  * If the CLK line is going low set microdrive0 (the only one, now)
  * to motor status as per bit0 (COMMS DATA).
  */
+inline
 void
 port_ctr_out( libspectrum_byte val )
 {
@@ -250,6 +254,7 @@ port_ctr_out( libspectrum_byte val )
  * Byte is taken from the data block of the running microdrive
  * cartridge
  */
+inline
 libspectrum_byte
 port_mdr_in( void )
 {
@@ -299,6 +304,7 @@ port_mdr_in( void )
  * the preamble. Once that arrives the SYNC_OK flag is set.
  *
  */
+inline
 void
 port_mdr_out( libspectrum_byte val )
 {
@@ -351,7 +357,7 @@ port_mdr_out( libspectrum_byte val )
 				       microdrive.head_pos,
 				       val );
       increment_head();
-      microdrive.modified = 1;
+      // microdrive.modified = 1; // Unused for now
     }
 
     /* transfered does include the preamble */

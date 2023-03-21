@@ -48,7 +48,7 @@ typedef struct microdrive_t {
   utils_file file;
   char *filename;		/* old filename */
   int inserted;
-  int modified;
+  int modified;  // This isn't used, but might be needed for the save code
   int motor_on;
   int head_pos;
   int transfered;
