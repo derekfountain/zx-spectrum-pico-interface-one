@@ -41,6 +41,10 @@
 
 #include "if1.h"
 
+#include "hardware/pio.h"
+#include "hardware/clocks.h"
+#include "blink.pio.h"
+
 /* 1 instruction on the 133MHz microprocessor is 7.5ns */
 /* 1 instruction on the 140MHz microprocessor is 7.1ns */
 /* 1 instruction on the 150MHz microprocessor is 6.6ns */
@@ -355,6 +359,17 @@ void core1_main( void )
   } 
 }
 
+void blink_pin_forever(PIO pio, uint sm, uint offset, uint pin, uint freq) {
+    blink_program_init(pio, sm, offset, pin);
+    pio_sm_set_enabled(pio, sm, true);
+
+    printf("Blinking pin %d at %d Hz\n", pin, freq);
+
+    // PIO counter program takes 3 more cycles in total than we pass as
+    // input (wait for n + 1; mov; jmp)
+    pio->txf[sm] = (clock_get_hz(clk_sys) / (2 * freq)) - 3;
+}
+
 int main()
 {
   bi_decl(bi_program_description("ZX Spectrum Pico IF1 board binary."));
@@ -418,7 +433,6 @@ int main()
   gpio_init(LED_PIN);
   gpio_set_dir(LED_PIN, GPIO_OUT);
 
-
   int signal;
   for( signal=0; signal<2; signal++ )
   {
@@ -427,6 +441,10 @@ int main()
     gpio_put(LED_PIN, 0);
     busy_wait_us_32(250000);
   }
+
+  PIO pio = pio0;
+  uint offset = pio_add_program(pio, &blink_program);
+  blink_pin_forever(pio, 0, offset, LED_PIN, 3);
 
   /*
    * Set up ports to have no data from Z80 heading to them, and to
