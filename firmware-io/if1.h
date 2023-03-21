@@ -42,7 +42,7 @@ enum {
 
 
 /*
- * Microdrive structure, represents the tape drive ifself.
+ * Microdrive structure, represents the drive ifself.
  */
 typedef struct microdrive_t {
   utils_file file;

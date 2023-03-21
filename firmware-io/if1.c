@@ -191,9 +191,14 @@ port_ctr_in( void )
       /* pream[block] is not SYNC_OK, we'll return GAP=1 and SYNC=1 indefinitely */
     }
     
-    /* If write protected flag is true, pull the bit in the status byte low */
-    if( libspectrum_microdrive_write_protect( microdrive.cartridge) )
+    /*
+     * The IF1 ROM code reads the status byte and checks the bit0 result
+     * for FORMAT, WRITE and the other write operations. It doesn't keep
+     * the value cached, it reads it fresh each time.
+     */
+    if( libspectrum_microdrive_write_protect( microdrive.cartridge ) )
     {
+       /* If write protected flag is true, pull the bit in the status byte low */
       ret &= 0xfe;
     }
   }

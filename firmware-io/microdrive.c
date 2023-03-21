@@ -56,6 +56,7 @@ libspectrum_microdrive_free( libspectrum_microdrive *microdrive )
 
 /* Accessors */
 
+inline
 libspectrum_byte
 libspectrum_microdrive_data( const libspectrum_microdrive *microdrive,
 			     size_t which )
@@ -63,6 +64,7 @@ libspectrum_microdrive_data( const libspectrum_microdrive *microdrive,
   return microdrive->data[ which ];
 }
 
+inline
 void
 libspectrum_microdrive_set_data( libspectrum_microdrive *microdrive,
 				 size_t which, libspectrum_byte data )
@@ -70,12 +72,14 @@ libspectrum_microdrive_set_data( libspectrum_microdrive *microdrive,
   microdrive->data[ which ] = data;
 }
 
+inline
 int
 libspectrum_microdrive_write_protect( const libspectrum_microdrive *microdrive )
 {
   return microdrive->write_protect;
 }
 
+inline
 void
 libspectrum_microdrive_set_write_protect( libspectrum_microdrive *microdrive,
 					  int write_protect )
@@ -83,12 +87,14 @@ libspectrum_microdrive_set_write_protect( libspectrum_microdrive *microdrive,
   microdrive->write_protect = write_protect;
 }
 
+inline
 libspectrum_byte
 libspectrum_microdrive_cartridge_len( const libspectrum_microdrive *microdrive )
 {
   return microdrive->cartridge_len;
 }
 
+inline
 void
 libspectrum_microdrive_set_cartridge_len( libspectrum_microdrive *microdrive,
 			     libspectrum_byte len )
