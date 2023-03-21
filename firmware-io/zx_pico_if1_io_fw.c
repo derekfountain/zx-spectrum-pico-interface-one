@@ -466,9 +466,23 @@ int main()
                                   ((raw_pattern & 0x20) << 1) |        /* xbxx xxxx */
                                   ((raw_pattern & 0x40) >> 2);         /* xxxb xxxx */
 
+gpio_put( TEST_OUTPUT_GP, 1 );
+__asm volatile ("nop");
+__asm volatile ("nop");
+__asm volatile ("nop");
+__asm volatile ("nop");
+gpio_put( TEST_OUTPUT_GP, 0 );
+
       port_mdr_out( (uint8_t)(z80_written_byte & 0xFF) );
 
 //      ADD_IOTRACE(CORE0_PORT_E7_Z80_OUT, port_e7_input_from_z80.byte);
+
+gpio_put( TEST_OUTPUT_GP, 1 );
+__asm volatile ("nop");
+__asm volatile ("nop");
+__asm volatile ("nop");
+__asm volatile ("nop");
+gpio_put( TEST_OUTPUT_GP, 0 );
 
       /* Wait for the IO request to complete */
       while( (gpio_get_all() & IORQ_BIT_MASK) == 0 );

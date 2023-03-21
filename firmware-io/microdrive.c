@@ -29,34 +29,7 @@
 
 #include "internals.h"
 
-/* The type itself */
-
-struct libspectrum_microdrive {
-
-  libspectrum_byte data[ LIBSPECTRUM_MICRODRIVE_CARTRIDGE_LENGTH ];
-  int write_protect;
-  libspectrum_byte cartridge_len;    /* Cartridge length in blocks */
-
-};
-
-typedef struct libspectrum_microdrive_block {
-
-  libspectrum_byte hdflag;		/* bit0 = 1-head, ( 0 - data ) */
-  libspectrum_byte hdbnum;		/* block num 1 -- 254 */
-  libspectrum_word hdblen;		/* not used */
-  libspectrum_byte hdbnam[11];		/* cartridge label + \0 */
-  libspectrum_byte hdchks;		/* header checksum */
- 
-  libspectrum_byte recflg;		/* bit0 = 0-data, bit1, bit2 */
-  libspectrum_byte recnum;		/* data block num  */
-  libspectrum_word reclen;		/* block length 0 -- 512 */
-  libspectrum_byte recnam[11];		/* record (file) name + \0 */
-  libspectrum_byte rechks;		/* descriptor checksum */
-
-  libspectrum_byte data[512];		/* data bytes */
-  libspectrum_byte datchk;		/* data checksum */
-
-} libspectrum_microdrive_block;
+#include "microdrive.h"
 
 static const size_t MDR_LENGTH = LIBSPECTRUM_MICRODRIVE_CARTRIDGE_LENGTH + 1;
 
@@ -256,8 +229,16 @@ LSTCHK   LD      E,A             ; update the 8-bit sum.
   return 0;
 }
 
-/* .mdr format routines */
 
+/*
+ * Read a buffer of data in MDR format into the microdrive cartridge
+ * data structure. This is called from the "insert" code. In the FUSE
+ * code the MDR data is read from the disk file and this is used to 
+ * load that data into the cartridge image buffer.
+ *
+ * When I've got data on SD card, this is going to need to work the
+ * same way as it does in FUSE.
+ */
 libspectrum_error
 libspectrum_microdrive_mdr_read( libspectrum_microdrive *microdrive,
 				 libspectrum_byte *buffer, size_t length )
@@ -293,6 +274,13 @@ libspectrum_microdrive_mdr_read( libspectrum_microdrive *microdrive,
   return LIBSPECTRUM_ERROR_NONE;
 }
 
+
+/*
+ * Write a cartridge image into a byte buffer.
+ *
+ * In the FUSE code the byte buffer is written out to a file on disk.
+ * I'm going to need this when the SD card bit is done.
+ */
 void
 libspectrum_microdrive_mdr_write( const libspectrum_microdrive *microdrive,
 				  libspectrum_byte **buffer, size_t *length )

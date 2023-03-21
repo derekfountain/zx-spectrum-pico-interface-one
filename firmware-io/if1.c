@@ -1,45 +1,13 @@
+#include <string.h>
+
 #include "hardware/gpio.h"
+extern const uint8_t LED_PIN;
 
 #include "libspectrum.h"
 #include "if1.h"
+#include "microdrive.h"
 
 #include "test_image.h"
-
-extern const uint8_t LED_PIN;
-
-typedef struct utils_file {
-
-  unsigned char *buffer;
-  size_t length;
-
-} utils_file;
-
-enum {
-  SYNC_NO = 0,
-  SYNC_OK = 0xff
-};
-
-typedef struct microdrive_t {
-  utils_file file;
-  char *filename;		/* old filename */
-  int inserted;
-  int modified;
-  int motor_on;
-  int head_pos;
-  int transfered;
-  int max_bytes;
-  libspectrum_byte pream[512];	/* preamble/sync area written */
-  libspectrum_byte last;
-  libspectrum_byte gap;
-  libspectrum_byte sync;
-
-  libspectrum_microdrive *cartridge;	/* write protect, len, blocks */
-
-} microdrive_t;
-
-typedef struct if1_ula_t {
-  int comms_clk;	/* the previous data comms state */
-} if1_ula_t;
 
 static microdrive_t microdrive;
 static if1_ula_t if1_ula;
@@ -53,12 +21,12 @@ if1_init( void *context )
   if1_ula.comms_clk = 0;
 
   /* 
-   * For now the cartridge is the test image. The insert routine will
-   * copy over it probably from a flash image or something at which point
-   * this will become an alloc().
+   * For now the cartridge is the test image. I don't have enough RAM to
+   * malloc the 135KB needed for a full size cartridge as well as the
+   * cartridge image. This will need jiggling about when I have writes
+   * working. See if1_mdr_insert() for the memcpy() bit.
    */
-  microdrive.cartridge = (void*)test_image_mdr;
-//  (microdrive.cartridge)->write_protect = 0;
+  microdrive.cartridge = malloc( sizeof(struct libspectrum_microdrive) );
 
   microdrive.inserted = 0;
   microdrive.modified = 0;
@@ -71,10 +39,15 @@ if1_mdr_insert( int which, const char *filename )
 {
   int i;
 
+  /*
+   * This currently loads the test image from RAM into the RAM buffer.
+   * I need to move things around so the test image is in flash, which
+   * will be closer to what is required.
+   */
   libspectrum_microdrive_mdr_read( microdrive.cartridge,
 				   test_image_mdr,
 				   test_image_mdr_len );
-//  libspectrum_microdrive_set_write_protect( microdrive.cartridge, 0 );
+  libspectrum_microdrive_set_write_protect( microdrive.cartridge, 0 );
 
   microdrive.inserted = 1;
   microdrive.modified = 0;
@@ -218,15 +191,15 @@ port_ctr_in( void )
       /* pream[block] is not SYNC_OK, we'll return GAP=1 and SYNC=1 indefinitely */
     }
     
-    /* if write protected */
+    /* If write protected flag is true, pull the bit in the status byte low */
     if( libspectrum_microdrive_write_protect( microdrive.cartridge) )
     {
-      ret &= 0xfe; /* active bit */
+      ret &= 0xfe;
     }
-    else
-    {
-      /* motor isn't running, we'll return GAP=1 and SYNC=1 */
-    }
+  }
+  else
+  {
+    /* motor isn't running, we'll return GAP=1 and SYNC=1 */
   }
 
   /*
@@ -237,12 +210,6 @@ port_ctr_in( void )
    */
   microdrives_restart();
 
-  /* If I retrun 0xf9 here, which is GAP and SYNC both low, the tape spins indefinitely */
-  /* If I return 0xfb here, which is GAP=0, SYNC=1, the tape spins indefinitely. Different to emulator?
-   * That seems ok, i think, the ROM code is lloking for the gap */
-  /* Return 0x04 gives it the GAP. It then says MD not present, cos there's no sync */
-
-  /* So it'll spin quite happily until broken into. SO the error must be triggered when this returns valid data */
   return ret;
 }
 
@@ -326,10 +293,6 @@ port_mdr_in( void )
  * MDR format. So this code watches for 10 0x00 bytes, then 2 0xff bytes - that's
  * the preamble. Once that arrives the SYNC_OK flag is set.
  *
- * I probably don't need this to work for read-only support. It's not going to work
- * inline, there's too much of it. But it looks like a delayed implementation wll
- * be ok. As long as the OUT instruction completes quickly what happens at the
- * microdrive - this - can take a few ms.
  */
 void
 port_mdr_out( libspectrum_byte val )
