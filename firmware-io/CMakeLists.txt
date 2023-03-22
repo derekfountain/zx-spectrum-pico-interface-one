@@ -23,6 +23,7 @@ if (TARGET tinyusb_device)
   )
 
   pico_generate_pio_header(zx_pico_if1_io_fw ${CMAKE_CURRENT_LIST_DIR}/mreq_dir.pio)
+  pico_generate_pio_header(zx_pico_if1_io_fw ${CMAKE_CURRENT_LIST_DIR}/iorq_dir.pio)
 
   target_link_libraries(zx_pico_if1_io_fw pico_stdlib pico_mem_ops pico_multicore hardware_pio)
 

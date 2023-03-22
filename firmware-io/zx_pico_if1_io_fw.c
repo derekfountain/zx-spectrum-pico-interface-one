@@ -44,6 +44,7 @@
 #include "hardware/pio.h"
 #include "hardware/clocks.h"
 #include "mreq_dir.pio.h"
+#include "iorq_dir.pio.h"
 
 /* 1 instruction on the 133MHz microprocessor is 7.5ns */
 /* 1 instruction on the 140MHz microprocessor is 7.1ns */
@@ -193,7 +194,10 @@ const uint32_t PORT_EF_WRITE = ((uint32_t)0 << IORQ_GP) |
                                ((uint32_t)1 << A6_GP)   |
                                ((uint32_t)1 << A7_GP);
 
-/* ROM read logic input, goes 0 when the MREQ to ROM is happening */
+/*
+ * ROM read logic input, goes 0 when the MREQ to ROM is happening.
+ * This is configured as input from the PIO init code
+ */
 const uint8_t  ROM_READ_GP              = 27;
 const uint32_t ROM_READ_BIT_MASK        = ((uint32_t)1 << ROM_READ_GP);
 
@@ -407,9 +411,6 @@ int main()
   gpio_init( WR_GP ); gpio_set_dir( WR_GP, GPIO_IN );
   gpio_pull_up( WR_GP );
 
-  gpio_init( ROM_READ_GP ); gpio_set_dir( ROM_READ_GP, GPIO_IN );
-  gpio_pull_up( ROM_READ_GP );
-
   /*
    * Output to databus level shifter DIRection pin. Normally 1 meaning
    * zx->pico, we assert 0 to switch it pico->zx to send back a response
@@ -420,10 +421,17 @@ int main()
 
   /* Use PIO to switch the level shifter's DIRection when MREQ is happening */
   PIO pio = pio0;
-  uint sm = pio_claim_unused_sm( pio, true );
-  uint offset = pio_add_program( pio, &mreq_dir_program );
-  mreq_dir_program_init( pio, sm, offset, ROM_READ_GP, DIR_OUTPUT_GP );
-  pio_sm_set_enabled(pio, sm, true);
+  uint sm_mreq = pio_claim_unused_sm( pio, true );
+  uint offset_mreq = pio_add_program( pio, &mreq_dir_program );
+  mreq_dir_program_init( pio, sm_mreq, offset_mreq, ROM_READ_GP, DIR_OUTPUT_GP );
+  pio_sm_set_enabled(pio, sm_mreq, true);
+
+#if 0
+  uint sm_iorq = pio_claim_unused_sm( pio, true );
+  uint offset_iorq = pio_add_program( pio, &iorq_dir_program );
+  iorq_dir_program_init( pio, sm_iorq, offset_iorq, 15 );
+  pio_sm_set_enabled(pio, sm_iorq, true);
+#endif
 
   gpio_init(TEST_OUTPUT_GP); gpio_set_dir(TEST_OUTPUT_GP, GPIO_OUT);
   gpio_put(TEST_OUTPUT_GP, 0);
@@ -514,8 +522,16 @@ int main()
 
       /* A Z80 read, this core needs to switch the level shifter direction for our port */
 
+gpio_put( TEST_OUTPUT_GP, 1 );
+__asm volatile ("nop");
+__asm volatile ("nop");
+__asm volatile ("nop");
+__asm volatile ("nop");
+gpio_put( TEST_OUTPUT_GP, 0 );
+
       /* Direction needs to be Pico->ZX */
-      gpio_put( DIR_OUTPUT_GP, 0 );
+// //      gpio_put( DIR_OUTPUT_GP, 0 );
+      pio_sm_put( pio, sm_mreq, 1 );
 
       /* Make data bus GPIOs outputs, pointed at the ZX */
       gpio_set_dir_out_masked( DBUS_MASK );
@@ -531,7 +547,8 @@ int main()
       gpio_set_dir_in_masked( DBUS_MASK );
 	  
       /* Put level shifter direction back to ZX->Pico */
-      gpio_put( DIR_OUTPUT_GP, 1 );
+// //      gpio_put( DIR_OUTPUT_GP, 1 );
+      pio_sm_put( pio, sm_mreq, 0 );
     }
 
     else if( (gpios_state & IF1_IOPORT_ACCESS_BIT_MASK) == PORT_EF_READ )
@@ -540,8 +557,16 @@ int main()
 
       /* A Z80 read, this core needs to switch the level shifter direction for our port */
 
+gpio_put( TEST_OUTPUT_GP, 1 );
+__asm volatile ("nop");
+__asm volatile ("nop");
+__asm volatile ("nop");
+__asm volatile ("nop");
+gpio_put( TEST_OUTPUT_GP, 0 );
+
       /* Direction needs to be Pico->ZX */
-      gpio_put( DIR_OUTPUT_GP, 0 );
+// //      gpio_put( DIR_OUTPUT_GP, 0 );
+      pio_sm_put( pio, sm_mreq, 1 );
 
       /* Make data bus GPIOs outputs, pointed at the ZX */
       gpio_set_dir_out_masked( DBUS_MASK );
@@ -557,7 +582,8 @@ int main()
       gpio_set_dir_in_masked( DBUS_MASK );
 	  
       /* Put level shifter direction back to ZX->Pico */
-      gpio_put( DIR_OUTPUT_GP, 1 );
+// //      gpio_put( DIR_OUTPUT_GP, 1 );
+      pio_sm_put( pio, sm_mreq, 0 );
     }
 
   } /* Infinite loop */
@@ -568,10 +594,10 @@ int main()
 
 #if 0
 /* Blip the result pin, shows on scope */
-gpio_put( TEST_OUTPUT_GP, 1 ); busy_wait_us_32(5);
-gpio_put( TEST_OUTPUT_GP, 0 ); busy_wait_us_32(5);
-
-gpio_put( TEST_OUTPUT_GP, 1 ); busy_wait_us_32(1000);
-gpio_put( TEST_OUTPUT_GP, 0 ); busy_wait_us_32(1000);
+gpio_put( TEST_OUTPUT_GP, 1 );
 __asm volatile ("nop");
+__asm volatile ("nop");
+__asm volatile ("nop");
+__asm volatile ("nop");
+gpio_put( TEST_OUTPUT_GP, 0 );
 #endif

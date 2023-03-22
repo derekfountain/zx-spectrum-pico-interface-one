@@ -19,10 +19,43 @@
 
 .program mreq_dir
 .wrap_target
-    wait 0 pin 0         ; stall until ROM_READ goes low
+
+wait_for_mreq_low:
+    jmp pin check_for_iorq                ; if mreq is high there's no ROM read happening, go see if IO is happening
+
+; drop through, a ROM read is happening
+; set the DIR 0
+
+set_dir_low:
     set pins, 0          ; set output low, switches dbus level shifter direction
 
-    wait 1 pin 0         ; now stall again until ROM_READ goes high again
+; a ROM read is happening, wait for it to end then go down to the bottom to set DIR back to 1
+
+    wait 1 pin 0
+    jmp low_ended
+
+
+
+
+check_for_iorq:
+
+    pull noblock                    ; fetch whatever the C has put in the FIFO
+
+    out x, 32                       ; load what came from the C into X
+
+    jmp !X, wait_for_mreq_low       ; if there's nothing inbound from the C go back to the top
+
+    set pins, 0                     ; set output low, switches dbus level shifter direction
+
+wait_for_anything:
+    pull noblock                    ; wait for the C to give us something, anything, then drop through
+    out x, 32
+    jmp !X, low_ended
+    jmp wait_for_anything
+
+; set the DIR output high again, loop back
+
+low_ended:
     set pins, 1          ; put the dbus level shifter direction back
 .wrap
 
@@ -48,6 +81,7 @@ void mreq_dir_program_init(PIO pio, uint sm, uint offset, uint input_pin, uint o
   pio_sm_config c = mreq_dir_program_get_default_config(offset);
   sm_config_set_in_pins(&c, input_pin);
   sm_config_set_set_pins(&c, output_pin, 1);
+  sm_config_set_jmp_pin(&c, input_pin);
 
   /* Initialise the state machine */
   pio_sm_init(pio, sm, offset, &c);
