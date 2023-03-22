@@ -1,32 +1,55 @@
-; MREQ direction switcher
+; MREQ direction switcher PIO program
 ;
+; The input pin is ROM_READ, the one which the external logic pulls low
+; when the A4+A5+MREQ condition is low. As soon as that goes low the PIO
+; pulls the ouput pin low. That's the one connected to the level shifter's
+; direction pin, which is held low until the ROM_READ condition is no
+; longer met.
+;
+; This works in concert with the IORQ code which does the same thing
+; with the direction pin when the an IO read is made from one of the
+; IF1's read ports. It relies on the fact that MREQ and IORQ can't
+; both be active at the same time so the direction pin can be pulled
+; low when either condition is met. See the PORT_E7_READ and
+; PORT_EF_READ read code in zxpico_if1_io.c.
 ;
 
-; SET pin 0 should be mapped to the direction switcher GPIO
+; IN pin 0 should be mapped to the ROM_READ pin. SET pin 0 should be
+; mapped to the direction switcher pin.
 
 .program mreq_dir
 .wrap_target
-    wait 0 pin 0         ; ROM_READ_GP
-    set pins, 0            ; Set output off, this needs to be DIR
+    wait 0 pin 0         ; stall until ROM_READ goes low
+    set pins, 0          ; set output low, switches dbus level shifter direction
 
-    wait 1 pin 0         ; ROM_READ_GP
-    set pins, 1            ; Set output on again
+    wait 1 pin 0         ; now stall again until ROM_READ goes high again
+    set pins, 1          ; put the dbus level shifter direction back
 .wrap
 
 
 % c-sdk {
 
-void mreq_dir_program_init(PIO pio, uint sm, uint offset, uint input_pin, uint output_pin) {
-   pio_gpio_init(pio, input_pin);
-   pio_gpio_init(pio, output_pin);
+/*
+ * input_pin should be ROM_READ, output_pin should be level shifter direction
+ */
+void mreq_dir_program_init(PIO pio, uint sm, uint offset, uint input_pin, uint output_pin)
+{
+  /* Set both pins up for PIO use */
+  pio_gpio_init(pio, input_pin);
+  pio_gpio_init(pio, output_pin);
 
-   pio_sm_set_consecutive_pindirs(pio, sm, input_pin,  1, false);
-   pio_sm_set_consecutive_pindirs(pio, sm, output_pin, 1, true);
+  /* Set input pin to be input */
+  pio_sm_set_consecutive_pindirs(pio, sm, input_pin,  1, false);
 
-   pio_sm_config c = mreq_dir_program_get_default_config(offset);
-   sm_config_set_in_pins(&c, input_pin);
-   sm_config_set_set_pins(&c, output_pin, 1);
+  /* Set output pin to be output */
+  pio_sm_set_consecutive_pindirs(pio, sm, output_pin, 1, true);
 
-   pio_sm_init(pio, sm, offset, &c);
+  /* Configure IN and SET sets, one pin each */
+  pio_sm_config c = mreq_dir_program_get_default_config(offset);
+  sm_config_set_in_pins(&c, input_pin);
+  sm_config_set_set_pins(&c, output_pin, 1);
+
+  /* Initialise the state machine */
+  pio_sm_init(pio, sm, offset, &c);
 }
 %}

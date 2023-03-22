@@ -361,11 +361,6 @@ void core1_main( void )
 }
 #endif
 
-void mreq_dir_pin_forever(PIO pio, uint sm, uint offset, uint input_pin, uint output_pin)
-{
-  mreq_dir_program_init(pio, sm, offset, input_pin, output_pin);
-  pio_sm_set_enabled(pio, sm, true);
-}
 
 int main()
 {
@@ -412,7 +407,6 @@ int main()
   gpio_init( WR_GP ); gpio_set_dir( WR_GP, GPIO_IN );
   gpio_pull_up( WR_GP );
 
-  /* Input from ROM logic, 1 when MREQ isn't happening, 0 when it is */
   gpio_init( ROM_READ_GP ); gpio_set_dir( ROM_READ_GP, GPIO_IN );
   gpio_pull_up( ROM_READ_GP );
 
@@ -423,6 +417,13 @@ int main()
    */
   gpio_init(DIR_OUTPUT_GP); gpio_set_dir(DIR_OUTPUT_GP, GPIO_OUT);
   gpio_put(DIR_OUTPUT_GP, 1);
+
+  /* Use PIO to switch the level shifter's DIRection when MREQ is happening */
+  PIO pio = pio0;
+  uint sm = pio_claim_unused_sm( pio, true );
+  uint offset = pio_add_program( pio, &mreq_dir_program );
+  mreq_dir_program_init( pio, sm, offset, ROM_READ_GP, DIR_OUTPUT_GP );
+  pio_sm_set_enabled(pio, sm, true);
 
   gpio_init(TEST_OUTPUT_GP); gpio_set_dir(TEST_OUTPUT_GP, GPIO_OUT);
   gpio_put(TEST_OUTPUT_GP, 0);
@@ -438,11 +439,6 @@ int main()
     gpio_put(LED_PIN, 0);
     busy_wait_us_32(250000);
   }
-
-//  gpio_init(15); gpio_set_dir(15, GPIO_OUT);
-  PIO pio = pio0;
-  uint offset = pio_add_program(pio, &mreq_dir_program);
-  mreq_dir_pin_forever(pio, 0, offset, ROM_READ_GP, DIR_OUTPUT_GP);
 
   /*
    * Set up ports to have no data from Z80 heading to them, and to
@@ -482,23 +478,9 @@ int main()
                                   ((raw_pattern & 0x20) << 1) |        /* xbxx xxxx */
                                   ((raw_pattern & 0x40) >> 2);         /* xxxb xxxx */
 
-gpio_put( TEST_OUTPUT_GP, 1 );
-__asm volatile ("nop");
-__asm volatile ("nop");
-__asm volatile ("nop");
-__asm volatile ("nop");
-gpio_put( TEST_OUTPUT_GP, 0 );
-
       port_mdr_out( (uint8_t)(z80_written_byte & 0xFF) );
 
 //      ADD_IOTRACE(CORE0_PORT_E7_Z80_OUT, port_e7_input_from_z80.byte);
-
-gpio_put( TEST_OUTPUT_GP, 1 );
-__asm volatile ("nop");
-__asm volatile ("nop");
-__asm volatile ("nop");
-__asm volatile ("nop");
-gpio_put( TEST_OUTPUT_GP, 0 );
 
       /* Wait for the IO request to complete */
       while( (gpio_get_all() & IORQ_BIT_MASK) == 0 );
