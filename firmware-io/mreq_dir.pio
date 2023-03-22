@@ -24,40 +24,48 @@ wait_for_mreq_low:
     jmp pin check_for_iorq                ; if mreq is high there's no ROM read happening, go see if IO is happening
 
 ; drop through, a ROM read is happening
-; set the DIR 0
 
 set_dir_low:
-    set pins, 0          ; set output low, switches dbus level shifter direction
+    set pins, 0                           ; set output low, switches dbus level shifter direction
 
 ; a ROM read is happening, wait for it to end then go down to the bottom to set DIR back to 1
 
-    wait 1 pin 0
-    jmp low_ended
+    wait 1 pin 0                          ; stall, waiting for ROM_READ to go back to 1
+    jmp low_ended                         ; exit via the instruction which resets DIR back to 1
 
 
 
 
 check_for_iorq:
+    pull noblock                          ; fetch whatever the 'C' has put in the FIFO, if anything
+    out x, 32                             ; load what came from the 'C' into X
 
-    pull noblock                    ; fetch whatever the C has put in the FIFO
+    jmp !X, wait_for_mreq_low             ; zero means there's nothing inbound from the 'C', there's nothing to do
+                                          ; so go back to the top
 
-    out x, 32                       ; load what came from the C into X
+; the 'C' has put a 1 in the FIFO - switch the level shifter
 
-    jmp !X, wait_for_mreq_low       ; if there's nothing inbound from the C go back to the top
+    set pins, 0                           ; set output low, switches dbus level shifter direction
 
-    set pins, 0                     ; set output low, switches dbus level shifter direction
+; now wait until the 'C' gives us a zero again which is the instruction to switch the level shifter back
 
-wait_for_anything:
-    pull noblock                    ; wait for the C to give us something, anything, then drop through
-    out x, 32
-    jmp !X, low_ended
-    jmp wait_for_anything
+wait_for_zero:
+    pull noblock                          ; fetch what the 'C' is giving us
+    out x, 32                             ; move it to X
+
+    jmp !X, low_ended                     ; if the 'C' is now giving us a 0 again, escape out and put the direction back
+    jmp wait_for_zero                     ; otherwise the 'C' is still returning the 1, so keep looping until it's gone
+
+
+
 
 ; set the DIR output high again, loop back
 
 low_ended:
     set pins, 1          ; put the dbus level shifter direction back
 .wrap
+
+
 
 
 % c-sdk {

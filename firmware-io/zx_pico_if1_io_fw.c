@@ -340,30 +340,20 @@ PORT_QUEUE port_ef_output_to_z80;  /* Read from status */
 
 void microdrives_reset( void );
 
-#if 0
 void core1_main( void )
 {
   while( 1 )
   {
-    register uint32_t gpios_state = gpio_get_all();
-
-    if( (gpios_state & ROM_READ_BIT_MASK) == 0 )
+    if( port_e7_input_from_z80.flag == NEW_INPUT_FROM_Z80 )
     {
-      /* ROM memory read, the other Pico handles the details of this.
-       * This Pico's responsibility is just to switch the data bus level
-       * shifter direction to Pico->ZX
-       */
-      gpio_put( DIR_OUTPUT_GP, 0 );
+      // Call routine to write data
 
-      /* Wait for the ROM request to complete */
-      while( (gpio_get_all() & ROM_READ_BIT_MASK) == 0 );
+      port_mdr_out( port_e7_input_from_z80.byte );
 
-      /* Put level shifter direction back to ZX->Pico */
-      gpio_put( DIR_OUTPUT_GP, 1 );
+      port_e7_input_from_z80.flag = HANDLED_DATA;
     }
   } 
 }
-#endif
 
 
 int main()
@@ -419,19 +409,12 @@ int main()
   gpio_init(DIR_OUTPUT_GP); gpio_set_dir(DIR_OUTPUT_GP, GPIO_OUT);
   gpio_put(DIR_OUTPUT_GP, 1);
 
-  /* Use PIO to switch the level shifter's DIRection when MREQ is happening */
-  PIO pio = pio0;
-  uint sm_mreq = pio_claim_unused_sm( pio, true );
+  /* Use PIO to switch the level shifter's DIRection */
+  PIO pio          = pio0;
+  uint sm_mreq     = pio_claim_unused_sm( pio, true );
   uint offset_mreq = pio_add_program( pio, &mreq_dir_program );
   mreq_dir_program_init( pio, sm_mreq, offset_mreq, ROM_READ_GP, DIR_OUTPUT_GP );
   pio_sm_set_enabled(pio, sm_mreq, true);
-
-#if 0
-  uint sm_iorq = pio_claim_unused_sm( pio, true );
-  uint offset_iorq = pio_add_program( pio, &iorq_dir_program );
-  iorq_dir_program_init( pio, sm_iorq, offset_iorq, 15 );
-  pio_sm_set_enabled(pio, sm_iorq, true);
-#endif
 
   gpio_init(TEST_OUTPUT_GP); gpio_set_dir(TEST_OUTPUT_GP, GPIO_OUT);
   gpio_put(TEST_OUTPUT_GP, 0);
@@ -466,7 +449,8 @@ int main()
   microdrives_reset();
 
   /* Init complete, run 2nd core code which does the DIR switch */
-//  multicore_launch_core1( core1_main ); 
+  port_e7_input_from_z80.flag = HANDLED_DATA;
+  multicore_launch_core1( core1_main ); 
 
   while( 1 )
   {
@@ -486,7 +470,9 @@ int main()
                                   ((raw_pattern & 0x20) << 1) |        /* xbxx xxxx */
                                   ((raw_pattern & 0x40) >> 2);         /* xxxb xxxx */
 
-      port_mdr_out( (uint8_t)(z80_written_byte & 0xFF) );
+      /* Flag this up for core1 to handle, it takes a while so can't do it here */
+      port_e7_input_from_z80.byte = z80_written_byte;
+      port_e7_input_from_z80.flag = NEW_INPUT_FROM_Z80;
 
 //      ADD_IOTRACE(CORE0_PORT_E7_Z80_OUT, port_e7_input_from_z80.byte);
 
@@ -522,15 +508,7 @@ int main()
 
       /* A Z80 read, this core needs to switch the level shifter direction for our port */
 
-gpio_put( TEST_OUTPUT_GP, 1 );
-__asm volatile ("nop");
-__asm volatile ("nop");
-__asm volatile ("nop");
-__asm volatile ("nop");
-gpio_put( TEST_OUTPUT_GP, 0 );
-
       /* Direction needs to be Pico->ZX */
-// //      gpio_put( DIR_OUTPUT_GP, 0 );
       pio_sm_put( pio, sm_mreq, 1 );
 
       /* Make data bus GPIOs outputs, pointed at the ZX */
@@ -547,7 +525,6 @@ gpio_put( TEST_OUTPUT_GP, 0 );
       gpio_set_dir_in_masked( DBUS_MASK );
 	  
       /* Put level shifter direction back to ZX->Pico */
-// //      gpio_put( DIR_OUTPUT_GP, 1 );
       pio_sm_put( pio, sm_mreq, 0 );
     }
 
@@ -557,15 +534,7 @@ gpio_put( TEST_OUTPUT_GP, 0 );
 
       /* A Z80 read, this core needs to switch the level shifter direction for our port */
 
-gpio_put( TEST_OUTPUT_GP, 1 );
-__asm volatile ("nop");
-__asm volatile ("nop");
-__asm volatile ("nop");
-__asm volatile ("nop");
-gpio_put( TEST_OUTPUT_GP, 0 );
-
       /* Direction needs to be Pico->ZX */
-// //      gpio_put( DIR_OUTPUT_GP, 0 );
       pio_sm_put( pio, sm_mreq, 1 );
 
       /* Make data bus GPIOs outputs, pointed at the ZX */
@@ -582,7 +551,6 @@ gpio_put( TEST_OUTPUT_GP, 0 );
       gpio_set_dir_in_masked( DBUS_MASK );
 	  
       /* Put level shifter direction back to ZX->Pico */
-// //      gpio_put( DIR_OUTPUT_GP, 1 );
       pio_sm_put( pio, sm_mreq, 0 );
     }
 
