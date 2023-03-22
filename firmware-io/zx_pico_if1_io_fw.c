@@ -43,7 +43,7 @@
 
 #include "hardware/pio.h"
 #include "hardware/clocks.h"
-#include "blink.pio.h"
+#include "mreq_dir.pio.h"
 
 /* 1 instruction on the 133MHz microprocessor is 7.5ns */
 /* 1 instruction on the 140MHz microprocessor is 7.1ns */
@@ -336,6 +336,7 @@ PORT_QUEUE port_ef_output_to_z80;  /* Read from status */
 
 void microdrives_reset( void );
 
+#if 0
 void core1_main( void )
 {
   while( 1 )
@@ -358,16 +359,12 @@ void core1_main( void )
     }
   } 
 }
+#endif
 
-void blink_pin_forever(PIO pio, uint sm, uint offset, uint pin, uint freq) {
-    blink_program_init(pio, sm, offset, pin);
-    pio_sm_set_enabled(pio, sm, true);
-
-    printf("Blinking pin %d at %d Hz\n", pin, freq);
-
-    // PIO counter program takes 3 more cycles in total than we pass as
-    // input (wait for n + 1; mov; jmp)
-    pio->txf[sm] = (clock_get_hz(clk_sys) / (2 * freq)) - 3;
+void mreq_dir_pin_forever(PIO pio, uint sm, uint offset, uint input_pin, uint output_pin)
+{
+  mreq_dir_program_init(pio, sm, offset, input_pin, output_pin);
+  pio_sm_set_enabled(pio, sm, true);
 }
 
 int main()
@@ -442,9 +439,10 @@ int main()
     busy_wait_us_32(250000);
   }
 
+//  gpio_init(15); gpio_set_dir(15, GPIO_OUT);
   PIO pio = pio0;
-  uint offset = pio_add_program(pio, &blink_program);
-  blink_pin_forever(pio, 0, offset, LED_PIN, 3);
+  uint offset = pio_add_program(pio, &mreq_dir_program);
+  mreq_dir_pin_forever(pio, 0, offset, ROM_READ_GP, DIR_OUTPUT_GP);
 
   /*
    * Set up ports to have no data from Z80 heading to them, and to
@@ -464,7 +462,7 @@ int main()
   microdrives_reset();
 
   /* Init complete, run 2nd core code which does the DIR switch */
-  multicore_launch_core1( core1_main ); 
+//  multicore_launch_core1( core1_main ); 
 
   while( 1 )
   {

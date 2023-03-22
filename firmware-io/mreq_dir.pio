@@ -1,0 +1,32 @@
+; MREQ direction switcher
+;
+;
+
+; SET pin 0 should be mapped to the direction switcher GPIO
+
+.program mreq_dir
+.wrap_target
+    wait 0 pin 0         ; ROM_READ_GP
+    set pins, 0            ; Set output off, this needs to be DIR
+
+    wait 1 pin 0         ; ROM_READ_GP
+    set pins, 1            ; Set output on again
+.wrap
+
+
+% c-sdk {
+
+void mreq_dir_program_init(PIO pio, uint sm, uint offset, uint input_pin, uint output_pin) {
+   pio_gpio_init(pio, input_pin);
+   pio_gpio_init(pio, output_pin);
+
+   pio_sm_set_consecutive_pindirs(pio, sm, input_pin,  1, false);
+   pio_sm_set_consecutive_pindirs(pio, sm, output_pin, 1, true);
+
+   pio_sm_config c = mreq_dir_program_get_default_config(offset);
+   sm_config_set_in_pins(&c, input_pin);
+   sm_config_set_set_pins(&c, output_pin, 1);
+
+   pio_sm_init(pio, sm, offset, &c);
+}
+%}
