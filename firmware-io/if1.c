@@ -26,7 +26,8 @@ if1_init( void *context )
    * cartridge image. This will need jiggling about when I have writes
    * working. See if1_mdr_insert() for the memcpy() bit.
    */
-  microdrive.cartridge = malloc( sizeof(struct libspectrum_microdrive) );
+  if( (microdrive.cartridge = malloc( sizeof(struct libspectrum_microdrive) )) == NULL )
+    return -1;
 
   microdrive.inserted = 0;
   microdrive.modified = 0;
@@ -44,9 +45,12 @@ if1_mdr_insert( int which, const char *filename )
    * I need to move things around so the test image is in flash, which
    * will be closer to what is required.
    */
-  libspectrum_microdrive_mdr_read( microdrive.cartridge,
-				   test_image_mdr,
-				   test_image_mdr_len );
+  if( libspectrum_microdrive_mdr_read( microdrive.cartridge,
+				       test_image_mdr,
+				       test_image_mdr_len ) != LIBSPECTRUM_ERROR_NONE )
+  {
+    return -1;
+  }
   libspectrum_microdrive_set_write_protect( microdrive.cartridge, 0 );
 
   microdrive.inserted = 1;

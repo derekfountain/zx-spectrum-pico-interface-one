@@ -115,7 +115,7 @@ libspectrum_microdrive_set_cartridge_len( libspectrum_microdrive *microdrive,
  */
 libspectrum_error
 libspectrum_microdrive_mdr_read( libspectrum_microdrive *microdrive,
-				 libspectrum_byte *buffer, size_t length )
+				 const libspectrum_byte *buffer, size_t length )
 {
   size_t data_length;
 

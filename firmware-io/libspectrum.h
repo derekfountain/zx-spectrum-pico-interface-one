@@ -1419,10 +1419,10 @@ libspectrum_rzx_finalise( libspectrum_rzx *rzx );
 
 typedef struct libspectrum_microdrive libspectrum_microdrive;
 
-/* #define LIBSPECTRUM_MICRODRIVE_BLOCK_MAX 254 */
+#define LIBSPECTRUM_MICRODRIVE_BLOCK_MAX 254
 
 /* Pico OOM, I created a smaller cartridge image for now */
-#define LIBSPECTRUM_MICRODRIVE_BLOCK_MAX 32
+/* #define LIBSPECTRUM_MICRODRIVE_BLOCK_MAX 32 */
 #define LIBSPECTRUM_MICRODRIVE_HEAD_LEN 15
 #define LIBSPECTRUM_MICRODRIVE_DATA_LEN 512
 #define LIBSPECTRUM_MICRODRIVE_BLOCK_LEN ( LIBSPECTRUM_MICRODRIVE_HEAD_LEN + \
@@ -1466,7 +1466,7 @@ libspectrum_microdrive_checksum( libspectrum_microdrive *microdrive,
 				 libspectrum_byte what );
 WIN32_DLL libspectrum_error
 libspectrum_microdrive_mdr_read( libspectrum_microdrive *microdrive,
-				 libspectrum_byte *buffer, size_t length );
+				 const libspectrum_byte *buffer, size_t length );
 WIN32_DLL void
 libspectrum_microdrive_mdr_write( const libspectrum_microdrive *microdrive,
 				  libspectrum_byte **buffer, size_t *length );

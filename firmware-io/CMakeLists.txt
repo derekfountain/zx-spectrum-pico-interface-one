@@ -10,7 +10,7 @@ set(CMAKE_CXX_STANDARD 17)
 # down the IORQ code path it runs slowly and the IO is missed. This
 # fetches the code into fast RAM from the start
 #
-set(PICO_COPY_TO_RAM 1)
+# set(PICO_COPY_TO_RAM 1)
 
 pico_sdk_init()
 
@@ -21,6 +21,10 @@ if (TARGET tinyusb_device)
     microdrive.c
     if1.c
   )
+
+  # I prefer to catch my own OOM conditions
+  # 
+  target_compile_definitions(zx_pico_if1_io_fw PUBLIC -D PICO_MALLOC_PANIC=0)
 
   pico_generate_pio_header(zx_pico_if1_io_fw ${CMAKE_CURRENT_LIST_DIR}/mreq_dir.pio)
 

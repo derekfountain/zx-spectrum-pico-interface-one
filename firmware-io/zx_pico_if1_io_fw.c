@@ -449,17 +449,35 @@ int main()
   port_e7_input_from_z80.flag = HANDLED_DATA;
   port_ef_input_from_z80.flag = HANDLED_DATA;
 
-  microdrives_restart_required = 0;
 
-  if1_init( NULL );
+  if( if1_init( NULL ) == -1 )
+  {
+    while(1)
+    {
+      gpio_put(LED_PIN, 1);
+      busy_wait_us_32(250000);
+      gpio_put(LED_PIN, 0);
+      busy_wait_us_32(250000);
+    }
+  }
 
   /* Insert the test image (no filename as yet) into Microdrive 0 */
-  if1_mdr_insert( 0, NULL );
+  if( if1_mdr_insert( 0, NULL ) != LIBSPECTRUM_ERROR_NONE )
+  {
+    while(1)
+    {
+      gpio_put(LED_PIN, 1);
+      busy_wait_us_32(25000);
+      gpio_put(LED_PIN, 0);
+      busy_wait_us_32(25000);
+    }
+  }
 
   microdrives_reset();
 
   /* Init complete, run 2nd core code which does the DIR switch */
-  port_e7_input_from_z80.flag = HANDLED_DATA;
+  microdrives_restart_required = 0;
+  port_e7_input_from_z80.flag  = HANDLED_DATA;
   multicore_launch_core1( core1_main ); 
 
   while( 1 )
