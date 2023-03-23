@@ -44,7 +44,6 @@
 #include "hardware/pio.h"
 #include "hardware/clocks.h"
 #include "mreq_dir.pio.h"
-#include "iorq_dir.pio.h"
 
 /* 1 instruction on the 133MHz microprocessor is 7.5ns */
 /* 1 instruction on the 140MHz microprocessor is 7.1ns */
@@ -338,7 +337,10 @@ PORT_QUEUE port_e7_output_to_z80;  /* Read from MD data stream */
 PORT_QUEUE port_ef_input_from_z80; /* Write to control register */
 PORT_QUEUE port_ef_output_to_z80;  /* Read from status */
 
+uint8_t microdrives_restart_required;
+
 void microdrives_reset( void );
+void microdrives_restart( void );
 
 void core1_main( void )
 {
@@ -346,11 +348,17 @@ void core1_main( void )
   {
     if( port_e7_input_from_z80.flag == NEW_INPUT_FROM_Z80 )
     {
-      // Call routine to write data
+      // Call routine to write a data byte out to the tape
 
       port_mdr_out( port_e7_input_from_z80.byte );
 
       port_e7_input_from_z80.flag = HANDLED_DATA;
+    }
+
+    if( microdrives_restart_required )
+    {
+      microdrives_restart();
+      microdrives_restart_required = 0;
     }
   } 
 }
@@ -440,6 +448,8 @@ int main()
   port_e7_output_to_z80.flag  = HANDLED_DATA;
   port_e7_input_from_z80.flag = HANDLED_DATA;
   port_ef_input_from_z80.flag = HANDLED_DATA;
+
+  microdrives_restart_required = 0;
 
   if1_init( NULL );
 
@@ -540,7 +550,20 @@ int main()
       /* Make data bus GPIOs outputs, pointed at the ZX */
       gpio_set_dir_out_masked( DBUS_MASK );
 
+gpio_put( TEST_OUTPUT_GP, 1 );
+__asm volatile ("nop");
+__asm volatile ("nop");
+__asm volatile ("nop");
+__asm volatile ("nop");
+gpio_put( TEST_OUTPUT_GP, 0 );
       gpio_put_masked( DBUS_MASK, preconverted_data[port_ctr_in()] );
+      microdrives_restart_required = 1;
+gpio_put( TEST_OUTPUT_GP, 1 );
+__asm volatile ("nop");
+__asm volatile ("nop");
+__asm volatile ("nop");
+__asm volatile ("nop");
+gpio_put( TEST_OUTPUT_GP, 0 );
 
 //    ADD_IOTRACE(CORE0_PORT_EF_Z80_IN, port_ef_output_to_z80.byte);
 

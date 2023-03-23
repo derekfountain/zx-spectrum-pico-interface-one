@@ -99,6 +99,7 @@ increment_head( void )
 void
 microdrives_restart( void )
 {
+  /* FIXME Surely it's possible to calculate where the head needs to move to? */
   while( ( microdrive.head_pos % LIBSPECTRUM_MICRODRIVE_BLOCK_LEN ) != 0  &&
 	 ( microdrive.head_pos % LIBSPECTRUM_MICRODRIVE_BLOCK_LEN ) != LIBSPECTRUM_MICRODRIVE_HEAD_LEN )
   {
@@ -122,18 +123,18 @@ libspectrum_byte
 port_ctr_in( void )
 {
   libspectrum_byte ret = 0xff;
-  int block;
+//  int block;
 
-  if( microdrive.motor_on && microdrive.inserted )
-  {
+//  if( microdrive.motor_on && microdrive.inserted )
+//  {
     /* Calculate the block under the head */
     /* max_bytes is the number of bytes which can be read from the current block */
-    block = microdrive.head_pos / 543 + ( microdrive.max_bytes == 15 ? 0 : 256 );
+//    block = microdrive.head_pos / 543 + ( microdrive.max_bytes == 15 ? 0 : 256 );
 
     /* pream might be an array of flags, one for each block, indicating something... */
     /* Original comment suggests formatted? Of the block? */
-    if( microdrive.pream[block] == SYNC_OK )  	/* if formatted */
-    {
+//    if( microdrive.pream[block] == SYNC_OK )  	/* if formatted */
+//    {
       /* This is the only place the gap is used. It counts down from 15 to 0.
        * While it's non-zero the GAP bit is set in the status byte returned
        * to the IF1. When it gets to zero the sync value is counted down.
@@ -188,11 +189,11 @@ port_ctr_in( void )
 	  microdrive.sync = 15;
 	}
       }
-    }
-    else
-    {
+//    }
+//    else
+//    {
       /* pream[block] is not SYNC_OK, we'll return GAP=1 and SYNC=1 indefinitely */
-    }
+//    }
     
     /*
      * The IF1 ROM code reads the status byte and checks the bit0 result
@@ -204,11 +205,11 @@ port_ctr_in( void )
        /* If write protected flag is true, pull the bit in the status byte low */
       ret &= 0xfe;
     }
-  }
-  else
-  {
+//  }
+//  else
+//  {
     /* motor isn't running, we'll return GAP=1 and SYNC=1 */
-  }
+//  }
 
   /*
    * Position the microdrives at the start of the next block.
@@ -216,7 +217,7 @@ port_ctr_in( void )
    * start its next read. This makes the microdrive ready
    * for that next read
    */
-  microdrives_restart();
+//  microdrives_restart();
 
   return ret;
 }
