@@ -505,6 +505,9 @@ int main()
 		    ((raw_pattern & 0x20) << 1) |        /* xbxx xxxx */
 		    ((raw_pattern & 0x40) >> 2) );       /* xxxb xxxx */
 
+      /* Use the other core to reposition the head to the next block */
+      microdrives_restart_required = 1;
+
 //    ADD_IOTRACE(CORE0_PORT_EF_Z80_OUT, port_ef_input_from_z80.byte);
 
       /* Wait for the IO request to complete */
@@ -550,20 +553,10 @@ int main()
       /* Make data bus GPIOs outputs, pointed at the ZX */
       gpio_set_dir_out_masked( DBUS_MASK );
 
-gpio_put( TEST_OUTPUT_GP, 1 );
-__asm volatile ("nop");
-__asm volatile ("nop");
-__asm volatile ("nop");
-__asm volatile ("nop");
-gpio_put( TEST_OUTPUT_GP, 0 );
       gpio_put_masked( DBUS_MASK, preconverted_data[port_ctr_in()] );
+
+      /* Use the other core to reposition the head to the next block */
       microdrives_restart_required = 1;
-gpio_put( TEST_OUTPUT_GP, 1 );
-__asm volatile ("nop");
-__asm volatile ("nop");
-__asm volatile ("nop");
-__asm volatile ("nop");
-gpio_put( TEST_OUTPUT_GP, 0 );
 
 //    ADD_IOTRACE(CORE0_PORT_EF_Z80_IN, port_ef_output_to_z80.byte);
 

@@ -123,6 +123,11 @@ libspectrum_byte
 port_ctr_in( void )
 {
   libspectrum_byte ret = 0xff;
+
+/*
+ * These checks are commented out because the code doesn't quite run quickly enough
+ * for the SAVE code to work. Needs optimising.
+ */
 //  int block;
 
 //  if( microdrive.motor_on && microdrive.inserted )
@@ -243,7 +248,7 @@ port_ctr_out( libspectrum_byte val )
   /* Note the level of the CLK line so we can see what it's done next time */
   if1_ula.comms_clk = ( val & 0x02 ) ? 1 : 0;
 
-  microdrives_restart();
+//  microdrives_restart();
 }
 
 
