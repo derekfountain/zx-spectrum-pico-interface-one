@@ -82,6 +82,14 @@ I work issues out. Enable with a solder bridge footprint if possible.
 :: Might not need doing
 
 
+I need to connect the /WAIT signal on the edge connector to GPIO18
+on the Pico.
+- Done on board #2
+: Needs doing on schematic
+: Needs doing on PCB
+
+
+
 Test points required, bring them out to plated holes:
 Test pin on Pico1, use pin 27, needed to trigger scope on particular
                    instruction, like INIR

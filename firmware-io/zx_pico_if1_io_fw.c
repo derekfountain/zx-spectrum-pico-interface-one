@@ -134,6 +134,8 @@ const uint32_t RD_BIT_MASK              = ((uint32_t)1 << RD_GP);
 const uint8_t  WR_GP                    = 10;
 const uint32_t WR_BIT_MASK              = ((uint32_t)1 << WR_GP);
 
+const uint8_t  WAIT_GP                  = 18;
+
 const uint32_t IF1_IOPORT_ACCESS_BIT_MASK = IORQ_BIT_MASK |
                                             RD_BIT_MASK |
                                             WR_BIT_MASK |
@@ -410,6 +412,8 @@ int __time_critical_func(main)( void )
   gpio_init( WR_GP ); gpio_set_dir( WR_GP, GPIO_IN );
   gpio_pull_up( WR_GP );
 
+  gpio_init( WAIT_GP ); gpio_set_dir( WAIT_GP, GPIO_IN );
+
   /*
    * Output to databus level shifter DIRection pin. Normally 1 meaning
    * zx->pico, we assert 0 to switch it pico->zx to send back a response
@@ -566,6 +570,18 @@ int __time_critical_func(main)( void )
 
       /* A Z80 read, this core needs to switch the level shifter direction for our port */
 
+      gpio_set_dir(WAIT_GP, GPIO_OUT);
+      gpio_put(WAIT_GP, 0);
+
+#if 1
+gpio_put( TEST_OUTPUT_GP, 1 );
+__asm volatile ("nop");
+__asm volatile ("nop");
+__asm volatile ("nop");
+__asm volatile ("nop");
+gpio_put( TEST_OUTPUT_GP, 0 );
+#endif
+
       /* Direction needs to be Pico->ZX */
       pio_sm_put( pio, sm_mreq, 1 );
 
@@ -579,6 +595,18 @@ int __time_critical_func(main)( void )
 
 //    ADD_IOTRACE(CORE0_PORT_EF_Z80_IN, port_ef_output_to_z80.byte);
 
+#if 1
+gpio_put( TEST_OUTPUT_GP, 1 );
+__asm volatile ("nop");
+__asm volatile ("nop");
+__asm volatile ("nop");
+__asm volatile ("nop");
+gpio_put( TEST_OUTPUT_GP, 0 );
+#endif
+
+busy_wait_us_32(10);
+      gpio_set_dir(WAIT_GP, GPIO_IN);
+
       /* Wait for the IO request to complete */
       while( (gpio_get_all() & IORQ_BIT_MASK) == 0 );
 
@@ -588,6 +616,7 @@ int __time_critical_func(main)( void )
       /* Put level shifter direction back to ZX->Pico */
       pio_sm_put( pio, sm_mreq, 0 );
     }
+
 
   } /* Infinite loop */
 
@@ -603,4 +632,5 @@ __asm volatile ("nop");
 __asm volatile ("nop");
 __asm volatile ("nop");
 gpio_put( TEST_OUTPUT_GP, 0 );
+busy_wait_us_32(1);
 #endif
