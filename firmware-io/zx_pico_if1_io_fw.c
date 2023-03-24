@@ -37,6 +37,7 @@
 #include "hardware/gpio.h"
 #include "pico/binary_info.h"
 #include "pico/multicore.h"
+#include "pico/platform.h"
 #include "hardware/timer.h"
 
 #include "if1.h"
@@ -342,7 +343,7 @@ uint8_t microdrives_restart_required;
 void microdrives_reset( void );
 void microdrives_restart( void );
 
-void core1_main( void )
+void __time_critical_func(core1_main)( void )
 {
   while( 1 )
   {
@@ -364,7 +365,7 @@ void core1_main( void )
 }
 
 
-int main()
+int __time_critical_func(main)( void )
 {
   bi_decl(bi_program_description("ZX Spectrum Pico IF1 board binary."));
 

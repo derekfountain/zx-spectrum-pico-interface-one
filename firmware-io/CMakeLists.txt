@@ -10,6 +10,9 @@ set(CMAKE_CXX_STANDARD 17)
 # down the IORQ code path it runs slowly and the IO is missed. This
 # fetches the code into fast RAM from the start
 #
+# The issue with this is that the test MDR image, all 100KB of it,
+# gets copied into RAM at startup.
+#
 # set(PICO_COPY_TO_RAM 1)
 
 pico_sdk_init()

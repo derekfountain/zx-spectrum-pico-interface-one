@@ -1,6 +1,7 @@
 #include <string.h>
 
 #include "hardware/gpio.h"
+#include "pico/platform.h"
 extern const uint8_t LED_PIN;
 
 #include "libspectrum.h"
@@ -84,7 +85,7 @@ microdrives_reset( void )
 static
 inline
 void
-increment_head( void )
+__time_critical_func(increment_head)( void )
 {
   microdrive.head_pos++;
   if( microdrive.head_pos >= (libspectrum_microdrive_cartridge_len( microdrive.cartridge ) * LIBSPECTRUM_MICRODRIVE_BLOCK_LEN) )
@@ -101,7 +102,7 @@ increment_head( void )
  * emulation we can immediately mkae it ready and respond "yes, ready".
  */
 void
-microdrives_restart( void )
+__time_critical_func(microdrives_restart)( void )
 {
   /* FIXME Surely it's possible to calculate where the head needs to move to? */
   while( ( microdrive.head_pos % LIBSPECTRUM_MICRODRIVE_BLOCK_LEN ) != 0  &&
@@ -124,7 +125,7 @@ microdrives_restart( void )
 
 inline
 libspectrum_byte
-port_ctr_in( void )
+__time_critical_func(port_ctr_in)( void )
 {
   libspectrum_byte ret = 0xff;
 
@@ -240,7 +241,7 @@ port_ctr_in( void )
  */
 inline
 void
-port_ctr_out( libspectrum_byte val )
+__time_critical_func(port_ctr_out)( libspectrum_byte val )
 {
   /* Look for a falling edge on the CLK line */
   if( !( val & 0x02 ) && ( if1_ula.comms_clk ) ) {	/* ~~\__ */
@@ -266,7 +267,7 @@ port_ctr_out( libspectrum_byte val )
  */
 inline
 libspectrum_byte
-port_mdr_in( void )
+__time_critical_func(port_mdr_in)( void )
 {
   libspectrum_byte ret = 0xff;
 
@@ -316,7 +317,7 @@ port_mdr_in( void )
  */
 inline
 void
-port_mdr_out( libspectrum_byte val )
+__time_critical_func(port_mdr_out)( libspectrum_byte val )
 {
   int block;
 
