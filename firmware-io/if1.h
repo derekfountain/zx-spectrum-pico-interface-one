@@ -53,7 +53,7 @@ typedef struct microdrive_t {
   int head_pos;
   int transfered;
   int max_bytes;
-  libspectrum_byte pream[512];	/* preamble/sync area written */
+  libspectrum_byte pream[512];	/* preamble/sync area written. 256 header blocks and 256 data blocks */
   libspectrum_byte last;
   libspectrum_byte gap;
   libspectrum_byte sync;

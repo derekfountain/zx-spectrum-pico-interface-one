@@ -66,6 +66,7 @@ ROM is read. Not sure if this will work, so make sure it's easy
 to cut. Don';t use pin 27, that's standard blipper. Any other
 will do.
 : Needs doing
+:: Correction, IO Pico is doing this now, so it's not necessary
 
 
 I need a signal from Pico2 to Pico1. Pico1 can't release the Z80

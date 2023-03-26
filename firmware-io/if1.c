@@ -75,11 +75,13 @@ if1_mdr_insert( int which, const char *filename )
 void
 microdrives_reset( void )
 {
-  microdrive.head_pos = 0;
-  microdrive.motor_on = 0; /* motor off */
-  microdrive.gap      = 15;
-  microdrive.sync     = 15;
+  microdrive.head_pos   = 0;
+  microdrive.motor_on   = 0;
+  microdrive.gap        = 15;
+  microdrive.sync       = 15;
   microdrive.transfered = 0;
+
+  if1_ula.comms_clk     = 0;
 }
 
 static
@@ -129,22 +131,18 @@ __time_critical_func(port_ctr_in)( void )
 {
   libspectrum_byte ret = 0xff;
 
-/*
- * These checks are commented out because the code doesn't quite run quickly enough
- * for the SAVE code to work. Needs optimising.
- */
-//  int block;
+  int block;
 
-//  if( microdrive.motor_on && microdrive.inserted )
-//  {
+  if( microdrive.motor_on && microdrive.inserted )
+  {
     /* Calculate the block under the head */
     /* max_bytes is the number of bytes which can be read from the current block */
-//    block = microdrive.head_pos / 543 + ( microdrive.max_bytes == 15 ? 0 : 256 );
+    block = microdrive.head_pos / 543 + ( microdrive.max_bytes == 15 ? 0 : 256 );
 
     /* pream might be an array of flags, one for each block, indicating something... */
     /* Original comment suggests formatted? Of the block? */
-//    if( microdrive.pream[block] == SYNC_OK )  	/* if formatted */
-//    {
+    if( microdrive.pream[block] == SYNC_OK )  	/* if formatted */
+    {
       /* This is the only place the gap is used. It counts down from 15 to 0.
        * While it's non-zero the GAP bit is set in the status byte returned
        * to the IF1. When it gets to zero the sync value is counted down.
@@ -199,11 +197,11 @@ __time_critical_func(port_ctr_in)( void )
 	  microdrive.sync = 15;
 	}
       }
-//    }
-//    else
-//    {
+    }
+    else
+    {
       /* pream[block] is not SYNC_OK, we'll return GAP=1 and SYNC=1 indefinitely */
-//    }
+    }
     
     /*
      * The IF1 ROM code reads the status byte and checks the bit0 result
@@ -215,11 +213,11 @@ __time_critical_func(port_ctr_in)( void )
        /* If write protected flag is true, pull the bit in the status byte low */
       ret &= 0xfe;
     }
-//  }
-//  else
-//  {
+  }
+  else
+  {
     /* motor isn't running, we'll return GAP=1 and SYNC=1 */
-//  }
+  }
 
   /*
    * Position the microdrives at the start of the next block.
@@ -227,7 +225,7 @@ __time_critical_func(port_ctr_in)( void )
    * start its next read. This makes the microdrive ready
    * for that next read
    */
-//  microdrives_restart();
+  microdrives_restart();
 
   return ret;
 }
@@ -253,7 +251,7 @@ __time_critical_func(port_ctr_out)( libspectrum_byte val )
   /* Note the level of the CLK line so we can see what it's done next time */
   if1_ula.comms_clk = ( val & 0x02 ) ? 1 : 0;
 
-//  microdrives_restart();
+  microdrives_restart();
 }
 
 
@@ -271,16 +269,15 @@ __time_critical_func(port_mdr_in)( void )
 {
   libspectrum_byte ret = 0xff;
 
-  if( microdrive.motor_on )
+  if( microdrive.motor_on && microdrive.inserted )
   {
     /*
-     * This looks like max_bytes is the number of bytes in the block under
+     * max_bytes is the number of bytes in the block under
      * the head, and transfered is the number of bytes transferred out of
      * it so far
      */
     if( microdrive.transfered < microdrive.max_bytes )
     {
-      /* last is the last byte read from the tape. It's not used anywhere but here */
       ret = libspectrum_microdrive_data( microdrive.cartridge,
 					 microdrive.head_pos );
       /* Move tape on, with wrap */
@@ -289,7 +286,7 @@ __time_critical_func(port_mdr_in)( void )
 
     /*
      * transfered is a count of the number of bytes transferred from
-     * the cartridge to the IF1
+     * the block to the IF1
      */
     microdrive.transfered++;
   }
@@ -344,7 +341,7 @@ __time_critical_func(port_mdr_out)( libspectrum_byte val )
     else if( microdrive.transfered > 9 && microdrive.transfered < 12 && val == 0xff )
     {
       /*
-       * ...followed by 2 0x00 bytes...
+       * ...followed by 2 0xFF bytes...
        */
       microdrive.pream[block]++;
     }

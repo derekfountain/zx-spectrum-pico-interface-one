@@ -25,7 +25,6 @@ wait_for_mreq_low:
 
 ; drop through, a ROM read is happening
 
-set_dir_low:
     set pins, 0                           ; set output low, switches dbus level shifter direction
 
 ; a ROM read is happening, wait for it to end then go down to the bottom to set DIR back to 1
@@ -62,7 +61,7 @@ wait_for_zero:
 ; set the DIR output high again, loop back
 
 low_ended:
-    set pins, 1          ; put the dbus level shifter direction back
+    set pins, 1                           ; put the dbus level shifter direction back
 .wrap
 
 

@@ -51,8 +51,8 @@
 /* 1 instruction on the 150MHz microprocessor is 6.6ns */
 /* 1 instruction on the 200MHz microprocessor is 5.0ns */
 
-//#define OVERCLOCK 150000
-#define OVERCLOCK 270000
+#define OVERCLOCK 150000
+//#define OVERCLOCK 270000
 
 const uint8_t LED_PIN = PICO_DEFAULT_LED_PIN;
 
@@ -134,8 +134,6 @@ const uint32_t RD_BIT_MASK              = ((uint32_t)1 << RD_GP);
 const uint8_t  WR_GP                    = 10;
 const uint32_t WR_BIT_MASK              = ((uint32_t)1 << WR_GP);
 
-const uint8_t  WAIT_GP                  = 18;
-
 const uint32_t IF1_IOPORT_ACCESS_BIT_MASK = IORQ_BIT_MASK |
                                             RD_BIT_MASK |
                                             WR_BIT_MASK |
@@ -206,9 +204,16 @@ const uint32_t ROM_READ_BIT_MASK        = ((uint32_t)1 << ROM_READ_GP);
 /*
  * Data bus leve shifter direction pin, 1 is zx->pico, which is the normal
  * position, 0 means pico->zx which is temporarily switched to when the
- * Pico wants to send a data byte back to the Spectrum
+ * Pico wants to send a data byte back to the Spectrum. This is now unused
+ * in this code because the PIO does it, see mreq_dir.pio
  */
 const uint8_t  DIR_OUTPUT_GP            = 28;
+
+/*
+ * This one's attached to the Z80's /WAIT line, open collector,
+ * pull low to set the Z80 waiting
+ */
+const uint8_t  WAIT_GP                  = 18;
 
 /* Test pin is one of the UART pins for now because there's a test point */
 const uint8_t  TEST_OUTPUT_GP           = 17;
@@ -343,28 +348,17 @@ PORT_QUEUE port_ef_output_to_z80;  /* Read from status */
 uint8_t microdrives_restart_required;
 
 void microdrives_reset( void );
-void microdrives_restart( void );
 
+
+#define CORE1_IN_USE 0
+#if CORE1_IN_USE
 void __time_critical_func(core1_main)( void )
 {
   while( 1 )
   {
-    if( port_e7_input_from_z80.flag == NEW_INPUT_FROM_Z80 )
-    {
-      // Call routine to write a data byte out to the tape
-
-      port_mdr_out( port_e7_input_from_z80.byte );
-
-      port_e7_input_from_z80.flag = HANDLED_DATA;
-    }
-
-    if( microdrives_restart_required )
-    {
-      microdrives_restart();
-      microdrives_restart_required = 0;
-    }
   } 
 }
+#endif
 
 
 int __time_critical_func(main)( void )
@@ -413,14 +407,6 @@ int __time_critical_func(main)( void )
   gpio_pull_up( WR_GP );
 
   gpio_init( WAIT_GP ); gpio_set_dir( WAIT_GP, GPIO_IN );
-
-  /*
-   * Output to databus level shifter DIRection pin. Normally 1 meaning
-   * zx->pico, we assert 0 to switch it pico->zx to send back a response
-   * to the Z80
-   */
-  gpio_init(DIR_OUTPUT_GP); gpio_set_dir(DIR_OUTPUT_GP, GPIO_OUT);
-  gpio_put(DIR_OUTPUT_GP, 1);
 
   /* Use PIO to switch the level shifter's DIRection */
   PIO pio          = pio0;
@@ -480,10 +466,10 @@ int __time_critical_func(main)( void )
 
   microdrives_reset();
 
-  /* Init complete, run 2nd core code which does the DIR switch */
-  microdrives_restart_required = 0;
-  port_e7_input_from_z80.flag  = HANDLED_DATA;
+#if CORE1_IN_USE
+  /* Init complete, run 2nd core code */
   multicore_launch_core1( core1_main ); 
+#endif
 
   while( 1 )
   {
@@ -496,6 +482,10 @@ int __time_critical_func(main)( void )
       /* Pick up the pattern of bits from the jumbled data bus GPIOs */
       register uint32_t raw_pattern = (gpios_state & DBUS_MASK);
 
+      /* Set Z80 waiting */
+      gpio_set_dir(WAIT_GP, GPIO_OUT);
+      gpio_put(WAIT_GP, 0);
+
       /* Sort those bits out into the value which the Z80 originally wrote */
       uint32_t z80_written_byte =  (raw_pattern & 0x87)       |        /* bxxx xbbb */
                                   ((raw_pattern & 0x08) << 2) |        /* xxbx xxxx */
@@ -504,10 +494,12 @@ int __time_critical_func(main)( void )
                                   ((raw_pattern & 0x40) >> 2);         /* xxxb xxxx */
 
       /* Flag this up for core1 to handle, it takes a while so can't do it here */
-      port_e7_input_from_z80.byte = z80_written_byte;
-      port_e7_input_from_z80.flag = NEW_INPUT_FROM_Z80;
+      port_mdr_out( z80_written_byte );
 
 //      ADD_IOTRACE(CORE0_PORT_E7_Z80_OUT, port_e7_input_from_z80.byte);
+
+      /* Done waiting */
+      gpio_set_dir(WAIT_GP, GPIO_IN);
 
       /* Wait for the IO request to complete */
       while( (gpio_get_all() & IORQ_BIT_MASK) == 0 );
@@ -516,10 +508,14 @@ int __time_critical_func(main)( void )
     else if( (gpios_state & IF1_IOPORT_ACCESS_BIT_MASK) == PORT_EF_WRITE )
     {
       /* Z80 write (OUT instruction) to port 0xEF (239), microdrive control */
-      /* All this does is turn on the motor */
+      /* This turns on the motor */
 
       /* Pick up the pattern of bits from the jumbled data bus GPIOs */
       register uint32_t raw_pattern = (gpios_state & DBUS_MASK);
+
+      /* Set Z80 waiting */
+      gpio_set_dir(WAIT_GP, GPIO_OUT);
+      gpio_put(WAIT_GP, 0);
 
       /* Sort those bits out into the value which the Z80 originally wrote */
       port_ctr_out(  (raw_pattern & 0x87)       |        /* bxxx xbbb */
@@ -528,21 +524,22 @@ int __time_critical_func(main)( void )
 		    ((raw_pattern & 0x20) << 1) |        /* xbxx xxxx */
 		    ((raw_pattern & 0x40) >> 2) );       /* xxxb xxxx */
 
-      /* Use the other core to reposition the head to the next block */
-      microdrives_restart_required = 1;
-
 //    ADD_IOTRACE(CORE0_PORT_EF_Z80_OUT, port_ef_input_from_z80.byte);
+
+      /* Done waiting */
+      gpio_set_dir(WAIT_GP, GPIO_IN);
 
       /* Wait for the IO request to complete */
       while( (gpio_get_all() & IORQ_BIT_MASK) == 0 );
-
     }
 
     else if( (gpios_state & IF1_IOPORT_ACCESS_BIT_MASK) == PORT_E7_READ )
     {
       /* Z80 read from port 0xE7 (231), Z80 wants a microdrive data byte */
 
-      /* A Z80 read, this core needs to switch the level shifter direction for our port */
+      /* Set Z80 waiting */
+      gpio_set_dir(WAIT_GP, GPIO_OUT);
+      gpio_put(WAIT_GP, 0);
 
       /* Direction needs to be Pico->ZX */
       pio_sm_put( pio, sm_mreq, 1 );
@@ -550,9 +547,13 @@ int __time_critical_func(main)( void )
       /* Make data bus GPIOs outputs, pointed at the ZX */
       gpio_set_dir_out_masked( DBUS_MASK );
 
+      /* Port handling function returns the data */
       gpio_put_masked( DBUS_MASK, preconverted_data[port_mdr_in()] );
 
 //    ADD_IOTRACE(CORE0_PORT_E7_Z80_IN, port_e7_output_to_z80.byte);
+
+      /* Done waiting */
+      gpio_set_dir(WAIT_GP, GPIO_IN);
 
       /* Wait for the IO request to complete */
       while( (gpio_get_all() & IORQ_BIT_MASK) == 0 );
@@ -568,19 +569,9 @@ int __time_critical_func(main)( void )
     {
       /* Z80 read from port 0xEF (239), microdrive status */
 
-      /* A Z80 read, this core needs to switch the level shifter direction for our port */
-
+      /* Set Z80 waiting */
       gpio_set_dir(WAIT_GP, GPIO_OUT);
       gpio_put(WAIT_GP, 0);
-
-#if 1
-gpio_put( TEST_OUTPUT_GP, 1 );
-__asm volatile ("nop");
-__asm volatile ("nop");
-__asm volatile ("nop");
-__asm volatile ("nop");
-gpio_put( TEST_OUTPUT_GP, 0 );
-#endif
 
       /* Direction needs to be Pico->ZX */
       pio_sm_put( pio, sm_mreq, 1 );
@@ -588,23 +579,12 @@ gpio_put( TEST_OUTPUT_GP, 0 );
       /* Make data bus GPIOs outputs, pointed at the ZX */
       gpio_set_dir_out_masked( DBUS_MASK );
 
+      /* Port handling function returns the status */
       gpio_put_masked( DBUS_MASK, preconverted_data[port_ctr_in()] );
-
-      /* Use the other core to reposition the head to the next block */
-      microdrives_restart_required = 1;
 
 //    ADD_IOTRACE(CORE0_PORT_EF_Z80_IN, port_ef_output_to_z80.byte);
 
-#if 1
-gpio_put( TEST_OUTPUT_GP, 1 );
-__asm volatile ("nop");
-__asm volatile ("nop");
-__asm volatile ("nop");
-__asm volatile ("nop");
-gpio_put( TEST_OUTPUT_GP, 0 );
-#endif
-
-busy_wait_us_32(10);
+      /* Done waiting */
       gpio_set_dir(WAIT_GP, GPIO_IN);
 
       /* Wait for the IO request to complete */
