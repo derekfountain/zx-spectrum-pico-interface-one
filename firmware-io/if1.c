@@ -47,8 +47,8 @@ if1_mdr_insert( int which, const char *filename )
    * will be closer to what is required.
    */
   if( libspectrum_microdrive_mdr_read( microdrive.cartridge,
-				       test_image_mdr,
-				       test_image_mdr_len ) != LIBSPECTRUM_ERROR_NONE )
+				       a1_180_mdr,
+				       a1_180_mdr_len ) != LIBSPECTRUM_ERROR_NONE )
   {
     return -1;
   }
