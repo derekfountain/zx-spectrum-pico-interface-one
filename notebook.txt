@@ -376,10 +376,7 @@ to build what it wants in memory.
 
 On motor_on, memcpy() from flash slot into RAM slot.
 On motor_off, memcpy() from RAM back to flash slot.
-
-Pico3->Pico2 protocol
-
-Mimic Fuse.
+ Fuse.
 
 I don't think I can do automatic Pico2 flash back to Pico3 SD card.
 It'd need doing on every sector write. So that leaves the Fuse model:
@@ -392,3 +389,60 @@ add a single button to save all cartridges back to SD.
 * Save to SD card
 * Save As to SD card
 * Write protect enable/disable
+
+
+
+The FORMAT Issue
+================
+
+Disassembly:
+
+https://www.tablix.org/~avian/spectrum/rom/if1_2.htm#L1B5D
+
+Start the motor, check for write protect.
+
+https://www.tablix.org/~avian/spectrum/rom/if1_2.htm#L1B75
+
+Enable writing - don't know what this does. Apparently nothing.
+
+Creates an unuable record: header, record, EOF, checksum
+
+It then works down from sector number 255 to 0
+
+  Writes out a header
+  Small gap
+  Writes out record https://www.tablix.org/~avian/spectrum/rom/if1_2.htm#L16AF writes the 0xFC
+  Small gap
+  Loop back to do all 255
+
+All sectors from 255 down to 1 have been written
+THIS APPEARS TO WORK
+
+https://www.tablix.org/~avian/spectrum/rom/if1_2.htm#L1BDF
+
+Turn on appropriate drive motor
+
+Counter to 50
+  Read next header from heads
+  Check whether sector read is free in the map
+  If sector is free, or bad read, or bad checksum
+    Move to next sector
+  Else
+    Mark sector as usable in sector map
+
+https://www.tablix.org/~avian/spectrum/rom/if1_2.htm#L1C35
+
+;   Now prepare to overwrite the unusable sectors (which are mapped as usable)
+;   with record descriptors which are usable.
+
+Updates the in-memory sector image with a useable one
+
+https://www.tablix.org/~avian/spectrum/rom/if1_2.htm#L1C40
+
+https://www.tablix.org/~avian/spectrum/rom/if1_2.htm#L15B3
+
+Write usable block to next free sector
+Mark map showing sector is now used
+
+OTIR is here:
+https://www.tablix.org/~avian/spectrum/rom/if1_2.htm#L15D0
