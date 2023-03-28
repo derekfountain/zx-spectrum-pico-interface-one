@@ -115,7 +115,8 @@ libspectrum_microdrive_set_cartridge_len( libspectrum_microdrive *microdrive,
  */
 libspectrum_error
 libspectrum_microdrive_mdr_read( libspectrum_microdrive *microdrive,
-				 const libspectrum_byte *buffer, size_t length )
+				 const libspectrum_byte *buffer, size_t length,
+  uint do_copy )
 {
   size_t data_length;
 
@@ -135,7 +136,10 @@ libspectrum_microdrive_mdr_read( libspectrum_microdrive *microdrive,
 
   data_length = length - ( length % LIBSPECTRUM_MICRODRIVE_BLOCK_LEN );
 
-  memcpy( microdrive->data, buffer, data_length ); buffer += data_length;
+  if( do_copy )
+    memcpy( microdrive->data, buffer, data_length );
+
+  buffer += data_length;
 
   if( ( length % LIBSPECTRUM_MICRODRIVE_BLOCK_LEN ) == 1 )
     libspectrum_microdrive_set_write_protect( microdrive, *buffer );
