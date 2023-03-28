@@ -1420,9 +1420,6 @@ libspectrum_rzx_finalise( libspectrum_rzx *rzx );
 typedef struct libspectrum_microdrive libspectrum_microdrive;
 
 #define LIBSPECTRUM_MICRODRIVE_BLOCK_MAX 254
-
-/* Pico OOM, I created a smaller cartridge image for now */
-/* #define LIBSPECTRUM_MICRODRIVE_BLOCK_MAX 32 */
 #define LIBSPECTRUM_MICRODRIVE_HEAD_LEN 15
 #define LIBSPECTRUM_MICRODRIVE_DATA_LEN 512
 #define LIBSPECTRUM_MICRODRIVE_BLOCK_LEN ( LIBSPECTRUM_MICRODRIVE_HEAD_LEN + \

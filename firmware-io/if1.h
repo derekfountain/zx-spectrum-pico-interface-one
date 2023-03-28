@@ -1,29 +1,29 @@
-/* if1.h: Interface 1 handling routines
-   Copyright (c) 2004-2016 Gergely Szasz, Philip Kendall
-   Copyright (c) 2015 Stuart Brady
-   Copyright (c) 2023 Derek Fountain
+/*
+ * ZX Pico IF1 Firmware, a Raspberry Pi Pico based ZX Interface One emulator
+ * Copyright (C) 2023 Derek Fountain
+ * Derived from the Fuse code:
+ *    Copyright (c) 2004-2016 Gergely Szasz, Philip Kendall
+ *    Copyright (c) 2015 Stuart Brady
+ * 
+ * This program is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU General Public License
+ * as published by the Free Software Foundation; either version 2
+ * of the License, or (at your option) any later version.
+ * 
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ * 
+ * You should have received a copy of the GNU General Public License
+ * along with this program; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
+ */
 
-   This program is free software; you can redistribute it and/or modify
-   it under the terms of the GNU General Public License as published by
-   the Free Software Foundation; either version 2 of the License, or
-   (at your option) any later version.
-
-   This program is distributed in the hope that it will be useful,
-   but WITHOUT ANY WARRANTY; without even the implied warranty of
-   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-   GNU General Public License for more details.
-
-   You should have received a copy of the GNU General Public License along
-   with this program; if not, write to the Free Software Foundation, Inc.,
-   51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
-
-*/
-
-#ifndef IF1_H
-#define IF1_H
+#ifndef __IF1_H
+#define __IF1_H
 
 #include "libspectrum.h"
-
 
 /* Probably won't need this in the long term */
 typedef struct utils_file {
@@ -35,16 +35,52 @@ typedef struct utils_file {
 
 
 /* This is used in the preamble */
-enum {
+enum
+{
   SYNC_NO = 0,
   SYNC_OK = 0xff
 };
 
 
 /*
+ * This represents a microdrive cartridge. I'm going to rename it.
+ */
+struct libspectrum_microdrive
+{
+  /*
+   * Byte array representing the tape, approx 135KB
+   *
+   * Copy and paste out to a text file with:
+   *
+   * (gdb) set print repeats 0
+   * (gdb) set print elements unlimited
+   * (gdb) set pagination off
+   * (gdb) p/x microdrive->cartridge.data
+   *
+   * Convert to MDR image with:
+   *
+   * > perl -ne 'map { print chr(hex($_)) } split(/, /, $_)' < mm_reformated_in_zx.txt > mm_reformated_in_zx.mdr
+   *
+   * mm_reformated_in_zx.mdr will then load into FUSE as a normal
+   * MDR file.
+   */
+
+  /* 137922 bytes, a disk image is 137923 because it saves the w/p byte at the end */
+  libspectrum_byte data[ LIBSPECTRUM_MICRODRIVE_CARTRIDGE_LENGTH ];
+
+  /* Whether this cartridge has its w/p tab removed */
+  int write_protect;
+  
+  /* Length in 543-byte blocks */
+  libspectrum_byte cartridge_len;    /* Cartridge length in blocks */
+};
+
+
+/*
  * Microdrive structure, represents the drive ifself.
  */
-typedef struct microdrive_t {
+typedef struct _microdrive_t
+{
   utils_file file;
   char *filename;		/* old filename */
   int inserted;
@@ -66,12 +102,14 @@ typedef struct microdrive_t {
 /*
  * IF1 ULA structure. I removed pretty much everything in this.
  */
-typedef struct if1_ula_t {
+typedef struct _if1_ula_t
+{
   int comms_clk;	/* the previous data comms state */
-} if1_ula_t;
+}
+if1_ula_t;
 
 
-int if1_init( void *context );
+int if1_init( void );
 
 libspectrum_byte port_ctr_in( void );
 void port_ctr_out( libspectrum_byte val );

@@ -1,33 +1,51 @@
+/*
+ * ZX Pico IF1 Firmware, a Raspberry Pi Pico based ZX Interface One emulator
+ * Copyright (C) 2023 Derek Fountain
+ * Derived from the Fuse code:
+ *    Copyright (c) 2004-2016 Gergely Szasz, Philip Kendall
+ *    Copyright (c) 2015 Stuart Brady
+ * 
+ * This program is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU General Public License
+ * as published by the Free Software Foundation; either version 2
+ * of the License, or (at your option) any later version.
+ * 
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ * 
+ * You should have received a copy of the GNU General Public License
+ * along with this program; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
+ */
+
 #include <string.h>
 
 #include "hardware/gpio.h"
 #include "pico/platform.h"
-extern const uint8_t LED_PIN;
-
 #include "libspectrum.h"
 #include "if1.h"
-#include "microdrive.h"
 
-#include "test_image.h"
+#include "flash_images.h"
 
 static microdrive_t microdrive;
-static if1_ula_t if1_ula;
+static if1_ula_t    if1_ula;
 
+extern const uint8_t LED_PIN;
 
-int
-if1_init( void *context )
+int if1_init( void )
 {
   int m, i;
 
   if1_ula.comms_clk = 0;
 
   /* 
-   * For now the cartridge is the test image. I don't have enough RAM to
-   * malloc the 135KB needed for a full size cartridge as well as the
-   * cartridge image. This will need jiggling about when I have writes
-   * working. See if1_mdr_insert() for the memcpy() bit.
+   * There's only one microdrive image in RAM. I don't have enough RAM to
+   * malloc more than one. The "not currently being used" images are held
+   * in flash and "paged" in.
    */
-  if( (microdrive.cartridge = malloc( sizeof(struct libspectrum_microdrive) )) == NULL )
+  if( (microdrive.cartridge = malloc( sizeof(struct libspectrum_microdrive)-25000 )) == NULL )
     return -1;
 
   microdrive.inserted = 0;
@@ -36,8 +54,7 @@ if1_init( void *context )
   return 0;
 }
 
-int
-if1_mdr_insert( int which, const char *filename )
+int if1_mdr_insert( int which, const char *filename )
 {
   int i;
 
@@ -47,8 +64,8 @@ if1_mdr_insert( int which, const char *filename )
    * will be closer to what is required.
    */
   if( libspectrum_microdrive_mdr_read( microdrive.cartridge,
-				       a1_180_mdr,
-				       a1_180_mdr_len ) != LIBSPECTRUM_ERROR_NONE )
+				       md1_image,
+				       md1_image_len ) != LIBSPECTRUM_ERROR_NONE )
   {
     return -1;
   }
@@ -72,8 +89,7 @@ if1_mdr_insert( int which, const char *filename )
   return 0;
 }
 
-void
-microdrives_reset( void )
+void microdrives_reset( void )
 {
   microdrive.head_pos   = 0;
   microdrive.motor_on   = 0;

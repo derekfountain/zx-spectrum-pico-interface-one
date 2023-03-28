@@ -441,8 +441,9 @@ int __time_critical_func(main)( void )
   port_ef_input_from_z80.flag = HANDLED_DATA;
 
 
-  if( if1_init( NULL ) == -1 )
+  if( if1_init() == -1 )
   {
+    /* Slow blink means not enough memory for the in-RAM microdrive image */
     while(1)
     {
       gpio_put(LED_PIN, 1);
