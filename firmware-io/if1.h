@@ -66,7 +66,7 @@ struct libspectrum_microdrive
    */
 
   /* 137922 bytes, a disk image is 137923 because it saves the w/p byte at the end */
-  libspectrum_byte data[ LIBSPECTRUM_MICRODRIVE_CARTRIDGE_LENGTH ];
+  libspectrum_byte *data;
 
   /* Whether this cartridge has its w/p tab removed */
   int write_protect;

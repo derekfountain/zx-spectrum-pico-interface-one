@@ -1419,7 +1419,10 @@ libspectrum_rzx_finalise( libspectrum_rzx *rzx );
 
 typedef struct libspectrum_microdrive libspectrum_microdrive;
 
-#define LIBSPECTRUM_MICRODRIVE_BLOCK_MAX 254
+/* Pico doesn't have enough RAM to hold a 254 block cartridge image. */
+/* #define LIBSPECTRUM_MICRODRIVE_BLOCK_MAX 254 */
+
+#define LIBSPECTRUM_MICRODRIVE_BLOCK_MAX 180
 #define LIBSPECTRUM_MICRODRIVE_HEAD_LEN 15
 #define LIBSPECTRUM_MICRODRIVE_DATA_LEN 512
 #define LIBSPECTRUM_MICRODRIVE_BLOCK_LEN ( LIBSPECTRUM_MICRODRIVE_HEAD_LEN + \

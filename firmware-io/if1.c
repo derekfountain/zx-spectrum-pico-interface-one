@@ -34,6 +34,10 @@ static if1_ula_t    if1_ula;
 
 extern const uint8_t LED_PIN;
 
+/*
+ * Initialise Interface One structure. Create the 8 microdrive images
+ * and allocate a buffer for the currently used cartridge.
+ */
 int if1_init( void )
 {
   int m, i;
@@ -46,6 +50,9 @@ int if1_init( void )
    * in flash and "paged" in.
    */
   if( (microdrive.cartridge = malloc( sizeof(struct libspectrum_microdrive) )) == NULL )
+    return -1;
+
+  if( (microdrive.cartridge->data = malloc( LIBSPECTRUM_MICRODRIVE_CARTRIDGE_LENGTH )) == NULL )
     return -1;
 
   microdrive.inserted = 0;
@@ -75,8 +82,7 @@ int if1_mdr_insert( int which, const char *filename )
   microdrive.modified = 0;
 
   /*
-   * pream is 512 bytes in the microdrive_t structure, the one in this
-   * file which represents the microdrive.
+   * pream is 512 bytes in the microdrive_t structure.
    * This is filling 2 areas of the microdrive area's premable with SYNC_OK.
    * The loop is over the number of blocks on the cartridge.
    * Not quite sure what it's doing, maybe marking some sort of sector map?
@@ -100,10 +106,7 @@ void microdrives_reset( void )
   if1_ula.comms_clk     = 0;
 }
 
-static
-inline
-void
-__time_critical_func(increment_head)( void )
+static inline void __time_critical_func(increment_head)( void )
 {
   microdrive.head_pos++;
   if( microdrive.head_pos >= (libspectrum_microdrive_cartridge_len( microdrive.cartridge ) * LIBSPECTRUM_MICRODRIVE_BLOCK_LEN) )
@@ -119,8 +122,7 @@ __time_critical_func(increment_head)( void )
  * the data ready? is the data ready? is the data ready?..." For this
  * emulation we can immediately mkae it ready and respond "yes, ready".
  */
-void
-__time_critical_func(microdrives_restart)( void )
+void __time_critical_func(microdrives_restart)( void )
 {
   /* FIXME Surely it's possible to calculate where the head needs to move to? */
   while( ( microdrive.head_pos % LIBSPECTRUM_MICRODRIVE_BLOCK_LEN ) != 0  &&
@@ -141,9 +143,7 @@ __time_critical_func(microdrives_restart)( void )
   }
 }
 
-inline
-libspectrum_byte
-__time_critical_func(port_ctr_in)( void )
+inline libspectrum_byte __time_critical_func(port_ctr_in)( void )
 {
   libspectrum_byte ret = 0xff;
 
@@ -253,9 +253,7 @@ __time_critical_func(port_ctr_in)( void )
  * If the CLK line is going low set microdrive0 (the only one, now)
  * to motor status as per bit0 (COMMS DATA).
  */
-inline
-void
-__time_critical_func(port_ctr_out)( libspectrum_byte val )
+inline void __time_critical_func(port_ctr_out)( libspectrum_byte val )
 {
   /* Look for a falling edge on the CLK line */
   if( !( val & 0x02 ) && ( if1_ula.comms_clk ) ) {	/* ~~\__ */
@@ -279,9 +277,7 @@ __time_critical_func(port_ctr_out)( libspectrum_byte val )
  * Byte is taken from the data block of the running microdrive
  * cartridge
  */
-inline
-libspectrum_byte
-__time_critical_func(port_mdr_in)( void )
+inline libspectrum_byte __time_critical_func(port_mdr_in)( void )
 {
   libspectrum_byte ret = 0xff;
 
@@ -328,9 +324,7 @@ __time_critical_func(port_mdr_in)( void )
  * the preamble. Once that arrives the SYNC_OK flag is set.
  *
  */
-inline
-void
-__time_critical_func(port_mdr_out)( libspectrum_byte val )
+inline void __time_critical_func(port_mdr_out)( libspectrum_byte val )
 {
   int block;
 
