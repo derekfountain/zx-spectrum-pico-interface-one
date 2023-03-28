@@ -45,7 +45,7 @@ int if1_init( void )
    * malloc more than one. The "not currently being used" images are held
    * in flash and "paged" in.
    */
-  if( (microdrive.cartridge = malloc( sizeof(struct libspectrum_microdrive)-25000 )) == NULL )
+  if( (microdrive.cartridge = malloc( sizeof(struct libspectrum_microdrive) )) == NULL )
     return -1;
 
   microdrive.inserted = 0;
