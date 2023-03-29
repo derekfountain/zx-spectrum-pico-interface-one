@@ -28,36 +28,28 @@
 #include "pico/platform.h"
 #include "libspectrum.h"
 #include "if1.h"
+#include "tape.h"
 
 #include "flash_images.h"
 
-/* This needs to be 8 unless the Pico just can't manage that many */
-#define NUM_MICRODRIVES         8
 #define NO_ACTIVE_MICRODRIVE   -1
 
 static microdrive_t microdrive[NUM_MICRODRIVES];
 static int32_t      active_microdrive;
 
-static uint8_t     *cartridge_data;
+//static uint8_t     *cartridge_data;
 
-typedef struct _cartridge_image
-{
-  const uint8_t  *address;
-  const uint32_t  length;
-}
-cartridge_image;
-
-static cartridge_image cartridge_images[2] = 
-{
-  { md1_image, md1_image_len },
-  { md2_image, md2_image_len },
+//static tape_image tape_images[2] = 
+//{
+//  { md1_image, md1_image_len },
+//  { md2_image, md2_image_len },
 //  { md3_image, md3_image_len },
 //  { md4_image, md4_image_len },
 //  { md5_image, md5_image_len },
 //  { md6_image, md6_image_len },
 //  { md7_image, md7_image_len },
 //  { md8_image, md8_image_len },
-};
+//};
 
 static if1_ula_t    if1_ula;
 
@@ -78,15 +70,15 @@ int if1_init( void )
    * malloc more than one. The "not currently being used" images are held
    * in flash and "paged" in.
    */
-  if( (cartridge_data = malloc( LIBSPECTRUM_MICRODRIVE_CARTRIDGE_LENGTH )) == NULL )
-    return -1;
+//  if( (cartridge_data = malloc( LIBSPECTRUM_MICRODRIVE_CARTRIDGE_LENGTH )) == NULL )
+//    return -1;
 
   for( m=0; m<NUM_MICRODRIVES; m++ )
   {
     if( (microdrive[m].cartridge = malloc( sizeof(struct libspectrum_microdrive) )) == NULL )
       return -1;    
     
-    microdrive[m].cartridge->data = cartridge_data;
+//    microdrive[m].cartridge->data = cartridge_data;
     microdrive[m].inserted        = 0;
     microdrive[m].modified        = 0;
   }
@@ -110,9 +102,12 @@ int if1_mdr_insert( int which, const char *filename )
    * will be closer to what is required.
    */
 
+  if( load_tape( which ) == -1 )
+    return -1;
+
   if( libspectrum_microdrive_mdr_read( microdrive[which].cartridge,
-				       cartridge_images[0].address,
-				       cartridge_images[0].length,
+				       NULL,
+				       0,
 				       1 ) != LIBSPECTRUM_ERROR_NONE )
     return -1;
 
@@ -423,8 +418,8 @@ inline libspectrum_byte __time_critical_func(port_mdr_in)( void )
      */
     if( microdrive[active_microdrive].transfered < microdrive[active_microdrive].max_bytes )
     {
-      ret = libspectrum_microdrive_data( microdrive[active_microdrive].cartridge,
-					 microdrive[active_microdrive].head_pos );
+      query_tape_byte( microdrive[active_microdrive].head_pos, &ret );
+
       /* Move tape on, with wrap */
       increment_head( active_microdrive );
     }
@@ -509,9 +504,7 @@ inline void __time_critical_func(port_mdr_out)( libspectrum_byte val )
 	&&
 	(microdrive[active_microdrive].transfered < (microdrive[active_microdrive].max_bytes + 12)) )
     {
-      libspectrum_microdrive_set_data( microdrive[active_microdrive].cartridge,
-				       microdrive[active_microdrive].head_pos,
-				       val );
+      write_tape_byte( microdrive[active_microdrive].head_pos, val );
       increment_head( active_microdrive );
       microdrive[active_microdrive].modified = 1;
     }

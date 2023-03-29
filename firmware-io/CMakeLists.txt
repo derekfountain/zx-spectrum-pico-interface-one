@@ -23,6 +23,8 @@ if (TARGET tinyusb_device)
     zx_pico_if1_io_fw.c
     microdrive.c
     if1.c
+    flash_images.c
+    tape.c
   )
 
   # I prefer to catch my own OOM conditions

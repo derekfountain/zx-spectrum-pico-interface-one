@@ -25,6 +25,9 @@
 
 #include "libspectrum.h"
 
+/* This needs to be 8 unless the Pico just can't manage that many */
+#define NUM_MICRODRIVES         8
+
 /* Probably won't need this in the long term */
 typedef struct utils_file {
 
@@ -66,7 +69,7 @@ struct libspectrum_microdrive
    */
 
   /* 137922 bytes, a disk image is 137923 because it saves the w/p byte at the end */
-  libspectrum_byte *data;
+//  libspectrum_byte *data;
 
   /* Whether this cartridge has its w/p tab removed */
   int write_protect;
@@ -107,6 +110,14 @@ typedef struct _if1_ula_t
   int comms_clk;	/* the previous data comms state */
 }
 if1_ula_t;
+
+
+typedef struct _tape_image
+{
+  const uint8_t  *address;
+  uint32_t  length;
+}
+tape_image;
 
 
 int if1_init( void );
