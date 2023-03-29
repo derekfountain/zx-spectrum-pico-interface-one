@@ -352,10 +352,21 @@ void microdrives_reset( void );
 
 #define CORE1_IN_USE 0
 #if CORE1_IN_USE
+uint8_t message[128];
 void __time_critical_func(core1_main)( void )
 {
+  stdio_init_all();
+
+  message[0] = '\0';
+  
   while( 1 )
   {
+    if( message[0] != '\0' )
+    {
+      busy_wait_us_32(3);
+      printf(message);
+      message[0] = '\0';
+    }
   } 
 }
 #endif
@@ -365,7 +376,7 @@ void __time_critical_func(core1_main)( void )
  * The software doesn't work with interrupts on. stdio doesn't work
  * with interrupts off. This is only of occasional use.
  */
-#define STDIO_ENABLED 0
+#define STDIO_ENABLED 1
 
 
 int __time_critical_func(main)( void )
@@ -376,7 +387,7 @@ int __time_critical_func(main)( void )
   stdio_init_all();
 #else  
   /* All interrupts off */
-  irq_set_mask_enabled( 0xFFFFFFFF, 0 );
+  irq_set_mask_enabled( 0xFFFFFFFF, 0 );  
 #endif  
 
 #ifdef OVERCLOCK
@@ -586,7 +597,7 @@ int __time_critical_func(main)( void )
       gpio_put(WAIT_GP, 0);
 
 #if STDIO_ENABLED
-      printf("PORT_EF_READ, calling port_ctr_in()\n"); busy_wait_us_32(10000);
+      printf("PORT_EF_READ, calling port_ctr_in()\n");
 #endif  
 
       /* Direction needs to be Pico->ZX */
@@ -600,6 +611,9 @@ int __time_critical_func(main)( void )
 
 //    ADD_IOTRACE(CORE0_PORT_EF_Z80_IN, port_ef_output_to_z80.byte);
 
+#if STDIO_ENABLED
+      printf("PORT_EF_READ, complete\n");
+#endif  
       /* Done waiting */
       gpio_set_dir(WAIT_GP, GPIO_IN);
 
@@ -612,9 +626,6 @@ int __time_critical_func(main)( void )
       /* Put level shifter direction back to ZX->Pico */
       pio_sm_put( pio, sm_mreq, 0 );
 
-#if STDIO_ENABLED
-      printf("PORT_EF_READ, complete\n");  busy_wait_us_32(10000);
-#endif  
     }
 
 
