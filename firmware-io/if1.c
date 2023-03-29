@@ -47,16 +47,16 @@ typedef struct _cartridge_image
 }
 cartridge_image;
 
-static cartridge_image cartridge_images[8] = 
+static cartridge_image cartridge_images[2] = 
 {
   { md1_image, md1_image_len },
   { md2_image, md2_image_len },
-  { md3_image, md3_image_len },
-  { md4_image, md4_image_len },
-  { md5_image, md5_image_len },
-  { md6_image, md6_image_len },
-  { md7_image, md7_image_len },
-  { md8_image, md8_image_len },
+//  { md3_image, md3_image_len },
+//  { md4_image, md4_image_len },
+//  { md5_image, md5_image_len },
+//  { md6_image, md6_image_len },
+//  { md7_image, md7_image_len },
+//  { md8_image, md8_image_len },
 };
 
 static if1_ula_t    if1_ula;
@@ -86,7 +86,7 @@ int if1_init( void )
     if( (microdrive[m].cartridge = malloc( sizeof(struct libspectrum_microdrive) )) == NULL )
       return -1;    
     
-    microdrive[m].cartridge->data = NULL;
+    microdrive[m].cartridge->data = cartridge_data;
     microdrive[m].inserted        = 0;
     microdrive[m].modified        = 0;
   }
@@ -111,10 +111,9 @@ int if1_mdr_insert( int which, const char *filename )
    */
 
   if( libspectrum_microdrive_mdr_read( microdrive[which].cartridge,
-				       cartridge_images[which].address,
-				       cartridge_images[which].length,
-0
- ) != LIBSPECTRUM_ERROR_NONE )
+				       cartridge_images[0].address,
+				       cartridge_images[0].length,
+				       1 ) != LIBSPECTRUM_ERROR_NONE )
     return -1;
 
   libspectrum_microdrive_set_write_protect( microdrive[which].cartridge, 0 );
@@ -322,63 +321,74 @@ inline void __time_critical_func(port_ctr_out)( libspectrum_byte val )
   /* Look for a falling edge on the CLK line */
   if( ((val & 0x02) == 0) && (if1_ula.comms_clk == 1) )
   {
-    /* Falling edge of the clock ~~\__ */
+    /* Falling edge of the clock on bit 0x02  ~~\__ */
 
+    uint32_t previously_active_microdrive = active_microdrive;
+
+    /*
+     * A pulse has arrived on bit 0x01. There will be 8 of these in total,
+     * sent in a 1ms sequence by the IF1's ROM routine SEL-DRIVE.
+     * https://www.tablix.org/~avian/spectrum/rom/if1_2.htm#L1532
+     * This pulse just received will be used to switch the motor of
+     * microdrive 0. All the current motor control values are shuffled
+     * along to the left and the new one is dropped into the microdrive
+     * furthest right
+     */
     int m;
-
     for( m = 7; m > 0; m-- )
     {
       microdrive[m].motor_on = microdrive[m - 1].motor_on;
     }
-
     uint8_t action = (val & 0x01) ? 0 : 1;
+    microdrive[0].motor_on = action;
 
-    /* Check what the instruction bit said - motor on or off? */
-    if( action == 0 )
+    /* Work out which microdrive that leaves active, if any */
+    uint32_t active_microdrive = NO_ACTIVE_MICRODRIVE;
+    for( m = 0; m < NUM_MICRODRIVES; m++ )
     {
-      /* Turn off motor  - we need to copy the data buffer out to flash */
-
-      if( active_microdrive != NO_ACTIVE_MICRODRIVE )
+      if( microdrive[m].motor_on )
       {
-	// memcpy data back to flash, then:
+	active_microdrive = m;
+	break;
+      }
+    }
+active_microdrive = 0;
+
 #if 0
-	long unsigned int offset = (long unsigned int)((uint8_t*)cartridge_images[active_microdrive].address - XIP_BASE);
-	size_t            bytes  = (size_t)(((cartridge_images[active_microdrive].length+
+    if( (previously_active_microdrive != NO_ACTIVE_MICRODRIVE) && (active_microdrive != previously_active_microdrive) )
+    {
+      /* Previously spinning drive has just had its motor turned off  - we need to copy the data buffer out to flash */
+
+      if( microdrive[active_microdrive].modified == 1 )
+      {
+	long unsigned int offset = (long unsigned int)((uint8_t*)cartridge_images[previously_active_microdrive].address - XIP_BASE);
+	size_t            bytes  = (size_t)(((cartridge_images[previously_active_microdrive].length+
 					                                 FLASH_SECTOR_SIZE) / FLASH_SECTOR_SIZE) * FLASH_SECTOR_SIZE);
 
 	flash_range_erase( offset, bytes );
 
-	bytes  = (size_t)(((cartridge_images[active_microdrive].length+FLASH_PAGE_SIZE) / FLASH_PAGE_SIZE) * FLASH_PAGE_SIZE);
-	flash_range_program( offset, microdrive[active_microdrive].cartridge->data, bytes );
-#endif
-//	memcpy( (uint8_t*)cartridge_images[active_microdrive].address,
-//		microdrive[active_microdrive].cartridge->data,
-//		cartridge_images[active_microdrive].length );
-
-	microdrive[active_microdrive].cartridge->data = NULL;
-
-	microdrive[active_microdrive].motor_on = 0;
-	gpio_put( LED_PIN, 0 );
-
-	/* There is now no active microdrive */
-	active_microdrive = NO_ACTIVE_MICRODRIVE;
+	bytes  = (size_t)(((cartridge_images[previously_active_microdrive].length+FLASH_PAGE_SIZE) / FLASH_PAGE_SIZE) * FLASH_PAGE_SIZE);
+	flash_range_program( offset, microdrive[previously_active_microdrive].cartridge->data, bytes );
+	microdrive[active_microdrive].modified = 0;
       }
-    }
-    else
-    {
-      /* Turn on motor - we need to copy the data buffer in from flash */
+      
+      microdrive[previously_active_microdrive].cartridge->data = NULL;
 
-      /* They all use the same cartridge_data buffer at easlt fornow */
-      active_microdrive=0;
+//      gpio_put( LED_PIN, 0 );
+    }
+
+    if( active_microdrive != NO_ACTIVE_MICRODRIVE )
+    {
+      /* Turn on motor - we need to bring in the data buffer from flash */
+
       microdrive[active_microdrive].cartridge->data = cartridge_data;
       libspectrum_microdrive_mdr_read( microdrive[active_microdrive].cartridge,
 				       cartridge_images[active_microdrive].address,
 				       cartridge_images[active_microdrive].length,
 				       1 );
-
-      microdrive[active_microdrive].motor_on = 1;
-      gpio_put( LED_PIN, 1 );
+//      gpio_put( LED_PIN, 1 );
     }
+#endif
 
   }
 
@@ -503,7 +513,7 @@ inline void __time_critical_func(port_mdr_out)( libspectrum_byte val )
 				       microdrive[active_microdrive].head_pos,
 				       val );
       increment_head( active_microdrive );
-      microdrive[active_microdrive].modified = 1; // Unused for now
+      microdrive[active_microdrive].modified = 1;
     }
 
     /* transfered does include the preamble */
