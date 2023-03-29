@@ -361,12 +361,23 @@ void __time_critical_func(core1_main)( void )
 #endif
 
 
+/*
+ * The software doesn't work with interrupts on. stdio doesn't work
+ * with interrupts off. This is only of occasional use.
+ */
+#define STDIO_ENABLED 0
+
+
 int __time_critical_func(main)( void )
 {
   bi_decl(bi_program_description("ZX Spectrum Pico IF1 board binary."));
 
+#if STDIO_ENABLED
+  stdio_init_all();
+#else  
   /* All interrupts off */
   irq_set_mask_enabled( 0xFFFFFFFF, 0 );
+#endif  
 
 #ifdef OVERCLOCK
   set_sys_clock_khz( OVERCLOCK, 1 );
@@ -574,6 +585,10 @@ int __time_critical_func(main)( void )
       gpio_set_dir(WAIT_GP, GPIO_OUT);
       gpio_put(WAIT_GP, 0);
 
+#if STDIO_ENABLED
+      printf("PORT_EF_READ, calling port_ctr_in()\n"); busy_wait_us_32(10000);
+#endif  
+
       /* Direction needs to be Pico->ZX */
       pio_sm_put( pio, sm_mreq, 1 );
 
@@ -596,6 +611,10 @@ int __time_critical_func(main)( void )
 	  
       /* Put level shifter direction back to ZX->Pico */
       pio_sm_put( pio, sm_mreq, 0 );
+
+#if STDIO_ENABLED
+      printf("PORT_EF_READ, complete\n");  busy_wait_us_32(10000);
+#endif  
     }
 
 
