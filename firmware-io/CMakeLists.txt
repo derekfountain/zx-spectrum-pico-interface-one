@@ -23,8 +23,6 @@ if (TARGET tinyusb_device)
     zx_pico_if1_io_fw.c
     microdrive.c
     if1.c
-    flash_images.c
-    tape.c
   )
 
   # I prefer to catch my own OOM conditions
@@ -33,9 +31,9 @@ if (TARGET tinyusb_device)
 
   pico_generate_pio_header(zx_pico_if1_io_fw ${CMAKE_CURRENT_LIST_DIR}/mreq_dir.pio)
 
-  target_link_libraries(zx_pico_if1_io_fw pico_stdlib pico_mem_ops pico_multicore hardware_pio hardware_flash)
+  target_link_libraries(zx_pico_if1_io_fw pico_stdlib pico_mem_ops pico_multicore hardware_pio)
 
-  pico_enable_stdio_usb(zx_pico_if1_io_fw 1)
+  pico_enable_stdio_usb(zx_pico_if1_io_fw 0)
   pico_enable_stdio_uart(zx_pico_if1_io_fw 0)
 
   pico_add_extra_outputs(zx_pico_if1_io_fw)

@@ -1466,7 +1466,7 @@ libspectrum_microdrive_checksum( libspectrum_microdrive *microdrive,
 				 libspectrum_byte what );
 WIN32_DLL libspectrum_error
 libspectrum_microdrive_mdr_read( libspectrum_microdrive *microdrive,
-				 const libspectrum_byte *buffer, size_t length, uint do_copy );
+				 const libspectrum_byte *buffer, size_t length );
 WIN32_DLL void
 libspectrum_microdrive_mdr_write( const libspectrum_microdrive *microdrive,
 				  libspectrum_byte **buffer, size_t *length );

@@ -22,35 +22,14 @@
 
 #include <string.h>
 
-#include "pico/stdlib.h"
-#include "hardware/flash.h"
 #include "hardware/gpio.h"
 #include "pico/platform.h"
 #include "libspectrum.h"
 #include "if1.h"
-#include "tape.h"
 
 #include "flash_images.h"
 
-#define NO_ACTIVE_MICRODRIVE   -1
-
-static microdrive_t microdrive[NUM_MICRODRIVES];
-static int32_t      active_microdrive;
-
-//static uint8_t     *cartridge_data;
-
-//static tape_image tape_images[2] = 
-//{
-//  { md1_image, md1_image_len },
-//  { md2_image, md2_image_len },
-//  { md3_image, md3_image_len },
-//  { md4_image, md4_image_len },
-//  { md5_image, md5_image_len },
-//  { md6_image, md6_image_len },
-//  { md7_image, md7_image_len },
-//  { md8_image, md8_image_len },
-//};
-
+static microdrive_t microdrive;
 static if1_ula_t    if1_ula;
 
 extern const uint8_t LED_PIN;
@@ -61,7 +40,7 @@ extern const uint8_t LED_PIN;
  */
 int if1_init( void )
 {
-  int m;
+  int m, i;
 
   if1_ula.comms_clk = 0;
 
@@ -70,52 +49,37 @@ int if1_init( void )
    * malloc more than one. The "not currently being used" images are held
    * in flash and "paged" in.
    */
-//  if( (cartridge_data = malloc( LIBSPECTRUM_MICRODRIVE_CARTRIDGE_LENGTH )) == NULL )
-//    return -1;
+  if( (microdrive.cartridge = malloc( sizeof(struct libspectrum_microdrive) )) == NULL )
+    return -1;
 
-  for( m=0; m<NUM_MICRODRIVES; m++ )
-  {
-    if( (microdrive[m].cartridge = malloc( sizeof(struct libspectrum_microdrive) )) == NULL )
-      return -1;    
-    
-//    microdrive[m].cartridge->data = cartridge_data;
-    microdrive[m].inserted        = 0;
-    microdrive[m].modified        = 0;
-  }
+  if( (microdrive.cartridge->data = malloc( LIBSPECTRUM_MICRODRIVE_CARTRIDGE_LENGTH )) == NULL )
+    return -1;
 
-  active_microdrive = NO_ACTIVE_MICRODRIVE;
+  microdrive.inserted = 0;
+  microdrive.modified = 0;
 
   return 0;
 }
 
-
 int if1_mdr_insert( int which, const char *filename )
 {
   int i;
-
-  if( which == -1 )
-    return -1;
 
   /*
    * This currently loads the test image from RAM into the RAM buffer.
    * I need to move things around so the test image is in flash, which
    * will be closer to what is required.
    */
-
-  if( load_tape( which ) == -1 )
+  if( libspectrum_microdrive_mdr_read( microdrive.cartridge,
+				       md1_image,
+				       md1_image_len ) != LIBSPECTRUM_ERROR_NONE )
+  {
     return -1;
+  }
+  libspectrum_microdrive_set_write_protect( microdrive.cartridge, 0 );
 
-  if( libspectrum_microdrive_mdr_read( microdrive[which].cartridge,
-				       NULL,
-				       0,
-				       1 ) != LIBSPECTRUM_ERROR_NONE )
-    return -1;
-
-  libspectrum_microdrive_set_write_protect( microdrive[which].cartridge, 0 );
-
-  /* Inserted, but not active */
-  microdrive[which].inserted = 1;
-  microdrive[which].modified = 0;
+  microdrive.inserted = 1;
+  microdrive.modified = 0;
 
   /*
    * pream is 512 bytes in the microdrive_t structure.
@@ -125,45 +89,31 @@ int if1_mdr_insert( int which, const char *filename )
    */
 
   /* we assume formatted cartridges */
-  for( i = libspectrum_microdrive_cartridge_len( microdrive[which].cartridge ); i > 0; i-- )
-    microdrive[which].pream[255 + i] = microdrive[which].pream[i-1] = SYNC_OK;
+  for( i = libspectrum_microdrive_cartridge_len( microdrive.cartridge ); i > 0; i-- )
+    microdrive.pream[255 + i] = microdrive.pream[i-1] = SYNC_OK;
 
   return 0;
 }
 
-
 void microdrives_reset( void )
 {
-  int m;
+  microdrive.head_pos   = 0;
+  microdrive.motor_on   = 0;
+  microdrive.gap        = 15;
+  microdrive.sync       = 15;
+  microdrive.transfered = 0;
 
-  for( m=0; m<NUM_MICRODRIVES; m++ )
-  {
-    microdrive[m].head_pos   = 0;
-    microdrive[m].motor_on   = 0;
-    microdrive[m].gap        = 15;
-    microdrive[m].sync       = 15;
-    microdrive[m].transfered = 0;
-  }
-
-  active_microdrive = NO_ACTIVE_MICRODRIVE;
-
-  if1_ula.comms_clk = 0;
+  if1_ula.comms_clk     = 0;
 }
 
-
-static inline void __time_critical_func(increment_head)( int which )
+static inline void __time_critical_func(increment_head)( void )
 {
-  if( which == NO_ACTIVE_MICRODRIVE )
-    return;
-
-  microdrive[which].head_pos++;
-  if( microdrive[which].head_pos >=
-                        (libspectrum_microdrive_cartridge_len( microdrive[which].cartridge ) * LIBSPECTRUM_MICRODRIVE_BLOCK_LEN) )
+  microdrive.head_pos++;
+  if( microdrive.head_pos >= (libspectrum_microdrive_cartridge_len( microdrive.cartridge ) * LIBSPECTRUM_MICRODRIVE_BLOCK_LEN) )
   {
-    microdrive[which].head_pos = 0;
+    microdrive.head_pos = 0;
   }
 }
-
 
 /*
  * I think the idea here is that whenever the Z80 asks for the microdrive
@@ -174,32 +124,24 @@ static inline void __time_critical_func(increment_head)( int which )
  */
 void __time_critical_func(microdrives_restart)( void )
 {
-  int m;
-
-  for( m=0; m<NUM_MICRODRIVES; m++ )
+  /* FIXME Surely it's possible to calculate where the head needs to move to? */
+  while( ( microdrive.head_pos % LIBSPECTRUM_MICRODRIVE_BLOCK_LEN ) != 0  &&
+	 ( microdrive.head_pos % LIBSPECTRUM_MICRODRIVE_BLOCK_LEN ) != LIBSPECTRUM_MICRODRIVE_HEAD_LEN )
   {
-    /* FIXME Surely it's possible to calculate where the head needs to move to? */
-    while( ( microdrive[m].head_pos % LIBSPECTRUM_MICRODRIVE_BLOCK_LEN ) != 0  &&
-	   ( microdrive[m].head_pos % LIBSPECTRUM_MICRODRIVE_BLOCK_LEN ) != LIBSPECTRUM_MICRODRIVE_HEAD_LEN )
-    {
-      increment_head( m ); /* put head in the start of a block */
-    }
+    increment_head(); /* put head in the start of a block */
+  }
 	
-    microdrive[m].transfered = 0; /* reset current number of bytes written */
+  microdrive.transfered = 0; /* reset current number of bytes written */
 
-    if( ( microdrive[m].head_pos % LIBSPECTRUM_MICRODRIVE_BLOCK_LEN ) == 0 )
-    {
-      /* up to 15 bytes for header blocks */
-      microdrive[m].max_bytes = LIBSPECTRUM_MICRODRIVE_HEAD_LEN;
-    }
-    else
-    {
-      /* up to 528 bytes for data blocks */
-      microdrive[m].max_bytes = LIBSPECTRUM_MICRODRIVE_HEAD_LEN + LIBSPECTRUM_MICRODRIVE_DATA_LEN + 1;
-    }
+  if( ( microdrive.head_pos % LIBSPECTRUM_MICRODRIVE_BLOCK_LEN ) == 0 )
+  {
+    microdrive.max_bytes = LIBSPECTRUM_MICRODRIVE_HEAD_LEN; /* up to 15 bytes for header blocks */
+  }
+  else
+  {
+    microdrive.max_bytes = LIBSPECTRUM_MICRODRIVE_HEAD_LEN + LIBSPECTRUM_MICRODRIVE_DATA_LEN + 1; /* up to 528 bytes for data blocks */
   }
 }
-
 
 inline libspectrum_byte __time_critical_func(port_ctr_in)( void )
 {
@@ -207,15 +149,15 @@ inline libspectrum_byte __time_critical_func(port_ctr_in)( void )
 
   int block;
 
-  if( (active_microdrive != NO_ACTIVE_MICRODRIVE) && microdrive[active_microdrive].motor_on && microdrive[active_microdrive].inserted )
+  if( microdrive.motor_on && microdrive.inserted )
   {
     /* Calculate the block under the head */
     /* max_bytes is the number of bytes which can be read from the current block */
-    block = microdrive[active_microdrive].head_pos / 543 + ( microdrive[active_microdrive].max_bytes == 15 ? 0 : 256 );
+    block = microdrive.head_pos / 543 + ( microdrive.max_bytes == 15 ? 0 : 256 );
 
     /* pream might be an array of flags, one for each block, indicating something... */
     /* Original comment suggests formatted? Of the block? */
-    if( microdrive[active_microdrive].pream[block] == SYNC_OK )  	/* if formatted */
+    if( microdrive.pream[block] == SYNC_OK )  	/* if formatted */
     {
       /* This is the only place the gap is used. It counts down from 15 to 0.
        * While it's non-zero the GAP bit is set in the status byte returned
@@ -253,22 +195,22 @@ inline libspectrum_byte __time_critical_func(port_ctr_in)( void )
        * A loop like that is pretty tight, there's 38Ts between INs, which on the
        * Spectrum's 3.5MHz Z80 is around 10uS.
        */
-      if( microdrive[active_microdrive].gap )
+      if( microdrive.gap )
       {
-	microdrive[active_microdrive].gap--;
+	microdrive.gap--;
       }
       else
       {
 	ret &= 0xf9; /* GAP and SYNC low (both are active low) */
 
-	if( microdrive[active_microdrive].sync )
+	if( microdrive.sync )
 	{
-	  microdrive[active_microdrive].sync--;
+	  microdrive.sync--;
 	}
 	else
 	{
-	  microdrive[active_microdrive].gap = 15;
-	  microdrive[active_microdrive].sync = 15;
+	  microdrive.gap = 15;
+	  microdrive.sync = 15;
 	}
       }
     }
@@ -282,7 +224,7 @@ inline libspectrum_byte __time_critical_func(port_ctr_in)( void )
      * for FORMAT, WRITE and the other write operations. It doesn't keep
      * the value cached, it reads it fresh each time.
      */
-    if( libspectrum_microdrive_write_protect( microdrive[active_microdrive].cartridge ) )
+    if( libspectrum_microdrive_write_protect( microdrive.cartridge ) )
     {
        /* If write protected flag is true, pull the bit in the status byte low */
       ret &= 0xfe;
@@ -314,77 +256,10 @@ inline libspectrum_byte __time_critical_func(port_ctr_in)( void )
 inline void __time_critical_func(port_ctr_out)( libspectrum_byte val )
 {
   /* Look for a falling edge on the CLK line */
-  if( ((val & 0x02) == 0) && (if1_ula.comms_clk == 1) )
-  {
-    /* Falling edge of the clock on bit 0x02  ~~\__ */
+  if( !( val & 0x02 ) && ( if1_ula.comms_clk ) ) {	/* ~~\__ */
 
-    uint32_t previously_active_microdrive = active_microdrive;
-
-    /*
-     * A pulse has arrived on bit 0x01. There will be 8 of these in total,
-     * sent in a 1ms sequence by the IF1's ROM routine SEL-DRIVE.
-     * https://www.tablix.org/~avian/spectrum/rom/if1_2.htm#L1532
-     * This pulse just received will be used to switch the motor of
-     * microdrive 0. All the current motor control values are shuffled
-     * along to the left and the new one is dropped into the microdrive
-     * furthest right
-     */
-    int m;
-    for( m = 7; m > 0; m-- )
-    {
-      microdrive[m].motor_on = microdrive[m - 1].motor_on;
-    }
-    uint8_t action = (val & 0x01) ? 0 : 1;
-    microdrive[0].motor_on = action;
-
-    /* Work out which microdrive that leaves active, if any */
-    uint32_t active_microdrive = NO_ACTIVE_MICRODRIVE;
-    for( m = 0; m < NUM_MICRODRIVES; m++ )
-    {
-      if( microdrive[m].motor_on )
-      {
-	active_microdrive = m;
-	break;
-      }
-    }
-active_microdrive = 0;
-
-#if 0
-    if( (previously_active_microdrive != NO_ACTIVE_MICRODRIVE) && (active_microdrive != previously_active_microdrive) )
-    {
-      /* Previously spinning drive has just had its motor turned off  - we need to copy the data buffer out to flash */
-
-      if( microdrive[active_microdrive].modified == 1 )
-      {
-	long unsigned int offset = (long unsigned int)((uint8_t*)cartridge_images[previously_active_microdrive].address - XIP_BASE);
-	size_t            bytes  = (size_t)(((cartridge_images[previously_active_microdrive].length+
-					                                 FLASH_SECTOR_SIZE) / FLASH_SECTOR_SIZE) * FLASH_SECTOR_SIZE);
-
-	flash_range_erase( offset, bytes );
-
-	bytes  = (size_t)(((cartridge_images[previously_active_microdrive].length+FLASH_PAGE_SIZE) / FLASH_PAGE_SIZE) * FLASH_PAGE_SIZE);
-	flash_range_program( offset, microdrive[previously_active_microdrive].cartridge->data, bytes );
-	microdrive[active_microdrive].modified = 0;
-      }
-      
-      microdrive[previously_active_microdrive].cartridge->data = NULL;
-
-//      gpio_put( LED_PIN, 0 );
-    }
-
-    if( active_microdrive != NO_ACTIVE_MICRODRIVE )
-    {
-      /* Turn on motor - we need to bring in the data buffer from flash */
-
-      microdrive[active_microdrive].cartridge->data = cartridge_data;
-      libspectrum_microdrive_mdr_read( microdrive[active_microdrive].cartridge,
-				       cartridge_images[active_microdrive].address,
-				       cartridge_images[active_microdrive].length,
-				       1 );
-//      gpio_put( LED_PIN, 1 );
-    }
-#endif
-
+    microdrive.motor_on = (val & 0x01) ? 0 : 1;
+    gpio_put( LED_PIN, microdrive.motor_on );
   }
 
   /* Note the level of the CLK line so we can see what it's done next time */
@@ -406,29 +281,26 @@ inline libspectrum_byte __time_critical_func(port_mdr_in)( void )
 {
   libspectrum_byte ret = 0xff;
 
-  if( active_microdrive == NO_ACTIVE_MICRODRIVE )
-    return ret;
-
-  if( microdrive[active_microdrive].motor_on && microdrive[active_microdrive].inserted )
+  if( microdrive.motor_on && microdrive.inserted )
   {
     /*
      * max_bytes is the number of bytes in the block under
      * the head, and transfered is the number of bytes transferred out of
      * it so far
      */
-    if( microdrive[active_microdrive].transfered < microdrive[active_microdrive].max_bytes )
+    if( microdrive.transfered < microdrive.max_bytes )
     {
-      query_tape_byte( microdrive[active_microdrive].head_pos, &ret );
-
+      ret = libspectrum_microdrive_data( microdrive.cartridge,
+					 microdrive.head_pos );
       /* Move tape on, with wrap */
-      increment_head( active_microdrive );
+      increment_head();
     }
 
     /*
      * transfered is a count of the number of bytes transferred from
      * the block to the IF1
      */
-    microdrive[active_microdrive].transfered++;
+    microdrive.transfered++;
   }
 
   return ret;
@@ -456,43 +328,40 @@ inline void __time_critical_func(port_mdr_out)( libspectrum_byte val )
 {
   int block;
 
-  if( active_microdrive == NO_ACTIVE_MICRODRIVE )
-    return;
-
-  if( microdrive[active_microdrive].motor_on && microdrive[active_microdrive].inserted )
+  if( microdrive.motor_on && microdrive.inserted )
   {
     /* Calculate the block under the head */
     /* max_bytes is the number of bytes which can be read from the current block */
-    block = microdrive[active_microdrive].head_pos / 543 + ( microdrive[active_microdrive].max_bytes == 15 ? 0 : 256 );
+    block = microdrive.head_pos / 543 + ( microdrive.max_bytes == 15 ? 0 : 256 );
 
     /*
      * Preamble handling
      */
-    if( microdrive[active_microdrive].transfered == 0 && val == 0x00 )
+    if( microdrive.transfered == 0 && val == 0x00 )
     {
       /*
        * This tracks the writing of 10 0x00 bytes...
        */
-      microdrive[active_microdrive].pream[block] = 1;
+      microdrive.pream[block] = 1;
     }
-    else if( microdrive[active_microdrive].transfered > 0 && microdrive[active_microdrive].transfered < 10 && val == 0x00 )
+    else if( microdrive.transfered > 0 && microdrive.transfered < 10 && val == 0x00 )
     {
-      microdrive[active_microdrive].pream[block]++;
+      microdrive.pream[block]++;
     }
-    else if( microdrive[active_microdrive].transfered > 9 && microdrive[active_microdrive].transfered < 12 && val == 0xff )
+    else if( microdrive.transfered > 9 && microdrive.transfered < 12 && val == 0xff )
     {
       /*
        * ...followed by 2 0xFF bytes...
        */
-      microdrive[active_microdrive].pream[block]++;
+      microdrive.pream[block]++;
     }
-    else if( microdrive[active_microdrive].transfered == 12 && microdrive[active_microdrive].pream[block] == 12 )
+    else if( microdrive.transfered == 12 && microdrive.pream[block] == 12 )
     {
       /*
        * ...and when those 12 have arrived the preamble is complete.
        * Not exactly robust, but good enough.
        */
-      microdrive[active_microdrive].pream[block] = SYNC_OK;
+      microdrive.pream[block] = SYNC_OK;
     }
 
     /*
@@ -500,16 +369,16 @@ inline void __time_critical_func(port_mdr_out)( libspectrum_byte val )
      * The preamble isn't counted, so only write when the head is
      * outside that range
      */
-    if( (microdrive[active_microdrive].transfered > 11)
-	&&
-	(microdrive[active_microdrive].transfered < (microdrive[active_microdrive].max_bytes + 12)) )
+    if( microdrive.transfered > 11 && microdrive.transfered < microdrive.max_bytes + 12 )
     {
-      write_tape_byte( microdrive[active_microdrive].head_pos, val );
-      increment_head( active_microdrive );
-      microdrive[active_microdrive].modified = 1;
+      libspectrum_microdrive_set_data( microdrive.cartridge,
+				       microdrive.head_pos,
+				       val );
+      increment_head();
+      // microdrive.modified = 1; // Unused for now
     }
 
     /* transfered does include the preamble */
-    microdrive[active_microdrive].transfered++;
+    microdrive.transfered++;
   }
 }

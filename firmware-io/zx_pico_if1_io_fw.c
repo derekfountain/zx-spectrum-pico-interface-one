@@ -280,180 +280,82 @@ void preconvert_data( void )
   }
 }
 
-void microdrives_reset( void );
+/*
+ * Tracing. I'm hoping the race condition in the entry (port then data isn't atomic)
+ * won't cause a problem.
+ * The trace enum matches what the Z80 does, OUT instructions get a Z80_OUT entry,
+ * IN instructions get a Z80_IN entry.
+ */
+typedef enum
+{
+  NULL_ENTRY,
+  CORE0_PORT_E7_Z80_OUT,
+  CORE0_PORT_E7_Z80_IN,
+  CORE0_PORT_EF_Z80_OUT,
+  CORE0_PORT_EF_Z80_IN,
+  CORE1_HANDLE_PORT_E7_Z80_OUT,
+  CORE1_PREPARE_PORT_E7_Z80_IN,
+  CORE1_HANDLE_PORT_EF_Z80_OUT,
+  CORE1_PREPARE_PORT_EF_Z80_IN,
+}
+IOTRACE_TYPE;
 
-PIO pio;
-uint sm_mreq;
+typedef struct _iotrace_entry
+{
+  IOTRACE_TYPE type;
+  uint8_t      byte;
+}
+IOTRACE_ENTRY;
+
+#define IOTRACE_SIZE 1024
+IOTRACE_ENTRY iotrace[IOTRACE_SIZE];
+uint32_t iotrace_wraps = 0;
+uint16_t iotrace_index = 0;
+
+#define ADD_IOTRACE(t,b) {iotrace[iotrace_index].type=t;iotrace[iotrace_index].byte=b;\
+    if(++iotrace_index==IOTRACE_SIZE){iotrace_index=0;iotrace_wraps++;}}
 
 /*
- * The software doesn't work with interrupts on. stdio doesn't work
- * with interrupts off. This is only of occasional use.
+ * Try to clarify the terminology here:
+ *
+ * "Input" in this code means the Z80 has written to us. The Z80 has done an OUT.
+ * It does this when it wants to to write the control register or to the MD tape.
+ *
+ * "Output" in this code means the Z80 has read from us. The Z80 has done an IN.
+ * It does this when it wants to read the status register, or from the MD tape.
  */
-#define STDIO_ENABLED 0
 
-#define CORE1_IN_USE 1
+typedef enum
+{
+  HANDLED_DATA,
+  NEW_INPUT_FROM_Z80,
+  DATA_WAITING_FOR_Z80,
+}
+QUEUE_FLAG;
+
+typedef struct _port_queue
+{
+  QUEUE_FLAG flag;        /* Flag */
+  uint8_t    byte;        /* Data byte, either input from Z80 or output to it */
+}
+PORT_QUEUE;
+
+PORT_QUEUE port_e7_input_from_z80; /* Write to MD data stream */
+PORT_QUEUE port_e7_output_to_z80;  /* Read from MD data stream */
+PORT_QUEUE port_ef_input_from_z80; /* Write to control register */
+PORT_QUEUE port_ef_output_to_z80;  /* Read from status */
+
+uint8_t microdrives_restart_required;
+
+void microdrives_reset( void );
+
+
+#define CORE1_IN_USE 0
 #if CORE1_IN_USE
-
-#define MESSAGE_LEN   32
-uint8_t message[MESSAGE_LEN];
-
 void __time_critical_func(core1_main)( void )
 {
-  /* All interrupts off in this core, the IO emulation won't work with interrupts enabled */
-  irq_set_mask_enabled( 0xFFFFFFFF, 0 );  
-
-  if( if1_init() == -1 )
-  {
-    /* Slow blink means not enough memory for the in-RAM microdrive image */
-    while(1)
-    {
-      gpio_put(LED_PIN, 1);
-      busy_wait_us_32(250000);
-      gpio_put(LED_PIN, 0);
-      busy_wait_us_32(250000);
-    }
-  }
-
-  /* Insert the test image (no filename as yet) into Microdrive 0 */
-  if( (if1_mdr_insert( 0, NULL ) != LIBSPECTRUM_ERROR_NONE) ||
-      (if1_mdr_insert( 1, NULL ) != LIBSPECTRUM_ERROR_NONE) )
-  {
-    while(1)
-    {
-      gpio_put(LED_PIN, 1);
-      busy_wait_us_32(25000);
-      gpio_put(LED_PIN, 0);
-      busy_wait_us_32(25000);
-    }
-  }
-
-  microdrives_reset();
-
   while( 1 )
   {
-    register uint32_t gpios_state = gpio_get_all();
-
-    if( (gpios_state & IF1_IOPORT_ACCESS_BIT_MASK) == PORT_E7_WRITE )
-    {
-      /* Z80 write (OUT instruction) to port 0xE7 (231), microdrive data */
-
-      /* Pick up the pattern of bits from the jumbled data bus GPIOs */
-      register uint32_t raw_pattern = (gpios_state & DBUS_MASK);
-
-      /* Set Z80 waiting */
-      gpio_set_dir(WAIT_GP, GPIO_OUT);
-      gpio_put(WAIT_GP, 0);
-
-      /* Sort those bits out into the value which the Z80 originally wrote */
-      uint32_t z80_written_byte =  (raw_pattern & 0x87)       |        /* bxxx xbbb */
-                                  ((raw_pattern & 0x08) << 2) |        /* xxbx xxxx */
-                                  ((raw_pattern & 0x10) >> 1) |        /* xxxx bxxx */
-                                  ((raw_pattern & 0x20) << 1) |        /* xbxx xxxx */
-                                  ((raw_pattern & 0x40) >> 2);         /* xxxb xxxx */
-
-      /* Flag this up for core1 to handle, it takes a while so can't do it here */
-      port_mdr_out( z80_written_byte );
-
-      /* Done waiting */
-      gpio_set_dir(WAIT_GP, GPIO_IN);
-
-      /* Wait for the IO request to complete */
-      while( (gpio_get_all() & IORQ_BIT_MASK) == 0 );
-    }
-
-    else if( (gpios_state & IF1_IOPORT_ACCESS_BIT_MASK) == PORT_EF_WRITE )
-    {
-      /* Z80 write (OUT instruction) to port 0xEF (239), microdrive control */
-      /* This turns on the motor */
-
-      /* Pick up the pattern of bits from the jumbled data bus GPIOs */
-      register uint32_t raw_pattern = (gpios_state & DBUS_MASK);
-
-      /* Set Z80 waiting */
-      gpio_set_dir(WAIT_GP, GPIO_OUT);
-      gpio_put(WAIT_GP, 0);
-
-      /* Sort those bits out into the value which the Z80 originally wrote */
-      port_ctr_out(  (raw_pattern & 0x87)       |        /* bxxx xbbb */
-		    ((raw_pattern & 0x08) << 2) |        /* xxbx xxxx */
-		    ((raw_pattern & 0x10) >> 1) |        /* xxxx bxxx */
-		    ((raw_pattern & 0x20) << 1) |        /* xbxx xxxx */
-		    ((raw_pattern & 0x40) >> 2) );       /* xxxb xxxx */
-
-      /* Done waiting */
-      gpio_set_dir(WAIT_GP, GPIO_IN);
-
-      /* Wait for the IO request to complete */
-      while( (gpio_get_all() & IORQ_BIT_MASK) == 0 );
-    }
-
-    else if( (gpios_state & IF1_IOPORT_ACCESS_BIT_MASK) == PORT_E7_READ )
-    {
-      /* Z80 read from port 0xE7 (231), Z80 wants a microdrive data byte */
-
-      /* Set Z80 waiting */
-      gpio_set_dir(WAIT_GP, GPIO_OUT);
-      gpio_put(WAIT_GP, 0);
-
-      /* Direction needs to be Pico->ZX */
-      pio_sm_put( pio, sm_mreq, 1 );
-
-      /* Make data bus GPIOs outputs, pointed at the ZX */
-      gpio_set_dir_out_masked( DBUS_MASK );
-
-      /* Port handling function returns the data */
-      gpio_put_masked( DBUS_MASK, preconverted_data[port_mdr_in()] );
-
-      /* Done waiting */
-      gpio_set_dir(WAIT_GP, GPIO_IN);
-
-      /* Wait for the IO request to complete */
-      while( (gpio_get_all() & IORQ_BIT_MASK) == 0 );
-
-      /* Make the GPIOs inputs again */
-      gpio_set_dir_in_masked( DBUS_MASK );
-	  
-      /* Put level shifter direction back to ZX->Pico */
-      pio_sm_put( pio, sm_mreq, 0 );
-    }
-
-    else if( (gpios_state & IF1_IOPORT_ACCESS_BIT_MASK) == PORT_EF_READ )
-    {
-      /* Z80 read from port 0xEF (239), microdrive status */
-
-      /* Set Z80 waiting */
-      gpio_set_dir(WAIT_GP, GPIO_OUT);
-      gpio_put(WAIT_GP, 0);
-
-#if 0
-      strcpy( message, "PORT_EF_READ running\n" );
-#endif
-
-      /* Direction needs to be Pico->ZX */
-      pio_sm_put( pio, sm_mreq, 1 );
-
-      /* Make data bus GPIOs outputs, pointed at the ZX */
-      gpio_set_dir_out_masked( DBUS_MASK );
-
-      /* Port handling function returns the status */
-      gpio_put_masked( DBUS_MASK, preconverted_data[port_ctr_in()] );
-
-      /* Done waiting */
-      gpio_set_dir(WAIT_GP, GPIO_IN);
-
-      /* Wait for the IO request to complete */
-      while( (gpio_get_all() & IORQ_BIT_MASK) == 0 );
-
-      /* Make the GPIOs inputs again */
-      gpio_set_dir_in_masked( DBUS_MASK );
-	  
-      /* Put level shifter direction back to ZX->Pico */
-      pio_sm_put( pio, sm_mreq, 0 );
-
-#if 0
-      strcpy( message, "PORT_EF_READ complete\n\n" );
-#endif
-    }
   } 
 }
 #endif
@@ -463,13 +365,8 @@ int __time_critical_func(main)( void )
 {
   bi_decl(bi_program_description("ZX Spectrum Pico IF1 board binary."));
 
-#if STDIO_ENABLED
-  stdio_init_all();
-  printf("ZX Spectrum Pico IF1 board binary."); fflush(stdout);
-#else  
   /* All interrupts off */
-  irq_set_mask_enabled( 0xFFFFFFFF, 0 );  
-#endif  
+  irq_set_mask_enabled( 0xFFFFFFFF, 0 );
 
 #ifdef OVERCLOCK
   set_sys_clock_khz( OVERCLOCK, 1 );
@@ -512,8 +409,8 @@ int __time_critical_func(main)( void )
   gpio_init( WAIT_GP ); gpio_set_dir( WAIT_GP, GPIO_IN );
 
   /* Use PIO to switch the level shifter's DIRection */
-  pio              = pio0;
-  sm_mreq          = pio_claim_unused_sm( pio, true );
+  PIO pio          = pio0;
+  uint sm_mreq     = pio_claim_unused_sm( pio, true );
   uint offset_mreq = pio_add_program( pio, &mreq_dir_program );
   mreq_dir_program_init( pio, sm_mreq, offset_mreq, ROM_READ_GP, DIR_OUTPUT_GP );
   pio_sm_set_enabled(pio, sm_mreq, true);
@@ -533,26 +430,175 @@ int __time_critical_func(main)( void )
     busy_wait_us_32(250000);
   }
 
+  /*
+   * Set up ports to have no data from Z80 heading to them, and to
+   * make them prime their first data byte ready for when the
+   * Z80 asks for it
+   */
+  port_ef_output_to_z80.flag  = HANDLED_DATA;
+  port_e7_output_to_z80.flag  = HANDLED_DATA;
+  port_e7_input_from_z80.flag = HANDLED_DATA;
+  port_ef_input_from_z80.flag = HANDLED_DATA;
+
+
+  if( if1_init() == -1 )
+  {
+    /* Slow blink means not enough memory for the in-RAM microdrive image */
+    while(1)
+    {
+      gpio_put(LED_PIN, 1);
+      busy_wait_us_32(250000);
+      gpio_put(LED_PIN, 0);
+      busy_wait_us_32(250000);
+    }
+  }
+
+  /* Insert the test image (no filename as yet) into Microdrive 0 */
+  if( if1_mdr_insert( 0, NULL ) != LIBSPECTRUM_ERROR_NONE )
+  {
+    while(1)
+    {
+      gpio_put(LED_PIN, 1);
+      busy_wait_us_32(25000);
+      gpio_put(LED_PIN, 0);
+      busy_wait_us_32(25000);
+    }
+  }
+
+  microdrives_reset();
 
 #if CORE1_IN_USE
   /* Init complete, run 2nd core code */
   multicore_launch_core1( core1_main ); 
 #endif
 
-  memset( message, 0, MESSAGE_LEN );
-
   while( 1 )
   {
-#if STDIO_ENABLED
-    if( strchr( message, '\n' ) != NULL )
-    {
-      busy_wait_us_32(1000000);
+    register uint32_t gpios_state = gpio_get_all();
 
-      printf(message); fflush(stdout);
-      while(1);
-      memset( message, 0, MESSAGE_LEN );
+    if( (gpios_state & IF1_IOPORT_ACCESS_BIT_MASK) == PORT_E7_WRITE )
+    {
+      /* Z80 write (OUT instruction) to port 0xE7 (231), microdrive data */
+
+      /* Pick up the pattern of bits from the jumbled data bus GPIOs */
+      register uint32_t raw_pattern = (gpios_state & DBUS_MASK);
+
+      /* Set Z80 waiting */
+      gpio_set_dir(WAIT_GP, GPIO_OUT);
+      gpio_put(WAIT_GP, 0);
+
+      /* Sort those bits out into the value which the Z80 originally wrote */
+      uint32_t z80_written_byte =  (raw_pattern & 0x87)       |        /* bxxx xbbb */
+                                  ((raw_pattern & 0x08) << 2) |        /* xxbx xxxx */
+                                  ((raw_pattern & 0x10) >> 1) |        /* xxxx bxxx */
+                                  ((raw_pattern & 0x20) << 1) |        /* xbxx xxxx */
+                                  ((raw_pattern & 0x40) >> 2);         /* xxxb xxxx */
+
+      /* Flag this up for core1 to handle, it takes a while so can't do it here */
+      port_mdr_out( z80_written_byte );
+
+//      ADD_IOTRACE(CORE0_PORT_E7_Z80_OUT, port_e7_input_from_z80.byte);
+
+      /* Done waiting */
+      gpio_set_dir(WAIT_GP, GPIO_IN);
+
+      /* Wait for the IO request to complete */
+      while( (gpio_get_all() & IORQ_BIT_MASK) == 0 );
     }
-#endif
+
+    else if( (gpios_state & IF1_IOPORT_ACCESS_BIT_MASK) == PORT_EF_WRITE )
+    {
+      /* Z80 write (OUT instruction) to port 0xEF (239), microdrive control */
+      /* This turns on the motor */
+
+      /* Pick up the pattern of bits from the jumbled data bus GPIOs */
+      register uint32_t raw_pattern = (gpios_state & DBUS_MASK);
+
+      /* Set Z80 waiting */
+      gpio_set_dir(WAIT_GP, GPIO_OUT);
+      gpio_put(WAIT_GP, 0);
+
+      /* Sort those bits out into the value which the Z80 originally wrote */
+      port_ctr_out(  (raw_pattern & 0x87)       |        /* bxxx xbbb */
+		    ((raw_pattern & 0x08) << 2) |        /* xxbx xxxx */
+		    ((raw_pattern & 0x10) >> 1) |        /* xxxx bxxx */
+		    ((raw_pattern & 0x20) << 1) |        /* xbxx xxxx */
+		    ((raw_pattern & 0x40) >> 2) );       /* xxxb xxxx */
+
+//    ADD_IOTRACE(CORE0_PORT_EF_Z80_OUT, port_ef_input_from_z80.byte);
+
+      /* Done waiting */
+      gpio_set_dir(WAIT_GP, GPIO_IN);
+
+      /* Wait for the IO request to complete */
+      while( (gpio_get_all() & IORQ_BIT_MASK) == 0 );
+    }
+
+    else if( (gpios_state & IF1_IOPORT_ACCESS_BIT_MASK) == PORT_E7_READ )
+    {
+      /* Z80 read from port 0xE7 (231), Z80 wants a microdrive data byte */
+
+      /* Set Z80 waiting */
+      gpio_set_dir(WAIT_GP, GPIO_OUT);
+      gpio_put(WAIT_GP, 0);
+
+      /* Direction needs to be Pico->ZX */
+      pio_sm_put( pio, sm_mreq, 1 );
+
+      /* Make data bus GPIOs outputs, pointed at the ZX */
+      gpio_set_dir_out_masked( DBUS_MASK );
+
+      /* Port handling function returns the data */
+      gpio_put_masked( DBUS_MASK, preconverted_data[port_mdr_in()] );
+
+//    ADD_IOTRACE(CORE0_PORT_E7_Z80_IN, port_e7_output_to_z80.byte);
+
+      /* Done waiting */
+      gpio_set_dir(WAIT_GP, GPIO_IN);
+
+      /* Wait for the IO request to complete */
+      while( (gpio_get_all() & IORQ_BIT_MASK) == 0 );
+
+      /* Make the GPIOs inputs again */
+      gpio_set_dir_in_masked( DBUS_MASK );
+	  
+      /* Put level shifter direction back to ZX->Pico */
+      pio_sm_put( pio, sm_mreq, 0 );
+    }
+
+    else if( (gpios_state & IF1_IOPORT_ACCESS_BIT_MASK) == PORT_EF_READ )
+    {
+      /* Z80 read from port 0xEF (239), microdrive status */
+
+      /* Set Z80 waiting */
+      gpio_set_dir(WAIT_GP, GPIO_OUT);
+      gpio_put(WAIT_GP, 0);
+
+      /* Direction needs to be Pico->ZX */
+      pio_sm_put( pio, sm_mreq, 1 );
+
+      /* Make data bus GPIOs outputs, pointed at the ZX */
+      gpio_set_dir_out_masked( DBUS_MASK );
+
+      /* Port handling function returns the status */
+      gpio_put_masked( DBUS_MASK, preconverted_data[port_ctr_in()] );
+
+//    ADD_IOTRACE(CORE0_PORT_EF_Z80_IN, port_ef_output_to_z80.byte);
+
+      /* Done waiting */
+      gpio_set_dir(WAIT_GP, GPIO_IN);
+
+      /* Wait for the IO request to complete */
+      while( (gpio_get_all() & IORQ_BIT_MASK) == 0 );
+
+      /* Make the GPIOs inputs again */
+      gpio_set_dir_in_masked( DBUS_MASK );
+	  
+      /* Put level shifter direction back to ZX->Pico */
+      pio_sm_put( pio, sm_mreq, 0 );
+    }
+
+
   } /* Infinite loop */
 
 }
