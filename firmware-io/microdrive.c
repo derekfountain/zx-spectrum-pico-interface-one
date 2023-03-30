@@ -25,8 +25,6 @@
 #include <stdlib.h>
 #include "pico/stdlib.h"
 
-#include "internals.h"
-
 #include "if1.h"
 
 static const size_t MDR_LENGTH = LIBSPECTRUM_MICRODRIVE_CARTRIDGE_LENGTH + 1;
