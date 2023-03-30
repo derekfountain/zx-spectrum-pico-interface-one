@@ -55,20 +55,6 @@ typedef enum libspectrum_error {
 } libspectrum_error;
 
 
-/* Memory allocators */
-
-void* libspectrum_malloc_n( size_t nmemb, size_t size );
-
-#define libspectrum_new( type, count ) \
-  ( ( type * ) libspectrum_malloc_n( (count), sizeof( type ) ) )
-
-
-/*
- * Microdrive image handling routines
- */
-
-typedef struct libspectrum_microdrive libspectrum_microdrive;
-
 /* Pico doesn't have enough RAM to hold a 254 block cartridge image. */
 /* #define LIBSPECTRUM_MICRODRIVE_BLOCK_MAX 254 */
 
@@ -83,31 +69,6 @@ typedef struct libspectrum_microdrive libspectrum_microdrive;
 
 /* Constructor/destructor */
 
-libspectrum_microdrive* libspectrum_microdrive_alloc( void );
-libspectrum_error libspectrum_microdrive_free( libspectrum_microdrive *microdrive );
 
-/* Accessors */
-
-libspectrum_byte libspectrum_microdrive_data( const libspectrum_microdrive *microdrive,
-					      size_t which );
-void libspectrum_microdrive_set_data( libspectrum_microdrive *microdrive,
-				      size_t which, libspectrum_byte data );
-
-int libspectrum_microdrive_write_protect( const libspectrum_microdrive *microdrive );
-void libspectrum_microdrive_set_write_protect( libspectrum_microdrive *microdrive,
-					       int write_protect );
-
-libspectrum_byte libspectrum_microdrive_cartridge_len( const libspectrum_microdrive *microdrive );
-void libspectrum_microdrive_set_cartridge_len( libspectrum_microdrive *microdrive,
-					       libspectrum_byte len );
-
-/* .mdr format routines */
-
-int libspectrum_microdrive_checksum( libspectrum_microdrive *microdrive,
-				     libspectrum_byte what );
-libspectrum_error libspectrum_microdrive_mdr_read( libspectrum_microdrive *microdrive,
-						   const libspectrum_byte *buffer, size_t length );
-void libspectrum_microdrive_mdr_write( const libspectrum_microdrive *microdrive,
-				       libspectrum_byte **buffer, size_t *length );
 
 #endif                          /* #ifndef LIBSPECTRUM_LIBSPECTRUM_H */

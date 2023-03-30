@@ -45,7 +45,7 @@ enum
 /*
  * This represents a microdrive cartridge. I'm going to rename it.
  */
-struct libspectrum_microdrive
+typedef struct _cartridge_t
 {
   /*
    * Byte array representing the tape, approx 135KB
@@ -73,7 +73,8 @@ struct libspectrum_microdrive
   
   /* Length in 543-byte blocks */
   libspectrum_byte cartridge_len;    /* Cartridge length in blocks */
-};
+}
+cartridge_t;
 
 
 /*
@@ -94,22 +95,14 @@ typedef struct _microdrive_t
   libspectrum_byte gap;
   libspectrum_byte sync;
 
-  libspectrum_microdrive *cartridge;	/* write protect, len, blocks */
+  cartridge_t *cartridge;      /* write protect, len, blocks */
 
 } microdrive_t;
 
 
-/*
- * IF1 ULA structure. I removed pretty much everything in this.
- */
-typedef struct _if1_ula_t
-{
-  int comms_clk;	/* the previous data comms state */
-}
-if1_ula_t;
-
 
 int if1_init( void );
+int if1_mdr_insert( int drive, const char *filename );
 
 libspectrum_byte port_ctr_in( void );
 void port_ctr_out( libspectrum_byte val );
@@ -117,10 +110,5 @@ void port_ctr_out( libspectrum_byte val );
 libspectrum_byte port_mdr_in( void );
 void port_mdr_out( libspectrum_byte val );
 
-int if1_mdr_insert( int drive, const char *filename );
-int if1_mdr_write( int drive, const char *filename );
-int if1_mdr_eject( int drive );
-int if1_mdr_save( int drive, int saveas );
-void if1_mdr_writeprotect( int drive, int wrprot );
 
 #endif

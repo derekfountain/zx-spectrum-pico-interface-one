@@ -38,7 +38,9 @@ static uint8_t cartridge_data[LIBSPECTRUM_MICRODRIVE_CARTRIDGE_LENGTH];
 
 /* This is for development, the array is required */
 static microdrive_t microdrive_single;
-static if1_ula_t    if1_ula;
+
+/* Clock bit in the ULA */
+static uint8_t if1_ula_comms_clk;
 
 extern const uint8_t LED_PIN;
 extern const uint8_t TEST_OUTPUT_GP;
@@ -51,14 +53,14 @@ int if1_init( void )
 {
   int m, i;
 
-  if1_ula.comms_clk = 0;
+  if1_ula_comms_clk = 0;
 
   /* 
    * There's only one microdrive image in RAM. I don't have enough RAM to
    * malloc more than one. The "not currently being used" images are held
    * in flash and "paged" in.
    */
-  if( (microdrive_single.cartridge = malloc( sizeof(struct libspectrum_microdrive) )) == NULL )
+  if( (microdrive_single.cartridge = malloc( sizeof(cartridge_t) )) == NULL )
     return -1;
 
   microdrive_single.inserted = 0;
@@ -126,7 +128,7 @@ void microdrives_reset( void )
   microdrive_single.sync       = 15;
   microdrive_single.transfered = 0;
 
-  if1_ula.comms_clk     = 0;
+  if1_ula_comms_clk     = 0;
 }
 
 static inline void __time_critical_func(increment_head)( void )
@@ -299,7 +301,7 @@ inline libspectrum_byte __time_critical_func(port_ctr_in)( void )
 inline void __time_critical_func(port_ctr_out)( libspectrum_byte val )
 {
   /* Look for a falling edge on the CLK line */
-  if( ((val & 0x02) == 0) && (if1_ula.comms_clk == 1) )
+  if( ((val & 0x02) == 0) && (if1_ula_comms_clk == 1) )
   {
     /* Falling edge of the clock on bit 0x02  ~~\__ */
 
@@ -342,7 +344,7 @@ inline void __time_critical_func(port_ctr_out)( libspectrum_byte val )
   }
 
   /* Note the level of the CLK line so we can see what it's done next time */
-  if1_ula.comms_clk = ( val & 0x02 ) ? 1 : 0;
+  if1_ula_comms_clk = ( val & 0x02 ) ? 1 : 0;
 
   microdrives_restart();
 }
