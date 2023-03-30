@@ -29,8 +29,9 @@
 
 #include "flash_images.h"
 
-#define NO_ACTIVE_MICRODRIVE ((int32_t)(-1))
-#define NUM_MICRODRIVES      ((int32_t)(8))
+typedef int32_t microdrive_index_t;
+#define NO_ACTIVE_MICRODRIVE ((microdrive_index_t)(-1))
+#define NUM_MICRODRIVES      ((microdrive_index_t)(8))
 static microdrive_t microdrive[NUM_MICRODRIVES];
 
 /* This is for development, the array is required */
@@ -122,6 +123,22 @@ static inline void __time_critical_func(increment_head)( void )
 }
 
 /*
+ * Find and return the index of the microdrive with the motor on.
+ * Returns NO_ACTIVE_MICRODRIVE if they're all off.
+ */
+static microdrive_index_t __time_critical_func(query_active_microdrive)( void )
+{
+  for( microdrive_index_t m=0; m<(NUM_MICRODRIVES); m++ )
+  {
+    if( microdrive[m].motor_on )
+    {
+      return m;
+    }
+  }
+  return NO_ACTIVE_MICRODRIVE;
+}
+
+/*
  * I think the idea here is that whenever the Z80 asks for the microdrive
  * status that can be seen as an indication that the IF1 is going to want
  * to read the tape. On the real device this action will be a poll, "is
@@ -152,6 +169,10 @@ void __time_critical_func(microdrives_restart)( void )
 inline libspectrum_byte __time_critical_func(port_ctr_in)( void )
 {
   libspectrum_byte ret = 0xff;
+
+  microdrive_index_t active_microdrive_index;
+  if( (active_microdrive_index=query_active_microdrive()) == NO_ACTIVE_MICRODRIVE )
+    return ret;  /* "Can't happen" */
 
   int block;
 
@@ -291,225 +312,18 @@ inline void __time_critical_func(port_ctr_out)( libspectrum_byte val )
      * We have a new pulse, shift all the previous ones along and
      * put this new one (inverted) in the right-most microdrive's motor
      */
-    int8_t m;
+    microdrive_index_t m;
     for( m = 7; m > 0; m-- )
     {
       microdrive[m].motor_on = microdrive[m - 1].motor_on;
     }
     microdrive[0].motor_on =(val & 0x01) ? 0 : 1;
 
-    /* Work out which microdrive that leaves active, if any */
-    int32_t active_microdrive = NO_ACTIVE_MICRODRIVE;
-    for( m = 0; m < NUM_MICRODRIVES; m++ )
-    {
-      if( microdrive[m].motor_on )
-      {
-for(int i=0; i<m+1; i++)
-{
-gpio_put( TEST_OUTPUT_GP, 1 );
-__asm volatile ("nop");
-__asm volatile ("nop");
-__asm volatile ("nop");
-__asm volatile ("nop");
-__asm volatile ("nop");
-__asm volatile ("nop");
-__asm volatile ("nop");
-__asm volatile ("nop");
-gpio_put( TEST_OUTPUT_GP, 0 );
-}
-__asm volatile ("nop");
-__asm volatile ("nop");
-__asm volatile ("nop");
-__asm volatile ("nop");
-__asm volatile ("nop");
-__asm volatile ("nop");
-__asm volatile ("nop");
-__asm volatile ("nop");
-__asm volatile ("nop");
-__asm volatile ("nop");
-__asm volatile ("nop");
-__asm volatile ("nop");
-__asm volatile ("nop");
-__asm volatile ("nop");
-__asm volatile ("nop");
-__asm volatile ("nop");
-__asm volatile ("nop");
-__asm volatile ("nop");
-__asm volatile ("nop");
-__asm volatile ("nop");
-__asm volatile ("nop");
-__asm volatile ("nop");
-__asm volatile ("nop");
-__asm volatile ("nop");
-__asm volatile ("nop");
-__asm volatile ("nop");
-__asm volatile ("nop");
-__asm volatile ("nop");
-__asm volatile ("nop");
-__asm volatile ("nop");
-__asm volatile ("nop");
-__asm volatile ("nop");
-__asm volatile ("nop");
-__asm volatile ("nop");
-__asm volatile ("nop");
-__asm volatile ("nop");
-__asm volatile ("nop");
-__asm volatile ("nop");
-__asm volatile ("nop");
-__asm volatile ("nop");
-__asm volatile ("nop");
-__asm volatile ("nop");
-__asm volatile ("nop");
-__asm volatile ("nop");
-__asm volatile ("nop");
-__asm volatile ("nop");
-__asm volatile ("nop");
-__asm volatile ("nop");
-__asm volatile ("nop");
-__asm volatile ("nop");
-__asm volatile ("nop");
-__asm volatile ("nop");
-__asm volatile ("nop");
-__asm volatile ("nop");
-__asm volatile ("nop");
-__asm volatile ("nop");
-__asm volatile ("nop");
-__asm volatile ("nop");
-__asm volatile ("nop");
-__asm volatile ("nop");
-__asm volatile ("nop");
-__asm volatile ("nop");
-__asm volatile ("nop");
-__asm volatile ("nop");
-__asm volatile ("nop");
-__asm volatile ("nop");
-__asm volatile ("nop");
-__asm volatile ("nop");
-__asm volatile ("nop");
-__asm volatile ("nop");
-__asm volatile ("nop");
-__asm volatile ("nop");
-__asm volatile ("nop");
-__asm volatile ("nop");
-__asm volatile ("nop");
-__asm volatile ("nop");
-__asm volatile ("nop");
-__asm volatile ("nop");
-__asm volatile ("nop");
-__asm volatile ("nop");
-__asm volatile ("nop");
-__asm volatile ("nop");
-__asm volatile ("nop");
-__asm volatile ("nop");
-__asm volatile ("nop");
-__asm volatile ("nop");
-__asm volatile ("nop");
-__asm volatile ("nop");
-
-gpio_put( TEST_OUTPUT_GP, 1 );
-__asm volatile ("nop");
-__asm volatile ("nop");
-__asm volatile ("nop");
-__asm volatile ("nop");
-__asm volatile ("nop");
-__asm volatile ("nop");
-__asm volatile ("nop");
-__asm volatile ("nop");
-__asm volatile ("nop");
-__asm volatile ("nop");
-__asm volatile ("nop");
-__asm volatile ("nop");
-__asm volatile ("nop");
-__asm volatile ("nop");
-__asm volatile ("nop");
-__asm volatile ("nop");
-__asm volatile ("nop");
-__asm volatile ("nop");
-__asm volatile ("nop");
-__asm volatile ("nop");
-__asm volatile ("nop");
-__asm volatile ("nop");
-__asm volatile ("nop");
-__asm volatile ("nop");
-__asm volatile ("nop");
-__asm volatile ("nop");
-__asm volatile ("nop");
-__asm volatile ("nop");
-__asm volatile ("nop");
-__asm volatile ("nop");
-__asm volatile ("nop");
-__asm volatile ("nop");
-__asm volatile ("nop");
-__asm volatile ("nop");
-__asm volatile ("nop");
-__asm volatile ("nop");
-__asm volatile ("nop");
-__asm volatile ("nop");
-__asm volatile ("nop");
-__asm volatile ("nop");
-__asm volatile ("nop");
-__asm volatile ("nop");
-__asm volatile ("nop");
-__asm volatile ("nop");
-__asm volatile ("nop");
-__asm volatile ("nop");
-__asm volatile ("nop");
-__asm volatile ("nop");
-__asm volatile ("nop");
-__asm volatile ("nop");
-__asm volatile ("nop");
-__asm volatile ("nop");
-__asm volatile ("nop");
-__asm volatile ("nop");
-__asm volatile ("nop");
-__asm volatile ("nop");
-__asm volatile ("nop");
-__asm volatile ("nop");
-__asm volatile ("nop");
-__asm volatile ("nop");
-__asm volatile ("nop");
-__asm volatile ("nop");
-__asm volatile ("nop");
-__asm volatile ("nop");
-__asm volatile ("nop");
-__asm volatile ("nop");
-__asm volatile ("nop");
-__asm volatile ("nop");
-__asm volatile ("nop");
-__asm volatile ("nop");
-__asm volatile ("nop");
-__asm volatile ("nop");
-__asm volatile ("nop");
-__asm volatile ("nop");
-__asm volatile ("nop");
-__asm volatile ("nop");
-__asm volatile ("nop");
-__asm volatile ("nop");
-__asm volatile ("nop");
-__asm volatile ("nop");
-__asm volatile ("nop");
-__asm volatile ("nop");
-__asm volatile ("nop");
-__asm volatile ("nop");
-__asm volatile ("nop");
-__asm volatile ("nop");
-__asm volatile ("nop");
-__asm volatile ("nop");
-gpio_put( TEST_OUTPUT_GP, 0 );
-
-	active_microdrive = m;
-	break;
-      }
-    }
-
-
-
-
+    /* Still need this for test and dev */
     microdrive_single.motor_on = (val & 0x01) ? 0 : 1;
 
     gpio_put( LED_PIN, microdrive_single.motor_on );
   }
-
 
   /* Note the level of the CLK line so we can see what it's done next time */
   if1_ula.comms_clk = ( val & 0x02 ) ? 1 : 0;
@@ -529,6 +343,10 @@ gpio_put( TEST_OUTPUT_GP, 0 );
 inline libspectrum_byte __time_critical_func(port_mdr_in)( void )
 {
   libspectrum_byte ret = 0xff;
+
+  microdrive_index_t active_microdrive_index;
+  if( (active_microdrive_index=query_active_microdrive()) == NO_ACTIVE_MICRODRIVE )
+    return ret;  /* "Can't happen" */
 
   if( microdrive_single.motor_on && microdrive_single.inserted )
   {
@@ -576,6 +394,10 @@ inline libspectrum_byte __time_critical_func(port_mdr_in)( void )
 inline void __time_critical_func(port_mdr_out)( libspectrum_byte val )
 {
   int block;
+
+  microdrive_index_t active_microdrive_index;
+  if( (active_microdrive_index=query_active_microdrive()) == NO_ACTIVE_MICRODRIVE )
+    return;  /* "Can't happen" */
 
   if( microdrive_single.motor_on && microdrive_single.inserted )
   {
@@ -631,3 +453,17 @@ inline void __time_critical_func(port_mdr_out)( libspectrum_byte val )
     microdrive_single.transfered++;
   }
 }
+
+
+#if 0
+gpio_put( TEST_OUTPUT_GP, 1 );
+__asm volatile ("nop");
+__asm volatile ("nop");
+__asm volatile ("nop");
+__asm volatile ("nop");
+__asm volatile ("nop");
+__asm volatile ("nop");
+__asm volatile ("nop");
+__asm volatile ("nop");
+gpio_put( TEST_OUTPUT_GP, 0 );
+#endif
