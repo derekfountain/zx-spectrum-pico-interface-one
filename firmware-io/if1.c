@@ -32,8 +32,27 @@
 typedef int32_t microdrive_index_t;
 #define NO_ACTIVE_MICRODRIVE ((microdrive_index_t)(-1))
 #define NUM_MICRODRIVES      ((microdrive_index_t)(8))
+
 static microdrive_t microdrive[NUM_MICRODRIVES];
 
+/*
+ * Byte array representing the tape, approx 97KB for a 180 sector
+ * tape. About 135KB for a 254 sector tape.
+ *
+ * Copy and paste out to a text file with:
+ *
+ * (gdb) set print repeats 0
+ * (gdb) set print elements unlimited
+ * (gdb) set pagination off
+ * (gdb) p/x microdrive->cartridge.data
+ *
+ * Convert to MDR image with:
+ *
+ * > perl -ne 'map { print chr(hex($_)) } split(/, /, $_)' < mm_reformated_in_zx.txt > mm_reformated_in_zx.mdr
+ *
+ * mm_reformated_in_zx.mdr will then load into FUSE as a normal
+ * MDR file.
+ */
 static uint8_t cartridge_data[LIBSPECTRUM_MICRODRIVE_CARTRIDGE_LENGTH];
 
 /* This is for development, the array is required */
