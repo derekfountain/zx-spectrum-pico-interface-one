@@ -21,7 +21,6 @@ if (TARGET tinyusb_device)
 
   add_executable(zx_pico_if1_io_fw
     zx_pico_if1_io_fw.c
-    microdrive.c
     if1.c
   )
 

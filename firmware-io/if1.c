@@ -34,6 +34,8 @@ typedef int32_t microdrive_index_t;
 #define NUM_MICRODRIVES      ((microdrive_index_t)(8))
 static microdrive_t microdrive[NUM_MICRODRIVES];
 
+static uint8_t cartridge_data[LIBSPECTRUM_MICRODRIVE_CARTRIDGE_LENGTH];
+
 /* This is for development, the array is required */
 static microdrive_t microdrive_single;
 static if1_ula_t    if1_ula;
@@ -59,9 +61,6 @@ int if1_init( void )
   if( (microdrive_single.cartridge = malloc( sizeof(struct libspectrum_microdrive) )) == NULL )
     return -1;
 
-  if( (microdrive_single.cartridge->data = malloc( LIBSPECTRUM_MICRODRIVE_CARTRIDGE_LENGTH )) == NULL )
-    return -1;
-
   microdrive_single.inserted = 0;
   microdrive_single.modified = 0;
 
@@ -70,21 +69,38 @@ int if1_init( void )
 
 int if1_mdr_insert( int which, const char *filename )
 {
-  int i;
+  size_t data_length;
 
   /*
    * This currently loads the test image from RAM into the RAM buffer.
    * I need to move things around so the test image is in flash, which
    * will be closer to what is required.
    */
-  if( libspectrum_microdrive_mdr_read( microdrive_single.cartridge,
-				       md1_image,
-				       md1_image_len ) != LIBSPECTRUM_ERROR_NONE )
-  {
-    return -1;
-  }
-  libspectrum_microdrive_set_write_protect( microdrive_single.cartridge, 0 );
+#if 0
+  This needs to know which image were inserting. I think it needs an index into 
+  the array of flash images
 
+  if( length < (LIBSPECTRUM_MICRODRIVE_BLOCK_LEN * 10) ||
+      ( length % LIBSPECTRUM_MICRODRIVE_BLOCK_LEN ) > 1 || length > MDR_LENGTH )
+  {
+    return LIBSPECTRUM_ERROR_CORRUPT;
+  }
+#endif
+
+// For now i've hardcoded the 0th image in flash
+
+  data_length = md1_image_len - ( md1_image_len % LIBSPECTRUM_MICRODRIVE_BLOCK_LEN );
+
+  uint8_t *buffer = cartridge_data;
+  memcpy( cartridge_data, md1_image, data_length ); buffer += data_length;
+
+  if( ( md1_image_len % LIBSPECTRUM_MICRODRIVE_BLOCK_LEN ) == 1 )
+    microdrive_single.cartridge->write_protect = *buffer;
+  else
+    microdrive_single.cartridge->write_protect = 0;
+
+  microdrive_single.cartridge->cartridge_len = (data_length / LIBSPECTRUM_MICRODRIVE_BLOCK_LEN);
+ 
   microdrive_single.inserted = 1;
   microdrive_single.modified = 0;
 
@@ -96,7 +112,7 @@ int if1_mdr_insert( int which, const char *filename )
    */
 
   /* we assume formatted cartridges */
-  for( i = libspectrum_microdrive_cartridge_len( microdrive_single.cartridge ); i > 0; i-- )
+  for( size_t i = microdrive_single.cartridge->cartridge_len; i > 0; i-- )
     microdrive_single.pream[255 + i] = microdrive_single.pream[i-1] = SYNC_OK;
 
   return 0;
@@ -116,7 +132,7 @@ void microdrives_reset( void )
 static inline void __time_critical_func(increment_head)( void )
 {
   microdrive_single.head_pos++;
-  if( microdrive_single.head_pos >= (libspectrum_microdrive_cartridge_len( microdrive_single.cartridge ) * LIBSPECTRUM_MICRODRIVE_BLOCK_LEN) )
+  if( microdrive_single.head_pos >= (microdrive_single.cartridge->cartridge_len * LIBSPECTRUM_MICRODRIVE_BLOCK_LEN) )
   {
     microdrive_single.head_pos = 0;
   }
@@ -251,7 +267,7 @@ inline libspectrum_byte __time_critical_func(port_ctr_in)( void )
      * for FORMAT, WRITE and the other write operations. It doesn't keep
      * the value cached, it reads it fresh each time.
      */
-    if( libspectrum_microdrive_write_protect( microdrive_single.cartridge ) )
+    if( microdrive_single.cartridge->write_protect )
     {
        /* If write protected flag is true, pull the bit in the status byte low */
       ret &= 0xfe;
@@ -357,8 +373,8 @@ inline libspectrum_byte __time_critical_func(port_mdr_in)( void )
      */
     if( microdrive_single.transfered < microdrive_single.max_bytes )
     {
-      ret = libspectrum_microdrive_data( microdrive_single.cartridge,
-					 microdrive_single.head_pos );
+      ret = cartridge_data[microdrive_single.head_pos];
+
       /* Move tape on, with wrap */
       increment_head();
     }
@@ -442,11 +458,11 @@ inline void __time_critical_func(port_mdr_out)( libspectrum_byte val )
      */
     if( microdrive_single.transfered > 11 && microdrive_single.transfered < microdrive_single.max_bytes + 12 )
     {
-      libspectrum_microdrive_set_data( microdrive_single.cartridge,
-				       microdrive_single.head_pos,
-				       val );
+
+      cartridge_data[microdrive_single.head_pos] = val;
       increment_head();
-      // microdrive_single.modified = 1; // Unused for now
+
+      microdrive_single.modified = 1; // Unused for now
     }
 
     /* transfered does include the preamble */
