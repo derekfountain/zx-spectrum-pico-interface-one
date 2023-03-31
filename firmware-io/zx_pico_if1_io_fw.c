@@ -318,9 +318,15 @@ void __time_critical_func(core1_main)( void )
     }
   }
 
-  /* Insert the test image (no filename as yet) into Microdrive 0 */
+  /* Insert the test images into the Microdrives */
   if( (if1_mdr_insert( 0, 1 ) != LIBSPECTRUM_ERROR_NONE) ||
-      (if1_mdr_insert( 1, 0 ) != LIBSPECTRUM_ERROR_NONE) )
+      (if1_mdr_insert( 1, 0 ) != LIBSPECTRUM_ERROR_NONE) ||
+      (if1_mdr_insert( 2, 0 ) != LIBSPECTRUM_ERROR_NONE) ||
+      (if1_mdr_insert( 3, 0 ) != LIBSPECTRUM_ERROR_NONE) ||
+      (if1_mdr_insert( 4, 0 ) != LIBSPECTRUM_ERROR_NONE) ||
+      (if1_mdr_insert( 5, 0 ) != LIBSPECTRUM_ERROR_NONE) ||
+      (if1_mdr_insert( 6, 0 ) != LIBSPECTRUM_ERROR_NONE) ||
+      (if1_mdr_insert( 7, 0 ) != LIBSPECTRUM_ERROR_NONE) )
   {
     while(1)
     {

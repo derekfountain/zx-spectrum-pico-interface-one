@@ -105,6 +105,8 @@ static void microdrives_reset( void )
 {
   for( microdrive_index_t m=0; m<NUM_MICRODRIVES; m++ )
   {
+    microdrive[m].inserted   = 0;
+    microdrive[m].modified   = 0;
     microdrive[m].head_pos   = 0;
     microdrive[m].motor_on   = 0;
     microdrive[m].gap        = 15;
@@ -135,9 +137,6 @@ int32_t if1_init( void )
   {
     if( (microdrive[m].cartridge = malloc( sizeof(cartridge_t) )) == NULL )
       return -1;
-
-    microdrive[m].inserted = 0;
-    microdrive[m].modified = 0;
   }
 
   microdrives_reset();
@@ -148,7 +147,11 @@ int32_t if1_init( void )
 }
 
 
-static int32_t load_flash_mdr_image( microdrive_index_t which )
+/*
+ * Load one of the tape images from flash into the RAM buffer.
+ * This updates the 'index_loaded' static variable.
+ */
+static int32_t load_flash_mdr_image( int32_t which )
 {
   /* Check requested image exists */
   if( (which < 0) || (which > sizeof(flash_mdr_image)-1) )
@@ -264,6 +267,8 @@ inline libspectrum_byte __time_critical_func(port_ctr_in)( void )
   microdrive_index_t active_microdrive_index;
   if( (active_microdrive_index=query_active_microdrive()) == NO_ACTIVE_MICRODRIVE )
     return ret;  /* "Can't happen" */
+
+  /* This routine doesn't access the tape data, no need to page that */
 
   int block;
 
@@ -440,10 +445,19 @@ inline libspectrum_byte __time_critical_func(port_mdr_in)( void )
      */
     if( microdrive[active_microdrive_index].transfered < microdrive[active_microdrive_index].max_bytes )
     {
+      if( index_loaded != active_microdrive_index )
+      {
+	load_flash_mdr_image( active_microdrive_index );
+      }
+
       ret = cartridge_data[microdrive[active_microdrive_index].head_pos];
 
       /* Move tape on, with wrap */
       increment_head(active_microdrive_index);
+    }
+    else
+    {
+      // What happens here and why?
     }
 
     /*
@@ -525,6 +539,11 @@ inline void __time_critical_func(port_mdr_out)( libspectrum_byte val )
      */
     if( microdrive[active_microdrive_index].transfered > 11 && microdrive[active_microdrive_index].transfered < microdrive[active_microdrive_index].max_bytes + 12 )
     {
+
+      if( index_loaded != active_microdrive_index )
+      {
+	load_flash_mdr_image( active_microdrive_index );
+      }
 
       cartridge_data[microdrive[active_microdrive_index].head_pos] = val;
       increment_head(active_microdrive_index);
