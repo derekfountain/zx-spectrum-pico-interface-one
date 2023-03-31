@@ -24,6 +24,8 @@
 
 #include "hardware/gpio.h"
 #include "pico/platform.h"
+#include "hardware/flash.h"
+
 #include "libspectrum.h"
 #include "if1.h"
 
@@ -105,6 +107,20 @@ extern const uint8_t LED_PIN;
 extern const uint8_t TEST_OUTPUT_GP;
 
 
+static void __time_critical_func(blib_test_pin)( void )
+{
+  gpio_put( TEST_OUTPUT_GP, 1 );
+  __asm volatile ("nop");
+  __asm volatile ("nop");
+  __asm volatile ("nop");
+  __asm volatile ("nop");
+  gpio_put( TEST_OUTPUT_GP, 0 );
+  __asm volatile ("nop");
+  __asm volatile ("nop");
+  __asm volatile ("nop");
+  __asm volatile ("nop");
+}
+
 /*
  * Reset the microdrive structures.
  */
@@ -144,6 +160,9 @@ int32_t if1_init( void )
   {
     if( (microdrive[m].cartridge = malloc( sizeof(cartridge_t) )) == NULL )
       return -1;
+
+    microdrive[m].cartridge->write_protect           = 0;
+    microdrive[m].cartridge->cartridge_len_in_blocks = 0;
   }
 
   microdrives_reset();
@@ -159,10 +178,22 @@ static int32_t unload_flash_mdr_image( void )
   if( cartridge_data_modified == 0 )
     return 0;
 
-  
+  if( flash_image_loaded == NO_FLASH_IMAGE )
+    return 0;
 
+  /* Write tape image back out to flash - erase flash first */
+  long unsigned int offset = (long unsigned int)((uint8_t*)flash_mdr_image[flash_image_loaded].flash_address - XIP_BASE);
+  size_t            bytes  = (size_t)(((flash_mdr_image[flash_image_loaded].length +
+					                              FLASH_SECTOR_SIZE) / FLASH_SECTOR_SIZE) * FLASH_SECTOR_SIZE);
 
-  flash_image_loaded != NO_FLASH_IMAGE;
+  flash_range_erase( offset, bytes );
+
+  /* Now write out the current tape contents */
+  bytes  = (size_t)(((flash_mdr_image[flash_image_loaded].length+FLASH_PAGE_SIZE) / FLASH_PAGE_SIZE) * FLASH_PAGE_SIZE);
+  flash_range_program( offset, cartridge_data, bytes );
+
+  /* I don't actually clear the memory, just the metadata */
+  flash_image_loaded      = NO_FLASH_IMAGE;
   cartridge_data_modified = 0;
 
   return 0;
@@ -183,6 +214,8 @@ static int32_t load_flash_tape_image( flash_mdr_image_index_t which )
   if( flash_mdr_image[which].length > LIBSPECTRUM_MICRODRIVE_CARTRIDGE_LENGTH )
     return -1;
 
+  gpio_put(LED_PIN, 1);
+
   /* If change of tape image in memory, write current tape data back out to flash */
   if( (flash_image_loaded != NO_FLASH_IMAGE) && (flash_image_loaded != which) )
   {
@@ -198,6 +231,8 @@ static int32_t load_flash_tape_image( flash_mdr_image_index_t which )
   flash_image_loaded      = which;
   cartridge_data_modified = 0;
 
+  gpio_put(LED_PIN, 0);
+
   return which;
 }
 
@@ -208,7 +243,7 @@ int32_t if1_mdr_insert( const microdrive_index_t which, const uint8_t load_data 
 {
   size_t length_in_bytes = flash_mdr_image[which].length - ( flash_mdr_image[which].length % LIBSPECTRUM_MICRODRIVE_BLOCK_LEN );
 
-  microdrive[which].cartridge->cartridge_len = (length_in_bytes / LIBSPECTRUM_MICRODRIVE_BLOCK_LEN);
+  microdrive[which].cartridge->cartridge_len_in_blocks = (length_in_bytes / LIBSPECTRUM_MICRODRIVE_BLOCK_LEN);
   microdrive[which].inserted = 1;
   microdrive[which].modified = 0;
 
@@ -224,7 +259,7 @@ int32_t if1_mdr_insert( const microdrive_index_t which, const uint8_t load_data 
    * The loop is over the number of blocks on the cartridge.
    * Not quite sure what it's doing, maybe marking some sort of sector map?
    */
-  for( size_t i = microdrive[which].cartridge->cartridge_len; i > 0; i-- )
+  for( size_t i = microdrive[which].cartridge->cartridge_len_in_blocks; i > 0; i-- )
     microdrive[which].pream[255 + i] = microdrive[which].pream[i-1] = SYNC_OK;
 
   return 0;
@@ -238,7 +273,7 @@ int32_t if1_mdr_insert( const microdrive_index_t which, const uint8_t load_data 
 static inline void __time_critical_func(increment_head)( microdrive_index_t which )
 {
   microdrive[which].head_pos++;
-  if( microdrive[which].head_pos >= (microdrive[which].cartridge->cartridge_len * LIBSPECTRUM_MICRODRIVE_BLOCK_LEN) )
+  if( microdrive[which].head_pos >= (microdrive[which].cartridge->cartridge_len_in_blocks * LIBSPECTRUM_MICRODRIVE_BLOCK_LEN) )
   {
     microdrive[which].head_pos = 0;
   }
@@ -301,7 +336,10 @@ inline libspectrum_byte __time_critical_func(port_ctr_in)( void )
 
   microdrive_index_t active_microdrive_index;
   if( (active_microdrive_index=query_active_microdrive()) == NO_ACTIVE_MICRODRIVE )
+  {
+    blib_test_pin();
     return ret;  /* "Can't happen" */
+  }
 
   /* This routine doesn't access the tape data, no need to page that */
 
@@ -469,7 +507,10 @@ inline libspectrum_byte __time_critical_func(port_mdr_in)( void )
 
   microdrive_index_t active_microdrive_index;
   if( (active_microdrive_index=query_active_microdrive()) == NO_ACTIVE_MICRODRIVE )
+  {
+    blib_test_pin(); blib_test_pin();
     return ret;  /* "Can't happen" */
+  }
 
   if( microdrive[active_microdrive_index].motor_on && microdrive[active_microdrive_index].inserted )
   {
@@ -483,7 +524,10 @@ inline libspectrum_byte __time_critical_func(port_mdr_in)( void )
       if( flash_image_loaded != active_microdrive_index )
       {
 	if( load_flash_tape_image( active_microdrive_index ) == -1 )
+	{
+	  blib_test_pin(); blib_test_pin(); blib_test_pin();
 	  return 0xFF;     /* "Can't happen" and there really aren't any good options here */
+	}
       }
 
       ret = cartridge_data[microdrive[active_microdrive_index].head_pos];
@@ -530,7 +574,10 @@ inline void __time_critical_func(port_mdr_out)( libspectrum_byte val )
 
   microdrive_index_t active_microdrive_index;
   if( (active_microdrive_index=query_active_microdrive()) == NO_ACTIVE_MICRODRIVE )
+  {
+    blib_test_pin(); blib_test_pin(); blib_test_pin(); blib_test_pin();
     return;  /* "Can't happen" */
+  }
 
   if( microdrive[active_microdrive_index].motor_on && microdrive[active_microdrive_index].inserted )
   {
@@ -579,7 +626,10 @@ inline void __time_critical_func(port_mdr_out)( libspectrum_byte val )
       if( flash_image_loaded != active_microdrive_index )
       {
 	if( load_flash_tape_image( active_microdrive_index ) == -1 )
+	{
+	  blib_test_pin(); blib_test_pin(); blib_test_pin(); blib_test_pin(); blib_test_pin();
 	  return;     /* "Can't happen" */
+	}
       }
 
       cartridge_data[microdrive[active_microdrive_index].head_pos] = val;

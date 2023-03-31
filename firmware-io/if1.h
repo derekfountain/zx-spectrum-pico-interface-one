@@ -52,7 +52,7 @@ typedef struct _cartridge_t
   int write_protect;
   
   /* Length in 543-byte blocks */
-  libspectrum_byte cartridge_len;    /* Cartridge length in blocks */
+  libspectrum_byte cartridge_len_in_blocks;
 }
 cartridge_t;
 
