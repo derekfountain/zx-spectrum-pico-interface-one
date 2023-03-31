@@ -280,8 +280,12 @@ void preconvert_data( void )
   }
 }
 
-void microdrives_reset( void );
-
+/*
+ * This PIO state machine is used to change the data bus level
+ * shifter direction when either the ROM handling Pico says it
+ * wants to send a byte back to the ZX, or when this code wants
+ * to send a byte from the IF1 back to the ZX.
+ */
 PIO pio;
 uint sm_mreq;
 
@@ -315,8 +319,8 @@ void __time_critical_func(core1_main)( void )
   }
 
   /* Insert the test image (no filename as yet) into Microdrive 0 */
-  if( (if1_mdr_insert( 0, NULL ) != LIBSPECTRUM_ERROR_NONE) ||
-      (if1_mdr_insert( 1, NULL ) != LIBSPECTRUM_ERROR_NONE) )
+  if( (if1_mdr_insert( 0, 1 ) != LIBSPECTRUM_ERROR_NONE) ||
+      (if1_mdr_insert( 1, 0 ) != LIBSPECTRUM_ERROR_NONE) )
   {
     while(1)
     {
@@ -327,7 +331,6 @@ void __time_critical_func(core1_main)( void )
     }
   }
 
-  microdrives_reset();
 
   while( 1 )
   {

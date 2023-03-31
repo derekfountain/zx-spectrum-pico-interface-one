@@ -75,14 +75,18 @@ typedef struct _microdrive_t
   libspectrum_byte gap;
   libspectrum_byte sync;
 
+  /* I might be able to make this an instance of the structure, remove the malloc */
   cartridge_t *cartridge;      /* write protect, len, blocks */
 
 } microdrive_t;
 
 
+/* Index into microdrives array, etc. 0 to 7, maybe -1 */
+typedef int32_t microdrive_index_t;
 
-int if1_init( void );
-int if1_mdr_insert( int drive, const char *filename );
+
+int32_t if1_init( void );
+int32_t if1_mdr_insert( const microdrive_index_t which, const uint8_t load_data );
 
 libspectrum_byte port_ctr_in( void );
 void port_ctr_out( libspectrum_byte val );

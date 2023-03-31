@@ -27,12 +27,48 @@
 #include "libspectrum.h"
 #include "if1.h"
 
+/* This file is generated from test data, don't change what's in it manually */
 #include "flash_images.h"
 
-typedef int32_t microdrive_index_t;
-#define NO_ACTIVE_MICRODRIVE ((microdrive_index_t)(-1))
-#define NUM_MICRODRIVES      ((microdrive_index_t)(8))
+#define NO_ACTIVE_MICRODRIVE  ((microdrive_index_t)(-1))
+#define NUM_MICRODRIVES       ((microdrive_index_t)(8))
+#define LAST_MICRODRIVE_INDEX (NUM_MICRODRIVES-1)
 
+/* Details of an MDR image in flash */
+typedef struct _flash_mdr_image
+{
+  uint8_t  *flash_address;
+  uint32_t  length;
+}
+flash_mdr_image_t;
+
+/*
+ * These are the test images in flash. They can be memcpy'ed from flash memory,
+ * but writing them back is more elaborate
+ */
+flash_mdr_image_t flash_mdr_image[NUM_MICRODRIVES] =
+{
+  { md1_image, md1_image_len },
+  { md2_image, md2_image_len },
+  { md3_image, md3_image_len },
+  { md4_image, md4_image_len },
+  { md5_image, md5_image_len },
+  { md6_image, md6_image_len },
+  { md7_image, md7_image_len },
+  { md8_image, md8_image_len },
+};
+
+/*
+ * There are 8 cartridge data images in flash. Only one of them can
+ * be in RAM at once. This holds the index of the one that's in RAM.
+ */
+microdrive_index_t index_loaded;
+
+/*
+ * These are the microdrives, typically 8 of them. This structure
+ * keeps track of the motor, the head position, gaps, preambles,
+ * things like that.
+ */
 static microdrive_t microdrive[NUM_MICRODRIVES];
 
 /*
@@ -61,11 +97,30 @@ static uint8_t if1_ula_comms_clk;
 extern const uint8_t LED_PIN;
 extern const uint8_t TEST_OUTPUT_GP;
 
+
 /*
- * Initialise Interface One structure. Create the 8 microdrive images
- * and allocate a buffer for the currently used cartridge.
+ * Reset the microdrive structures.
  */
-int if1_init( void )
+static void microdrives_reset( void )
+{
+  for( microdrive_index_t m=0; m<NUM_MICRODRIVES; m++ )
+  {
+    microdrive[m].head_pos   = 0;
+    microdrive[m].motor_on   = 0;
+    microdrive[m].gap        = 15;
+    microdrive[m].sync       = 15;
+    microdrive[m].transfered = 0;
+  }
+
+  if1_ula_comms_clk     = 0;
+}
+
+
+/*
+ * Initialise Interface One structure. Create the 8 microdrive images.
+ * All start off with no cartridge inserted.
+ */
+int32_t if1_init( void )
 {
   int m, i;
 
@@ -85,78 +140,63 @@ int if1_init( void )
     microdrive[m].modified = 0;
   }
 
+  microdrives_reset();
+
+  index_loaded = NO_ACTIVE_MICRODRIVE;
+
   return 0;
 }
 
-int if1_mdr_insert( int which, const char *filename )
+
+static int32_t load_flash_mdr_image( microdrive_index_t which )
 {
-  size_t data_length;
+  /* Check requested image exists */
+  if( (which < 0) || (which > sizeof(flash_mdr_image)-1) )
+    return -1;
+
+  /* Check requested image will fit in buffer */
+  if( flash_mdr_image[which].length > LIBSPECTRUM_MICRODRIVE_CARTRIDGE_LENGTH )
+    return -1;
+
+  /* Copy data in from flash */
+  memcpy( cartridge_data, flash_mdr_image[which].flash_address, flash_mdr_image[which].length );
+  index_loaded = which;
+
+  return which;
+}
+
+
+int32_t if1_mdr_insert( const microdrive_index_t which, const uint8_t load_data )
+{
+  size_t length_in_bytes = flash_mdr_image[which].length - ( flash_mdr_image[which].length % LIBSPECTRUM_MICRODRIVE_BLOCK_LEN );
+
+  microdrive[which].cartridge->cartridge_len = (length_in_bytes / LIBSPECTRUM_MICRODRIVE_BLOCK_LEN);
+  microdrive[which].inserted = 1;
+  microdrive[which].modified = 0;
+
+  if( load_data )
+  {
+    if( load_flash_mdr_image( which ) == -1 )
+      return -1;
+  }
 
   /*
-   * This currently loads the test image from RAM into the RAM buffer.
-   * I need to move things around so the test image is in flash, which
-   * will be closer to what is required.
+   * pream is 512 bytes in the microdrive_t structure.
+   * This is filling 2 areas of the microdrive area's premable with SYNC_OK.
+   * The loop is over the number of blocks on the cartridge.
+   * Not quite sure what it's doing, maybe marking some sort of sector map?
    */
-#if 0
-  This needs to know which image were inserting. I think it needs an index into 
-  the array of flash images
-
-  if( length < (LIBSPECTRUM_MICRODRIVE_BLOCK_LEN * 10) ||
-      ( length % LIBSPECTRUM_MICRODRIVE_BLOCK_LEN ) > 1 || length > MDR_LENGTH )
-  {
-    return LIBSPECTRUM_ERROR_CORRUPT;
-  }
-#endif
-
-// For now i've hardcoded the 0th image in flash
-
-  data_length = md1_image_len - ( md1_image_len % LIBSPECTRUM_MICRODRIVE_BLOCK_LEN );
-
-  uint8_t *buffer = cartridge_data;
-  memcpy( buffer, md1_image, data_length ); buffer += data_length;
-
-  for( microdrive_index_t m=0; m<NUM_MICRODRIVES; m++ )
-  {
-    if( ( md1_image_len % LIBSPECTRUM_MICRODRIVE_BLOCK_LEN ) == 1 )
-    {
-      microdrive[m].cartridge->write_protect = *buffer;
-    }
-    else
-    {
-      microdrive[m].cartridge->write_protect = 0;
-    }
-    microdrive[m].cartridge->cartridge_len = (data_length / LIBSPECTRUM_MICRODRIVE_BLOCK_LEN);
-    microdrive[m].inserted = 1;
-    microdrive[m].modified = 0;
-
-    /*
-     * pream is 512 bytes in the microdrive_t structure.
-     * This is filling 2 areas of the microdrive area's premable with SYNC_OK.
-     * The loop is over the number of blocks on the cartridge.
-     * Not quite sure what it's doing, maybe marking some sort of sector map?
-     */
-    /* we assume formatted cartridges */
-    for( size_t i = microdrive[m].cartridge->cartridge_len; i > 0; i-- )
-      microdrive[m].pream[255 + i] = microdrive[m].pream[i-1] = SYNC_OK;
-  }
+  for( size_t i = microdrive[which].cartridge->cartridge_len; i > 0; i-- )
+    microdrive[which].pream[255 + i] = microdrive[which].pream[i-1] = SYNC_OK;
 
   return 0;
 }
 
-void microdrives_reset( void )
-{
-  for( microdrive_index_t m=0; m<NUM_MICRODRIVES; m++ )
-  {
-    microdrive[m].head_pos   = 0;
-    microdrive[m].motor_on   = 0;
-    microdrive[m].gap        = 15;
-    microdrive[m].sync       = 15;
-    microdrive[m].transfered = 0;
-  }
 
-  if1_ula_comms_clk     = 0;
-}
-
+/*
+ * Advance the given microdrive's head position on the tape.
+ * Wrap at the "end" of the tape.
+ */
 static inline void __time_critical_func(increment_head)( microdrive_index_t which )
 {
   microdrive[which].head_pos++;
@@ -166,13 +206,14 @@ static inline void __time_critical_func(increment_head)( microdrive_index_t whic
   }
 }
 
+
 /*
  * Find and return the index of the microdrive with the motor on.
  * Returns NO_ACTIVE_MICRODRIVE if they're all off.
  */
 static microdrive_index_t __time_critical_func(query_active_microdrive)( void )
 {
-  for( microdrive_index_t m=0; m<(NUM_MICRODRIVES); m++ )
+  for( microdrive_index_t m=0; m<NUM_MICRODRIVES; m++ )
   {
     if( microdrive[m].motor_on )
     {
@@ -181,6 +222,7 @@ static microdrive_index_t __time_critical_func(query_active_microdrive)( void )
   }
   return NO_ACTIVE_MICRODRIVE;
 }
+
 
 /*
  * I think the idea here is that whenever the Z80 asks for the microdrive
@@ -213,6 +255,7 @@ void __time_critical_func(microdrives_restart)( void )
   }
 
 }
+
 
 inline libspectrum_byte __time_critical_func(port_ctr_in)( void )
 {
@@ -322,7 +365,6 @@ inline libspectrum_byte __time_critical_func(port_ctr_in)( void )
 }
 
 
-
 /*
  * Control output, which means the IF1 is setting the active drive.
  * If the CLK line is going low set microdrive0 (the only one, now)
@@ -360,8 +402,7 @@ inline void __time_critical_func(port_ctr_out)( libspectrum_byte val )
      * We have a new pulse, shift all the previous ones along and
      * put this new one (inverted) in the right-most microdrive's motor
      */
-    microdrive_index_t m;
-    for( m = 7; m > 0; m-- )
+    for( microdrive_index_t m = LAST_MICRODRIVE_INDEX; m > 0; m-- )
     {
       microdrive[m].motor_on = microdrive[m - 1].motor_on;
     }
@@ -373,7 +414,6 @@ inline void __time_critical_func(port_ctr_out)( libspectrum_byte val )
 
   microdrives_restart();
 }
-
 
 
 /*

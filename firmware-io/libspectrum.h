@@ -21,8 +21,8 @@
 
 */
 
-#ifndef LIBSPECTRUM_LIBSPECTRUM_H
-#define LIBSPECTRUM_LIBSPECTRUM_H
+#ifndef __LIBSPECTRUM_H
+#define __LIBSPECTRUM_H
 
 #include <stdlib.h>
 #include <stdint.h>
@@ -63,12 +63,9 @@ typedef enum libspectrum_error {
 #define LIBSPECTRUM_MICRODRIVE_DATA_LEN 512
 #define LIBSPECTRUM_MICRODRIVE_BLOCK_LEN ( LIBSPECTRUM_MICRODRIVE_HEAD_LEN + \
                                            LIBSPECTRUM_MICRODRIVE_HEAD_LEN +  \
-                                           LIBSPECTRUM_MICRODRIVE_DATA_LEN + 1 )
+                                           LIBSPECTRUM_MICRODRIVE_DATA_LEN + 1 )   /* 543 */
 #define LIBSPECTRUM_MICRODRIVE_CARTRIDGE_LENGTH \
-        ( LIBSPECTRUM_MICRODRIVE_BLOCK_MAX * LIBSPECTRUM_MICRODRIVE_BLOCK_LEN )
-
-/* Constructor/destructor */
+        ( LIBSPECTRUM_MICRODRIVE_BLOCK_MAX * LIBSPECTRUM_MICRODRIVE_BLOCK_LEN )    /* 97740 for 180 block cartridge */
 
 
-
-#endif                          /* #ifndef LIBSPECTRUM_LIBSPECTRUM_H */
+#endif
