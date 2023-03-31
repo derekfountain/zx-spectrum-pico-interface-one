@@ -84,6 +84,12 @@ typedef struct _microdrive_t
 /* Index into microdrives array, etc. 0 to 7, maybe -1 */
 typedef int32_t microdrive_index_t;
 
+/* A byte on tape, the cartridge has an array of these */
+typedef uint8_t tape_byte_t;
+
+/* Index of MDR image into flash array */
+typedef int32_t flash_mdr_image_index_t;
+
 
 int32_t if1_init( void );
 int32_t if1_mdr_insert( const microdrive_index_t which, const uint8_t load_data );

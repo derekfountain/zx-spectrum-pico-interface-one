@@ -34,10 +34,14 @@
 #define NUM_MICRODRIVES       ((microdrive_index_t)(8))
 #define LAST_MICRODRIVE_INDEX (NUM_MICRODRIVES-1)
 
-/* Details of an MDR image in flash */
+/*
+ * Details of an MDR image in flash. At the moment the address points to
+ * the tape bytes. This will eventually be the complete MDR image sent
+ * from SD card
+ */
 typedef struct _flash_mdr_image
 {
-  uint8_t  *flash_address;
+  void     *flash_address;
   uint32_t  length;
 }
 flash_mdr_image_t;
@@ -48,21 +52,23 @@ flash_mdr_image_t;
  */
 flash_mdr_image_t flash_mdr_image[NUM_MICRODRIVES] =
 {
-  { md1_image, md1_image_len },
-  { md2_image, md2_image_len },
-  { md3_image, md3_image_len },
-  { md4_image, md4_image_len },
-  { md5_image, md5_image_len },
-  { md6_image, md6_image_len },
-  { md7_image, md7_image_len },
-  { md8_image, md8_image_len },
+  { tape1_image, tape1_image_len },
+  { tape2_image, tape2_image_len },
+  { tape3_image, tape3_image_len },
+  { tape4_image, tape4_image_len },
+  { tape5_image, tape5_image_len },
+  { tape6_image, tape6_image_len },
+  { tape7_image, tape7_image_len },
+  { tape8_image, tape8_image_len },
 };
 
 /*
  * There are 8 cartridge data images in flash. Only one of them can
  * be in RAM at once. This holds the index of the one that's in RAM.
  */
-microdrive_index_t index_loaded;
+flash_mdr_image_index_t flash_image_loaded;
+
+#define NO_FLASH_IMAGE  ((flash_mdr_image_index_t)(-1))
 
 /*
  * These are the microdrives, typically 8 of them. This structure
@@ -89,7 +95,8 @@ static microdrive_t microdrive[NUM_MICRODRIVES];
  * mm_reformated_in_zx.mdr will then load into FUSE as a normal
  * MDR file.
  */
-static uint8_t cartridge_data[LIBSPECTRUM_MICRODRIVE_CARTRIDGE_LENGTH];
+static tape_byte_t cartridge_data[LIBSPECTRUM_MICRODRIVE_CARTRIDGE_LENGTH];
+static uint8_t     cartridge_data_modified;
 
 /* Clock bit in the ULA */
 static uint8_t if1_ula_comms_clk;
@@ -141,7 +148,22 @@ int32_t if1_init( void )
 
   microdrives_reset();
 
-  index_loaded = NO_ACTIVE_MICRODRIVE;
+  flash_image_loaded = NO_FLASH_IMAGE;
+
+  return 0;
+}
+
+
+static int32_t unload_flash_mdr_image( void )
+{
+  if( cartridge_data_modified == 0 )
+    return 0;
+
+  
+
+
+  flash_image_loaded != NO_FLASH_IMAGE;
+  cartridge_data_modified = 0;
 
   return 0;
 }
@@ -149,9 +171,9 @@ int32_t if1_init( void )
 
 /*
  * Load one of the tape images from flash into the RAM buffer.
- * This updates the 'index_loaded' static variable.
+ * This updates the 'flash_image_loaded' static variable.
  */
-static int32_t load_flash_mdr_image( int32_t which )
+static int32_t load_flash_tape_image( flash_mdr_image_index_t which )
 {
   /* Check requested image exists */
   if( (which < 0) || (which > sizeof(flash_mdr_image)-1) )
@@ -161,12 +183,25 @@ static int32_t load_flash_mdr_image( int32_t which )
   if( flash_mdr_image[which].length > LIBSPECTRUM_MICRODRIVE_CARTRIDGE_LENGTH )
     return -1;
 
-  /* Copy data in from flash */
-  memcpy( cartridge_data, flash_mdr_image[which].flash_address, flash_mdr_image[which].length );
-  index_loaded = which;
+  /* If change of tape image in memory, write current tape data back out to flash */
+  if( (flash_image_loaded != NO_FLASH_IMAGE) && (flash_image_loaded != which) )
+  {
+    if( unload_flash_mdr_image() == -1 )
+      return -1;
+  }
+
+  /*
+   * Copy data in from flash. What's currently at the address is the tape data, but
+   * that might change as what's held in flash develops
+   */
+  memcpy( cartridge_data, (tape_byte_t*)flash_mdr_image[which].flash_address, flash_mdr_image[which].length );
+  flash_image_loaded      = which;
+  cartridge_data_modified = 0;
 
   return which;
 }
+
+
 
 
 int32_t if1_mdr_insert( const microdrive_index_t which, const uint8_t load_data )
@@ -179,7 +214,7 @@ int32_t if1_mdr_insert( const microdrive_index_t which, const uint8_t load_data 
 
   if( load_data )
   {
-    if( load_flash_mdr_image( which ) == -1 )
+    if( load_flash_tape_image( which ) == -1 )
       return -1;
   }
 
@@ -445,9 +480,10 @@ inline libspectrum_byte __time_critical_func(port_mdr_in)( void )
      */
     if( microdrive[active_microdrive_index].transfered < microdrive[active_microdrive_index].max_bytes )
     {
-      if( index_loaded != active_microdrive_index )
+      if( flash_image_loaded != active_microdrive_index )
       {
-	load_flash_mdr_image( active_microdrive_index );
+	if( load_flash_tape_image( active_microdrive_index ) == -1 )
+	  return 0xFF;     /* "Can't happen" and there really aren't any good options here */
       }
 
       ret = cartridge_data[microdrive[active_microdrive_index].head_pos];
@@ -457,7 +493,7 @@ inline libspectrum_byte __time_critical_func(port_mdr_in)( void )
     }
     else
     {
-      // What happens here and why?
+      // What happens here and why? I think it means we've gone off the end of the block, so gap tape
     }
 
     /*
@@ -540,12 +576,14 @@ inline void __time_critical_func(port_mdr_out)( libspectrum_byte val )
     if( microdrive[active_microdrive_index].transfered > 11 && microdrive[active_microdrive_index].transfered < microdrive[active_microdrive_index].max_bytes + 12 )
     {
 
-      if( index_loaded != active_microdrive_index )
+      if( flash_image_loaded != active_microdrive_index )
       {
-	load_flash_mdr_image( active_microdrive_index );
+	if( load_flash_tape_image( active_microdrive_index ) == -1 )
+	  return;     /* "Can't happen" */
       }
 
       cartridge_data[microdrive[active_microdrive_index].head_pos] = val;
+      cartridge_data_modified = 1;
       increment_head(active_microdrive_index);
 
       microdrive[active_microdrive_index].modified = 1; // Unused for now
