@@ -50,7 +50,16 @@ flash_mdr_image_t;
 
 /*
  * These are the test images in flash. They can be memcpy'ed from flash memory,
- * but writing them back is more elaborate
+ * but writing them back is more elaborate.
+ *
+ * Examine, for example, 98304 bytes of flash memory with:
+ *
+ * (gdb) x/98304xb flash_mdr_image[0].flash_address
+ *
+ * Remove any cruft from the bottom of the output (left side is OK) then convert
+ * to binary with
+ *
+ * > perl -ne 'while( m/ (0x..)/g) {print chr(hex($1))}' < ram.txt > ram.bin
  */
 flash_mdr_image_t flash_mdr_image[NUM_MICRODRIVES] =
 {
@@ -88,7 +97,8 @@ static microdrive_t microdrive[NUM_MICRODRIVES];
  * (gdb) set print repeats 0
  * (gdb) set print elements unlimited
  * (gdb) set pagination off
- * (gdb) p/x microdrive->cartridge.data
+ * (gdb) p/x cartridge_data
+ * (gdb) set max-value-size unlimited
  *
  * Convert to MDR image with:
  *
@@ -96,6 +106,7 @@ static microdrive_t microdrive[NUM_MICRODRIVES];
  *
  * mm_reformated_in_zx.mdr will then load into FUSE as a normal
  * MDR file.
+ *
  */
 static tape_byte_t cartridge_data[LIBSPECTRUM_MICRODRIVE_CARTRIDGE_LENGTH];
 static uint8_t     cartridge_data_modified;
@@ -105,6 +116,9 @@ static uint8_t if1_ula_comms_clk;
 
 extern const uint8_t LED_PIN;
 extern const uint8_t TEST_OUTPUT_GP;
+
+
+void __time_critical_func(microdrives_restart)( void );
 
 
 static void __time_critical_func(blib_test_pin)( void )
@@ -173,6 +187,18 @@ int32_t if1_init( void )
 }
 
 
+typedef struct
+{
+  uint32_t     flash_offset;       /* Area of flash from XIP_BASE which gets erased */
+  size_t       erase_length;
+  tape_byte_t *src_address;        /* Area from RAM which gets programmed into flash */
+  size_t       program_length;
+}
+erase_trace_entry_t;
+
+static erase_trace_entry_t erase_trace[10];
+static uint32_t erase_trace_index = 0;
+
 static int32_t unload_flash_mdr_image( void )
 {
   if( cartridge_data_modified == 0 )
@@ -182,17 +208,28 @@ static int32_t unload_flash_mdr_image( void )
     return 0;
 
   /* Write tape image back out to flash - erase flash first */
-  long unsigned int offset = (long unsigned int)((uint8_t*)flash_mdr_image[flash_image_loaded].flash_address - XIP_BASE);
-  size_t            bytes  = (size_t)(((flash_mdr_image[flash_image_loaded].length +
+  uint32_t offset = (uint32_t)(((uint8_t*)(flash_mdr_image[flash_image_loaded].flash_address)) - XIP_BASE);
+  size_t   bytes  = (size_t)(((flash_mdr_image[flash_image_loaded].length +
 					                              FLASH_SECTOR_SIZE) / FLASH_SECTOR_SIZE) * FLASH_SECTOR_SIZE);
 
   flash_range_erase( offset, bytes );
+
+blib_test_pin();
+
+  erase_trace[erase_trace_index].flash_offset = offset;
+  erase_trace[erase_trace_index].erase_length = bytes;
 
   /* Now write out the current tape contents */
   bytes  = (size_t)(((flash_mdr_image[flash_image_loaded].length+FLASH_PAGE_SIZE) / FLASH_PAGE_SIZE) * FLASH_PAGE_SIZE);
   flash_range_program( offset, cartridge_data, bytes );
 
-  /* I don't actually clear the memory, just the metadata */
+blib_test_pin();
+
+  erase_trace[erase_trace_index].src_address    = cartridge_data;
+  erase_trace[erase_trace_index].program_length = bytes;
+  erase_trace_index++;
+
+  /* I don't actually clear the cartridge RAM memory, just the metadata */
   flash_image_loaded      = NO_FLASH_IMAGE;
   cartridge_data_modified = 0;
 
@@ -207,7 +244,7 @@ static int32_t unload_flash_mdr_image( void )
 static int32_t load_flash_tape_image( flash_mdr_image_index_t which )
 {
   /* Check requested image exists */
-  if( (which < 0) || (which > sizeof(flash_mdr_image)-1) )
+  if( (which < 0) || (which > LAST_MICRODRIVE_INDEX) )
     return -1;
 
   /* Check requested image will fit in buffer */
@@ -261,6 +298,8 @@ int32_t if1_mdr_insert( const microdrive_index_t which, const uint8_t load_data 
    */
   for( size_t i = microdrive[which].cartridge->cartridge_len_in_blocks; i > 0; i-- )
     microdrive[which].pream[255 + i] = microdrive[which].pream[i-1] = SYNC_OK;
+
+  microdrives_restart();
 
   return 0;
 }
@@ -330,6 +369,9 @@ void __time_critical_func(microdrives_restart)( void )
 }
 
 
+/*
+ * Control port in - Z80 is reading IF1/microdrives status
+ */
 inline libspectrum_byte __time_critical_func(port_ctr_in)( void )
 {
   libspectrum_byte ret = 0xff;
