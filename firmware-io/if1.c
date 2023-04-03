@@ -199,7 +199,7 @@ erase_trace_entry_t;
 static erase_trace_entry_t erase_trace[10];
 static uint32_t erase_trace_index = 0;
 
-static int32_t unload_flash_mdr_image( void )
+static int32_t __time_critical_func(unload_flash_mdr_image)( void )
 {
   if( cartridge_data_modified == 0 )
     return 0;
@@ -212,9 +212,28 @@ static int32_t unload_flash_mdr_image( void )
   size_t   bytes  = (size_t)(((flash_mdr_image[flash_image_loaded].length +
 					                              FLASH_SECTOR_SIZE) / FLASH_SECTOR_SIZE) * FLASH_SECTOR_SIZE);
 
+  /*
+   * With just the erase, /IORQ lasts about 450ms
+   *  Pre-erase starts about 2us from /IORQ low
+   *  Post-erase comes in about 8.25ms from /IORQ high
+   * With just the program, /IORQ lasts about 65ms
+   *  Pre-program comes in about 2.5us from /IORQ low
+   *  Post-program comes in about 9ms from /IORQ high
+   * With both, /IORQ lasts about 625ms
+   *  Pre-erase starts about 2us from /IORQ low
+   *  Post-program comes in about 9ms from /IORQ high
+   *
+   * All timings at 150MHz. The erase is the slow bit, programming is much faster.
+   * The "bytes" recalculation explains the difference between the two singular
+   * data points and the whole lot in one go.
+   * 
+   * Running flash_range_erase() and flash_range_program() a second time without
+   * reseting the Pico doesn't change anything, so they must be running from RAM.
+   */
+#define DISABLED_FLASH_WRITE_BACK 1
+/* Disabled, it takes far too long and crashes the Z80 which is in /WAIT */
+#if !DISABLED_FLASH_WRITE_BACK
   flash_range_erase( offset, bytes );
-
-blib_test_pin();
 
   erase_trace[erase_trace_index].flash_offset = offset;
   erase_trace[erase_trace_index].erase_length = bytes;
@@ -223,11 +242,10 @@ blib_test_pin();
   bytes  = (size_t)(((flash_mdr_image[flash_image_loaded].length+FLASH_PAGE_SIZE) / FLASH_PAGE_SIZE) * FLASH_PAGE_SIZE);
   flash_range_program( offset, cartridge_data, bytes );
 
-blib_test_pin();
-
   erase_trace[erase_trace_index].src_address    = cartridge_data;
   erase_trace[erase_trace_index].program_length = bytes;
   erase_trace_index++;
+#endif
 
   /* I don't actually clear the cartridge RAM memory, just the metadata */
   flash_image_loaded      = NO_FLASH_IMAGE;
@@ -241,7 +259,7 @@ blib_test_pin();
  * Load one of the tape images from flash into the RAM buffer.
  * This updates the 'flash_image_loaded' static variable.
  */
-static int32_t load_flash_tape_image( flash_mdr_image_index_t which )
+static int32_t __time_critical_func(load_flash_tape_image)( flash_mdr_image_index_t which )
 {
   /* Check requested image exists */
   if( (which < 0) || (which > LAST_MICRODRIVE_INDEX) )
