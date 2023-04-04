@@ -108,7 +108,7 @@ static microdrive_t microdrive[NUM_MICRODRIVES];
  * MDR file.
  *
  */
-static tape_byte_t cartridge_data[LIBSPECTRUM_MICRODRIVE_CARTRIDGE_LENGTH];
+static tape_byte_t  __attribute__((aligned(4))) cartridge_data[LIBSPECTRUM_MICRODRIVE_CARTRIDGE_LENGTH];
 static uint8_t     cartridge_data_modified;
 
 /* Clock bit in the ULA */
@@ -121,7 +121,7 @@ extern const uint8_t TEST_OUTPUT_GP;
 void __time_critical_func(microdrives_restart)( void );
 
 
-static void __time_critical_func(blib_test_pin)( void )
+static void __time_critical_func(blip_test_pin)( void )
 {
   gpio_put( TEST_OUTPUT_GP, 1 );
   __asm volatile ("nop");
@@ -135,11 +135,20 @@ static void __time_critical_func(blib_test_pin)( void )
   __asm volatile ("nop");
 }
 
+
 /*
- * Reset the microdrive structures.
+ * Initialise Interface One structure. Create the 8 microdrive images.
+ * All start off with no cartridge inserted.
  */
-static void microdrives_reset( void )
+int32_t if1_init( void )
 {
+  if1_ula_comms_clk = 0;
+
+  /* 
+   * There's only one microdrive image in RAM. I don't have enough RAM 
+   * for more than one. The "not currently being used" images are held
+   * in flash and "paged" in.
+   */
   for( microdrive_index_t m=0; m<NUM_MICRODRIVES; m++ )
   {
     microdrive[m].inserted   = 0;
@@ -149,37 +158,10 @@ static void microdrives_reset( void )
     microdrive[m].gap        = 15;
     microdrive[m].sync       = 15;
     microdrive[m].transfered = 0;
+
+    microdrive[m].cartridge_write_protect = 0;
+    microdrive[m].cartridge_len_in_blocks = 0;
   }
-
-  if1_ula_comms_clk     = 0;
-}
-
-
-/*
- * Initialise Interface One structure. Create the 8 microdrive images.
- * All start off with no cartridge inserted.
- */
-int32_t if1_init( void )
-{
-  int m, i;
-
-  if1_ula_comms_clk = 0;
-
-  /* 
-   * There's only one microdrive image in RAM. I don't have enough RAM to
-   * malloc more than one. The "not currently being used" images are held
-   * in flash and "paged" in.
-   */
-  for( microdrive_index_t m=0; m<NUM_MICRODRIVES; m++ )
-  {
-    if( (microdrive[m].cartridge = malloc( sizeof(cartridge_t) )) == NULL )
-      return -1;
-
-    microdrive[m].cartridge->write_protect           = 0;
-    microdrive[m].cartridge->cartridge_len_in_blocks = 0;
-  }
-
-  microdrives_reset();
 
   flash_image_loaded = NO_FLASH_IMAGE;
 
@@ -230,9 +212,9 @@ static int32_t __time_critical_func(unload_flash_mdr_image)( void )
    * Running flash_range_erase() and flash_range_program() a second time without
    * reseting the Pico doesn't change anything, so they must be running from RAM.
    */
-#define DISABLED_FLASH_WRITE_BACK 1
+#define ENABLED_FLASH_WRITE_BACK 0
 /* Disabled, it takes far too long and crashes the Z80 which is in /WAIT */
-#if !DISABLED_FLASH_WRITE_BACK
+#if ENABLED_FLASH_WRITE_BACK
   flash_range_erase( offset, bytes );
 
   erase_trace[erase_trace_index].flash_offset = offset;
@@ -246,6 +228,8 @@ static int32_t __time_critical_func(unload_flash_mdr_image)( void )
   erase_trace[erase_trace_index].program_length = bytes;
   erase_trace_index++;
 #endif
+
+  TRACE_DATA(TRC_UNLOAD_IMAGE, flash_image_loaded);
 
   /* I don't actually clear the cartridge RAM memory, just the metadata */
   flash_image_loaded      = NO_FLASH_IMAGE;
@@ -269,8 +253,6 @@ static int32_t __time_critical_func(load_flash_tape_image)( flash_mdr_image_inde
   if( flash_mdr_image[which].length > LIBSPECTRUM_MICRODRIVE_CARTRIDGE_LENGTH )
     return -1;
 
-  gpio_put(LED_PIN, 1);
-
   /* If change of tape image in memory, write current tape data back out to flash */
   if( (flash_image_loaded != NO_FLASH_IMAGE) && (flash_image_loaded != which) )
   {
@@ -282,11 +264,13 @@ static int32_t __time_critical_func(load_flash_tape_image)( flash_mdr_image_inde
    * Copy data in from flash. What's currently at the address is the tape data, but
    * that might change as what's held in flash develops
    */
+  TRACE_DATA(TRC_LOAD_IMAGE, which);
+blip_test_pin();
   memcpy( cartridge_data, (tape_byte_t*)flash_mdr_image[which].flash_address, flash_mdr_image[which].length );
+blip_test_pin();
+  TRACE_DATA(TRC_LOAD_IMAGE, which);
   flash_image_loaded      = which;
   cartridge_data_modified = 0;
-
-  gpio_put(LED_PIN, 0);
 
   return which;
 }
@@ -298,7 +282,7 @@ int32_t if1_mdr_insert( const microdrive_index_t which, const uint8_t load_data 
 {
   size_t length_in_bytes = flash_mdr_image[which].length - ( flash_mdr_image[which].length % LIBSPECTRUM_MICRODRIVE_BLOCK_LEN );
 
-  microdrive[which].cartridge->cartridge_len_in_blocks = (length_in_bytes / LIBSPECTRUM_MICRODRIVE_BLOCK_LEN);
+  microdrive[which].cartridge_len_in_blocks = (length_in_bytes / LIBSPECTRUM_MICRODRIVE_BLOCK_LEN);
   microdrive[which].inserted = 1;
   microdrive[which].modified = 0;
 
@@ -314,10 +298,12 @@ int32_t if1_mdr_insert( const microdrive_index_t which, const uint8_t load_data 
    * The loop is over the number of blocks on the cartridge.
    * Not quite sure what it's doing, maybe marking some sort of sector map?
    */
-  for( size_t i = microdrive[which].cartridge->cartridge_len_in_blocks; i > 0; i-- )
+  for( size_t i = microdrive[which].cartridge_len_in_blocks; i > 0; i-- )
     microdrive[which].pream[255 + i] = microdrive[which].pream[i-1] = SYNC_OK;
 
   microdrives_restart();
+
+  TRACE_DATA(TRC_IMAGE_INIT, which);
 
   return 0;
 }
@@ -330,7 +316,7 @@ int32_t if1_mdr_insert( const microdrive_index_t which, const uint8_t load_data 
 static inline void __time_critical_func(increment_head)( microdrive_index_t which )
 {
   microdrive[which].head_pos++;
-  if( microdrive[which].head_pos >= (microdrive[which].cartridge->cartridge_len_in_blocks * LIBSPECTRUM_MICRODRIVE_BLOCK_LEN) )
+  if( microdrive[which].head_pos >= (microdrive[which].cartridge_len_in_blocks * LIBSPECTRUM_MICRODRIVE_BLOCK_LEN) )
   {
     microdrive[which].head_pos = 0;
   }
@@ -365,7 +351,6 @@ void __time_critical_func(microdrives_restart)( void )
 {
   for( microdrive_index_t m=0; m<NUM_MICRODRIVES; m++ )
   {
-    /* FIXME Surely it's possible to calculate where the head needs to move to? */
     while( ( microdrive[m].head_pos % LIBSPECTRUM_MICRODRIVE_BLOCK_LEN ) != 0  &&
 	   ( microdrive[m].head_pos % LIBSPECTRUM_MICRODRIVE_BLOCK_LEN ) != LIBSPECTRUM_MICRODRIVE_HEAD_LEN )
     {
@@ -397,8 +382,8 @@ inline libspectrum_byte __time_critical_func(port_ctr_in)( void )
   microdrive_index_t active_microdrive_index;
   if( (active_microdrive_index=query_active_microdrive()) == NO_ACTIVE_MICRODRIVE )
   {
-    blib_test_pin();
-    return ret;  /* "Can't happen" */
+    blip_test_pin();
+    return ret;  /* "Can't happen" with IF1 ROM code */
   }
 
   /* This routine doesn't access the tape data, no need to page that */
@@ -450,6 +435,10 @@ inline libspectrum_byte __time_critical_func(port_ctr_in)( void )
        * a yes. It's just waiting for the tape to get into position, I think.
        * A loop like that is pretty tight, there's 38Ts between INs, which on the
        * Spectrum's 3.5MHz Z80 is around 10uS.
+       *
+       * If the gap isn't found the IF1 ROM code drops out at NOPRES:
+       * https://www.tablix.org/~avian/spectrum/rom/if1_2.htm#L153D
+       * If the sync isn't found then it spins forever.
        */
       if( microdrive[active_microdrive_index].gap )
       {
@@ -480,7 +469,7 @@ inline libspectrum_byte __time_critical_func(port_ctr_in)( void )
      * for FORMAT, WRITE and the other write operations. It doesn't keep
      * the value cached, it reads it fresh each time.
      */
-    if( microdrive[active_microdrive_index].cartridge->write_protect )
+    if( microdrive[active_microdrive_index].cartridge_write_protect )
     {
        /* If write protected flag is true, pull the bit in the status byte low */
       ret &= 0xfe;
@@ -540,11 +529,16 @@ inline void __time_critical_func(port_ctr_out)( libspectrum_byte val )
      * We have a new pulse, shift all the previous ones along and
      * put this new one (inverted) in the right-most microdrive's motor
      */
+    uint8_t any_motor_on = 0;
     for( microdrive_index_t m = LAST_MICRODRIVE_INDEX; m > 0; m-- )
     {
       microdrive[m].motor_on = microdrive[m - 1].motor_on;
+      any_motor_on |= microdrive[m].motor_on;
     }
     microdrive[0].motor_on =(val & 0x01) ? 0 : 1;
+    any_motor_on |= microdrive[0].motor_on;
+
+    gpio_put(LED_PIN, any_motor_on );
   }
 
   /* Note the level of the CLK line so we can see what it's done next time */
@@ -568,8 +562,8 @@ inline libspectrum_byte __time_critical_func(port_mdr_in)( void )
   microdrive_index_t active_microdrive_index;
   if( (active_microdrive_index=query_active_microdrive()) == NO_ACTIVE_MICRODRIVE )
   {
-    blib_test_pin(); blib_test_pin();
-    return ret;  /* "Can't happen" */
+    blip_test_pin(); blip_test_pin();
+    return ret;  /* "Can't happen" with IF1 ROM code */
   }
 
   if( microdrive[active_microdrive_index].motor_on && microdrive[active_microdrive_index].inserted )
@@ -585,7 +579,7 @@ inline libspectrum_byte __time_critical_func(port_mdr_in)( void )
       {
 	if( load_flash_tape_image( active_microdrive_index ) == -1 )
 	{
-	  blib_test_pin(); blib_test_pin(); blib_test_pin();
+	  blip_test_pin(); blip_test_pin(); blip_test_pin();
 	  return 0xFF;     /* "Can't happen" and there really aren't any good options here */
 	}
       }
@@ -597,7 +591,8 @@ inline libspectrum_byte __time_critical_func(port_mdr_in)( void )
     }
     else
     {
-      // What happens here and why? I think it means we've gone off the end of the block, so gap tape
+      /* We've gone off the end of the block. Set the 'gap' bit */
+      ret = 0xff;
     }
 
     /*
@@ -635,8 +630,8 @@ inline void __time_critical_func(port_mdr_out)( libspectrum_byte val )
   microdrive_index_t active_microdrive_index;
   if( (active_microdrive_index=query_active_microdrive()) == NO_ACTIVE_MICRODRIVE )
   {
-    blib_test_pin(); blib_test_pin(); blib_test_pin(); blib_test_pin();
-    return;  /* "Can't happen" */
+    blip_test_pin(); blip_test_pin(); blip_test_pin(); blip_test_pin();
+    return;  /* "Can't happen" with IF1 ROM code */
   }
 
   if( microdrive[active_microdrive_index].motor_on && microdrive[active_microdrive_index].inserted )
@@ -680,15 +675,17 @@ inline void __time_critical_func(port_mdr_out)( libspectrum_byte val )
      * The preamble isn't counted, so only write when the head is
      * outside that range
      */
-    if( microdrive[active_microdrive_index].transfered > 11 && microdrive[active_microdrive_index].transfered < microdrive[active_microdrive_index].max_bytes + 12 )
+    if( (microdrive[active_microdrive_index].transfered > 11)
+	&&
+	(microdrive[active_microdrive_index].transfered < (microdrive[active_microdrive_index].max_bytes + 12)) )
     {
 
       if( flash_image_loaded != active_microdrive_index )
       {
-	if( load_flash_tape_image( active_microdrive_index ) == -1 )
+	if( load_flash_tape_image( active_microdrive_index ) == NO_ACTIVE_MICRODRIVE )
 	{
-	  blib_test_pin(); blib_test_pin(); blib_test_pin(); blib_test_pin(); blib_test_pin();
-	  return;     /* "Can't happen" */
+	  blip_test_pin(); blip_test_pin(); blip_test_pin(); blip_test_pin(); blip_test_pin();
+	  return;     /* "Can't happen" with IF1 ROM code */
 	}
       }
 

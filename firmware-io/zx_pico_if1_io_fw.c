@@ -218,6 +218,9 @@ const uint8_t  WAIT_GP                  = 18;
 /* Test pin is one of the UART pins for now because there's a test point */
 const uint8_t  TEST_OUTPUT_GP           = 17;
 
+/* Rudimentary trace table for whole program */
+TRACE_TYPE trace[256];
+uint8_t trace_index=0;     /* 8 bit index, auto-wraps */
 
 /*
  * The 8 address bus bits arrive on the GPIOs in a weird pattern which is
@@ -306,6 +309,8 @@ void __time_critical_func(core1_main)( void )
   /* All interrupts off in this core, the IO emulation won't work with interrupts enabled */
   irq_set_mask_enabled( 0xFFFFFFFF, 0 );  
 
+  TRACE(TRC_INTS_OFF);
+
   if( if1_init() == -1 )
   {
     /* Slow blink means not enough memory for the in-RAM microdrive image */
@@ -317,6 +322,8 @@ void __time_critical_func(core1_main)( void )
       busy_wait_us_32(250000);
     }
   }
+
+  TRACE(TRC_IF1_INIT);
 
   /* Insert the test images into the Microdrives */
   if( (if1_mdr_insert( 0, 1 ) != LIBSPECTRUM_ERROR_NONE) ||
@@ -337,6 +344,7 @@ void __time_critical_func(core1_main)( void )
     }
   }
 
+  TRACE(TRC_IMAGES_INIT);
 
   while( 1 )
   {
@@ -354,13 +362,13 @@ void __time_critical_func(core1_main)( void )
       gpio_put(WAIT_GP, 0);
 
       /* Sort those bits out into the value which the Z80 originally wrote */
-      uint32_t z80_written_byte =  (raw_pattern & 0x87)       |        /* bxxx xbbb */
-                                  ((raw_pattern & 0x08) << 2) |        /* xxbx xxxx */
-                                  ((raw_pattern & 0x10) >> 1) |        /* xxxx bxxx */
-                                  ((raw_pattern & 0x20) << 1) |        /* xbxx xxxx */
-                                  ((raw_pattern & 0x40) >> 2);         /* xxxb xxxx */
+      register uint32_t z80_written_byte =  (raw_pattern & 0x87)       |        /* bxxx xbbb */
+                                           ((raw_pattern & 0x08) << 2) |        /* xxbx xxxx */
+                                           ((raw_pattern & 0x10) >> 1) |        /* xxxx bxxx */
+                                           ((raw_pattern & 0x20) << 1) |        /* xbxx xxxx */
+                                           ((raw_pattern & 0x40) >> 2);         /* xxxb xxxx */
 
-      /* Flag this up for core1 to handle, it takes a while so can't do it here */
+      /* Write the byte out */
       port_mdr_out( z80_written_byte );
 
       /* Done waiting */
@@ -368,6 +376,8 @@ void __time_critical_func(core1_main)( void )
 
       /* Wait for the IO request to complete */
       while( (gpio_get_all() & IORQ_BIT_MASK) == 0 );
+
+      TRACE_DATA(TRC_WRITE_E7_DATA, z80_written_byte);
     }
 
     else if( (gpios_state & IF1_IOPORT_ACCESS_BIT_MASK) == PORT_EF_WRITE )
@@ -383,17 +393,20 @@ void __time_critical_func(core1_main)( void )
       gpio_put(WAIT_GP, 0);
 
       /* Sort those bits out into the value which the Z80 originally wrote */
-      port_ctr_out(  (raw_pattern & 0x87)       |        /* bxxx xbbb */
-		    ((raw_pattern & 0x08) << 2) |        /* xxbx xxxx */
-		    ((raw_pattern & 0x10) >> 1) |        /* xxxx bxxx */
-		    ((raw_pattern & 0x20) << 1) |        /* xbxx xxxx */
-		    ((raw_pattern & 0x40) >> 2) );       /* xxxb xxxx */
+      register uint32_t control_byte =  (raw_pattern & 0x87)       |        /* bxxx xbbb */
+	                               ((raw_pattern & 0x08) << 2) |        /* xxbx xxxx */
+                                       ((raw_pattern & 0x10) >> 1) |        /* xxxx bxxx */
+		                       ((raw_pattern & 0x20) << 1) |        /* xbxx xxxx */
+		                       ((raw_pattern & 0x40) >> 2);         /* xxxb xxxx */
+      port_ctr_out( control_byte );
 
       /* Done waiting */
       gpio_set_dir(WAIT_GP, GPIO_IN);
 
       /* Wait for the IO request to complete */
       while( (gpio_get_all() & IORQ_BIT_MASK) == 0 );
+
+      TRACE_DATA(TRC_WRITE_EF_CONTROL, control_byte);
     }
 
     else if( (gpios_state & IF1_IOPORT_ACCESS_BIT_MASK) == PORT_E7_READ )
@@ -411,7 +424,8 @@ void __time_critical_func(core1_main)( void )
       gpio_set_dir_out_masked( DBUS_MASK );
 
       /* Port handling function returns the data */
-      gpio_put_masked( DBUS_MASK, preconverted_data[port_mdr_in()] );
+      register uint32_t md_data = preconverted_data[port_mdr_in()];
+      gpio_put_masked( DBUS_MASK, md_data );
 
       /* Done waiting */
       gpio_set_dir(WAIT_GP, GPIO_IN);
@@ -424,6 +438,8 @@ void __time_critical_func(core1_main)( void )
 	  
       /* Put level shifter direction back to ZX->Pico */
       pio_sm_put( pio, sm_mreq, 0 );
+
+      TRACE_DATA(TRC_READ_E7_DATA, md_data);
     }
 
     else if( (gpios_state & IF1_IOPORT_ACCESS_BIT_MASK) == PORT_EF_READ )
@@ -445,7 +461,8 @@ void __time_critical_func(core1_main)( void )
       gpio_set_dir_out_masked( DBUS_MASK );
 
       /* Port handling function returns the status */
-      gpio_put_masked( DBUS_MASK, preconverted_data[port_ctr_in()] );
+      register uint32_t md_status = preconverted_data[port_ctr_in()];
+      gpio_put_masked( DBUS_MASK, md_status );
 
       /* Done waiting */
       gpio_set_dir(WAIT_GP, GPIO_IN);
@@ -459,6 +476,8 @@ void __time_critical_func(core1_main)( void )
       /* Put level shifter direction back to ZX->Pico */
       pio_sm_put( pio, sm_mreq, 0 );
 
+      TRACE_DATA(TRC_READ_EF_STATUS, md_status);
+
 #if 0
       strcpy( message, "PORT_EF_READ complete\n\n" );
 #endif
@@ -471,6 +490,8 @@ void __time_critical_func(core1_main)( void )
 int __time_critical_func(main)( void )
 {
   bi_decl(bi_program_description("ZX Spectrum Pico IF1 board binary."));
+
+  TRACE(TRC_INIT);
 
 #if STDIO_ENABLED
   stdio_init_all();
@@ -489,6 +510,8 @@ int __time_critical_func(main)( void )
 
   /* Create address indirection table, this is the address bus optimisation  */
   create_indirection_table();
+
+  TRACE(TRC_DATA_CONV);
 
   /* Pull the buses to zeroes */
   gpio_init( A0_GP  ); gpio_set_dir( A0_GP,  GPIO_IN );  gpio_pull_down( A0_GP  );
@@ -520,6 +543,14 @@ int __time_critical_func(main)( void )
 
   gpio_init( WAIT_GP ); gpio_set_dir( WAIT_GP, GPIO_IN );
 
+  gpio_init(TEST_OUTPUT_GP); gpio_set_dir(TEST_OUTPUT_GP, GPIO_OUT);
+  gpio_put(TEST_OUTPUT_GP, 0);
+
+  gpio_init(LED_PIN);
+  gpio_set_dir(LED_PIN, GPIO_OUT);
+
+  TRACE(TRC_GPIOS_INIT);
+
   /* Use PIO to switch the level shifter's DIRection */
   pio              = pio0;
   sm_mreq          = pio_claim_unused_sm( pio, true );
@@ -527,12 +558,9 @@ int __time_critical_func(main)( void )
   mreq_dir_program_init( pio, sm_mreq, offset_mreq, ROM_READ_GP, DIR_OUTPUT_GP );
   pio_sm_set_enabled(pio, sm_mreq, true);
 
-  gpio_init(TEST_OUTPUT_GP); gpio_set_dir(TEST_OUTPUT_GP, GPIO_OUT);
-  gpio_put(TEST_OUTPUT_GP, 0);
+  TRACE(TRC_PIOS_INIT);
 
-  gpio_init(LED_PIN);
-  gpio_set_dir(LED_PIN, GPIO_OUT);
-
+#if 0
   int signal;
   for( signal=0; signal<2; signal++ )
   {
@@ -541,11 +569,13 @@ int __time_critical_func(main)( void )
     gpio_put(LED_PIN, 0);
     busy_wait_us_32(250000);
   }
-
+#endif
 
 #if CORE1_IN_USE
   /* Init complete, run 2nd core code */
   multicore_launch_core1( core1_main ); 
+
+  TRACE(TRC_CORE1_INIT);
 #endif
 
   memset( message, 0, MESSAGE_LEN );

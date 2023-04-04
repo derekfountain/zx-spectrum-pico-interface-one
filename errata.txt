@@ -75,12 +75,11 @@ direction, so Pico1 can be the ROM until Pico2 is ready to go.
 : Needs doing
 
 
-Work out and add the AND gate so I can do the DIR change in hardware.
-Still not sure I need it for the final version, the Pico should be
-able to manage, but it might take some pressure off the Picos while
-I work issues out. Enable with a solder bridge footprint if possible.
+Add another couple of LEDs to the IO pico so I can see at a glance
+if it's responding to IOs. Low priority, but if I have a couple
+of GPIOs left this will be handy. Make sure the tracks are easy
+to cut so i can reuse the GPIOs if I need to.
 : Needs doing
-:: Might not need doing
 
 
 I need to connect the /WAIT signal on the edge connector to GPIO18

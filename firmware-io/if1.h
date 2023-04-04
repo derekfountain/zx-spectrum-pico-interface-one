@@ -34,28 +34,55 @@ typedef struct utils_file {
 } utils_file;
 
 
+/*
+ * Very basic trace table, at least allows me to see the bringup sequence has completed
+ *
+ * (gdb) set print repeats 0
+ * (gdb) set print elements unlimited
+ * (gdb) set pagination off
+ * (gdb) set max-value-size unlimited
+ * (gdb) p trace
+ */
+typedef enum
+{
+  TRC_NONE = 0,
+  TRC_INIT,
+  TRC_DATA_CONV,
+  TRC_GPIOS_INIT,
+  TRC_PIOS_INIT,
+  TRC_CORE1_INIT,
+  TRC_INTS_OFF,
+  TRC_IF1_INIT,
+  TRC_IMAGE_INIT,
+  TRC_IMAGES_INIT,
+  TRC_LOAD_IMAGE,
+  TRC_UNLOAD_IMAGE,
+
+  TRC_READ_EF_STATUS,
+  TRC_READ_E7_DATA,
+  TRC_WRITE_EF_CONTROL,
+  TRC_WRITE_E7_DATA,
+}
+TRACE_CODE;
+
+typedef struct _trace_type
+{
+  TRACE_CODE code;
+  uint8_t    data;
+}
+TRACE_TYPE;
+
+extern TRACE_TYPE trace[];
+extern uint8_t    trace_index;
+#define TRACE(c)        {trace[trace_index].code=c;trace[trace_index++].data=0;  }
+#define TRACE_DATA(c,d) {trace[trace_index].code=c;trace[trace_index++].data=(d);}
+
 /* This is used in the preamble */
 enum
 {
   SYNC_NO = 0,
   SYNC_OK = 0xff
 };
-
-
-/*
- * This represents a microdrive cartridge. It used to store the tape
- * image, but that got taken out for Pico reasons.
- */
-typedef struct _cartridge_t
-{
-  /* Whether this cartridge has its w/p tab removed */
-  int write_protect;
-  
-  /* Length in 543-byte blocks */
-  libspectrum_byte cartridge_len_in_blocks;
-}
-cartridge_t;
-
 
 /*
  * Microdrive structure, represents the drive ifself.
@@ -75,8 +102,8 @@ typedef struct _microdrive_t
   libspectrum_byte gap;
   libspectrum_byte sync;
 
-  /* I might be able to make this an instance of the structure, remove the malloc */
-  cartridge_t *cartridge;      /* write protect, len, blocks */
+  libspectrum_byte cartridge_write_protect;
+  libspectrum_byte cartridge_len_in_blocks;
 
 } microdrive_t;
 
