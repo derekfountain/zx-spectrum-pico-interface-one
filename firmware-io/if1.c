@@ -25,6 +25,7 @@
 #include "hardware/gpio.h"
 #include "pico/platform.h"
 #include "hardware/flash.h"
+#include "hardware/dma.h"
 
 #include "libspectrum.h"
 #include "if1.h"
@@ -266,7 +267,32 @@ static int32_t __time_critical_func(load_flash_tape_image)( flash_mdr_image_inde
    */
   TRACE_DATA(TRC_LOAD_IMAGE, which);
 blip_test_pin();
-  memcpy( cartridge_data, (tape_byte_t*)flash_mdr_image[which].flash_address, flash_mdr_image[which].length );
+
+  /*
+   * memcpy( cartridge_data, (tape_byte_t*)flash_mdr_image[which].flash_address, flash_mdr_image[which].length );
+   *
+   * Using DMA, but in practise this is only about 1ms faster than the memcpy()
+   * It still takes about 8ms which is too long for an IORQ. It can be backgrounded
+   * if that's ever useful?
+   */
+  int chan             = dma_claim_unused_channel( true );
+  dma_channel_config c = dma_channel_get_default_config( chan );
+  channel_config_set_transfer_data_size( &c, DMA_SIZE_32 );
+  channel_config_set_read_increment( &c, true );
+  channel_config_set_write_increment( &c, true );
+
+  dma_channel_configure(
+    chan,                                  // Channel to be configured
+    &c,                                    // The configuration we just created
+    cartridge_data,                        // The initial write address
+    flash_mdr_image[which].flash_address,  // The initial read address
+    flash_mdr_image[which].length/4,       // Number of transfers; in this case each is 4 bytes.
+    true                                   // Start immediately.
+  );
+
+  dma_channel_wait_for_finish_blocking( chan );
+  dma_channel_unclaim( chan );
+
 blip_test_pin();
   TRACE_DATA(TRC_LOAD_IMAGE, which);
   flash_image_loaded      = which;
