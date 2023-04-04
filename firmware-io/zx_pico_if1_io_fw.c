@@ -560,18 +560,10 @@ int __time_critical_func(main)( void )
 
   TRACE(TRC_PIOS_INIT);
 
-#if 0
-  int signal;
-  for( signal=0; signal<2; signal++ )
-  {
-    gpio_put(LED_PIN, 1);
-    busy_wait_us_32(250000);
-    gpio_put(LED_PIN, 0);
-    busy_wait_us_32(250000);
-  }
-#endif
-
 #if CORE1_IN_USE
+  /* For some reason the second core code doesn't get started unless I pause for a moment here */
+  busy_wait_us_32(100000);
+
   /* Init complete, run 2nd core code */
   multicore_launch_core1( core1_main ); 
 

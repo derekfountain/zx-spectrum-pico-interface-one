@@ -62,7 +62,7 @@ flash_mdr_image_t;
  *
  * > perl -ne 'while( m/ (0x..)/g) {print chr(hex($1))}' < ram.txt > ram.bin
  */
-flash_mdr_image_t flash_mdr_image[NUM_MICRODRIVES] =
+static flash_mdr_image_t flash_mdr_image[NUM_MICRODRIVES] =
 {
   { tape1_image, tape1_image_len },
   { tape2_image, tape2_image_len },
@@ -119,7 +119,7 @@ extern const uint8_t LED_PIN;
 extern const uint8_t TEST_OUTPUT_GP;
 
 
-void __time_critical_func(microdrives_restart)( void );
+static void __time_critical_func(microdrives_restart)( void );
 
 
 static void __time_critical_func(blip_test_pin)( void )
@@ -136,6 +136,19 @@ static void __time_critical_func(blip_test_pin)( void )
   __asm volatile ("nop");
 }
 
+typedef struct
+{
+  uint32_t     flash_offset;       /* Area of flash from XIP_BASE which gets erased */
+  size_t       erase_length;
+  tape_byte_t *src_address;        /* Area from RAM which gets programmed into flash */
+  size_t       program_length;
+}
+erase_trace_entry_t;
+
+static erase_trace_entry_t erase_trace[10];
+static uint32_t erase_trace_index;
+
+
 
 /*
  * Initialise Interface One structure. Create the 8 microdrive images.
@@ -143,6 +156,8 @@ static void __time_critical_func(blip_test_pin)( void )
  */
 int32_t if1_init( void )
 {
+  erase_trace_index = 0;
+
   if1_ula_comms_clk = 0;
 
   /* 
@@ -169,18 +184,6 @@ int32_t if1_init( void )
   return 0;
 }
 
-
-typedef struct
-{
-  uint32_t     flash_offset;       /* Area of flash from XIP_BASE which gets erased */
-  size_t       erase_length;
-  tape_byte_t *src_address;        /* Area from RAM which gets programmed into flash */
-  size_t       program_length;
-}
-erase_trace_entry_t;
-
-static erase_trace_entry_t erase_trace[10];
-static uint32_t erase_trace_index = 0;
 
 static int32_t __time_critical_func(unload_flash_mdr_image)( void )
 {
@@ -373,7 +376,7 @@ static microdrive_index_t __time_critical_func(query_active_microdrive)( void )
  * the data ready? is the data ready? is the data ready?..." For this
  * emulation we can immediately mkae it ready and respond "yes, ready".
  */
-void __time_critical_func(microdrives_restart)( void )
+static void __time_critical_func(microdrives_restart)( void )
 {
   for( microdrive_index_t m=0; m<NUM_MICRODRIVES; m++ )
   {
