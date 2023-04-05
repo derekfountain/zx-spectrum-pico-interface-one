@@ -330,6 +330,10 @@ int32_t if1_mdr_insert( const microdrive_index_t which, const uint8_t load_data 
   for( size_t i = microdrive[which].cartridge_len_in_blocks; i > 0; i-- )
     microdrive[which].pream[255 + i] = microdrive[which].pream[i-1] = SYNC_OK;
 
+  /*
+   * Position ready to read a block. Probably redundant because the motor-on
+   * code does it
+   */
   microdrives_restart();
 
   TRACE_DATA(TRC_IMAGE_INIT, which);
@@ -439,42 +443,33 @@ inline libspectrum_byte __time_critical_func(port_ctr_in)( void )
        *  GAP=1, SYNC=1 15 times
        *  GAP=0, SYNC=0 15 times
        *
-       * From the IF1 disassembly:
-       * 
-       * ;; REPTEST
-       * L154C:  LD      B,$06           ; six consecutive reads required to register
-       *                                 ; as a gap.
-       *
        * Gap is looked for in the FORMAT command, and the TURN-ON routine
        * which establishes if a formatted cartridge is in the drive. Also
-       * GET-M-BUF which is the microdrive block read routine.
-       *
-       * The sync counter is also only used here. That's accessed in the ROM
-       *
-       * LD      B,$3C           ; set count 60 decimal.
-       *
-       * ;; DR-READY
-       * L1620:  IN      A,($EF)         ;
-       * AND     $02             ; isolate sync bit.
-       * JR      Z,L162A         ; forward to READY-RE
-       *
-       * DJNZ    L1620           ; back to DR-READY
-       *
-       * So it just asks "is sync set yet?" 60 times and breaks out when it sees
-       * a yes. It's just waiting for the tape to get into position, I think.
-       * A loop like that is pretty tight, there's 38Ts between INs, which on the
-       * Spectrum's 3.5MHz Z80 is around 10uS.
+       * GET-M-BUF which is the microdrive block read routine. These bits
+       * of code look for a non-gap followed by a gap. In the receive-block
+       * code https://www.tablix.org/~avian/spectrum/rom/if1_2.htm#L15EB
+       * it looks for 8 non-gap statuses, followed by 6 gap statuses
+       * followed by one SYNC status. (Setting .gap to 8 and .sync to 6
+       * works here, but I'll keep with the original code's 15s.)
        *
        * If the gap isn't found the IF1 ROM code drops out at NOPRES:
        * https://www.tablix.org/~avian/spectrum/rom/if1_2.htm#L153D
-       * If the sync isn't found then it spins forever.
+       * If the sync isn't found then it goes back to looking for
+       * non-gap followed by gap. When looking for a data block it
+       * loops 500 times before giving up; when looking for a header
+       * block it loops 65535 times before giving up.
        */
       if( microdrive[active_microdrive_index].gap )
       {
+	/* Send back a "no-gap status", the IF1 looks for 8 consecutive of these */
 	microdrive[active_microdrive_index].gap--;
       }
       else
       {
+	/*
+	 * Now start sending back "gap status", the IF1 looks for 6 consecutive of these
+	 * followed by one "sync status"
+	 */
 	ret &= 0xf9; /* GAP and SYNC low (both are active low) */
 
 	if( microdrive[active_microdrive_index].sync )
@@ -483,7 +478,8 @@ inline libspectrum_byte __time_critical_func(port_ctr_in)( void )
 	}
 	else
 	{
-	  microdrive[active_microdrive_index].gap = 15;
+	  /* 15 is overkill to keep the IF1 ROM code happy, but that's the original FUSE code */
+	  microdrive[active_microdrive_index].gap  = 15;
 	  microdrive[active_microdrive_index].sync = 15;
 	}
       }
@@ -573,6 +569,12 @@ inline void __time_critical_func(port_ctr_out)( libspectrum_byte val )
   /* Note the level of the CLK line so we can see what it's done next time */
   if1_ula_comms_clk = ( val & 0x02 ) ? 1 : 0;
 
+  /*
+   * Position all drives at the start of their next block. This is
+   * redundant because after starting the motor the next thing the
+   * IF1 will do is read status, which does this step. Leave it in
+   * though because FUSE does it.
+   */
   microdrives_restart();
 }
 

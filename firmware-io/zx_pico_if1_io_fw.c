@@ -561,7 +561,10 @@ int __time_critical_func(main)( void )
   TRACE(TRC_PIOS_INIT);
 
 #if CORE1_IN_USE
-  /* For some reason the second core code doesn't get started unless I pause for a moment here */
+  /*
+   * For some reason the second core code doesn't get started after SWD programming
+   * unless I pause for a moment here
+   */
   busy_wait_us_32(100000);
 
   /* Init complete, run 2nd core code */
