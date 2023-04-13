@@ -124,6 +124,7 @@ const uint32_t  D5_BIT_MASK  = ((uint32_t)1 <<  D5_GP);
 const uint32_t  D6_BIT_MASK  = ((uint32_t)1 <<  D6_GP);
 const uint32_t  D7_BIT_MASK  = ((uint32_t)1 <<  D7_GP);
 
+/* Input from the logic which merges A14, A15 and MREQ, goes active on a ROM read */
 const uint8_t  ROM_READ_GP              = 8;
 const uint32_t ROM_READ_BIT_MASK        = ((uint32_t)1 << ROM_READ_GP);
 
@@ -430,35 +431,11 @@ int main()
     gpio_set_dir_out_masked( DBUS_MASK );
     gpio_put_masked( DBUS_MASK, rom_value );
 
-/* This is part of tracking down the RST 38H weirdness I see at this address. Off for now */
-#if 0
-if( (rom_image_ptr == __ROMs_if1_rom) && (rom_address == 0x163C) )
-{
-gpio_put( TEST_OUTPUT_GP, 1 );
-__asm volatile ("nop");
-__asm volatile ("nop");
-__asm volatile ("nop");
-__asm volatile ("nop");
-gpio_put( TEST_OUTPUT_GP, 0 );
-}
-#endif
     /*
      * Spin until the Z80 releases MREQ indicating the read is complete.
      * ROM_READ is active low - if it's 0 then the ROM is still being read.
      */
     while( (gpio_get_all() & ROM_READ_BIT_MASK) == 0 );
-
-#if 0
-if( (rom_image_ptr == __ROMs_if1_rom) && (rom_address == 0x163C) )
-{
-gpio_put( TEST_OUTPUT_GP, 1 );
-__asm volatile ("nop");
-__asm volatile ("nop");
-__asm volatile ("nop");
-__asm volatile ("nop");
-gpio_put( TEST_OUTPUT_GP, 0 );
-}
-#endif
 
     /*
      * Set the data bus GPIOs back to inputs. The level shifter for the data

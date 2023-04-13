@@ -39,16 +39,21 @@ of 3 regulators tied together. Separate into 3 supplies.
 - Cut 3V3 track to Pico2 on current board
 : Need to cut 3v3 track to pico3 on current board
 
-Change the level shifter direction control from hardware to
+
+Change the dbus level shifter direction control from hardware to
 software. Wire GPIO27 of Pico2 as an input for the ROM_READ_INV
 signal, and GPIO28 as an output to the data bus level shifter's DIR
 pin. This will allow the data bus to reverse direction on
 memory reads, and also on IO request reads.
 - Done on board #2,
+- Done on v1.2 of the board
+
 
 Remove the level shifter U202 which does IORQ, RD and WR.
 These signals are permanently ZX->Pico so don't need shifting.
 - Bridged on board #1
+- Done on v1.2 of the board
+
 
 Untangle the bus pins on all the Picos. Make databus D0 to D7
 in sequence, then address lines, then control bus lines. I
@@ -58,15 +63,6 @@ benefit.
 : Needs doing
 : Make sure the GPIOs which share the ADC are not used for 5V
 : Won't be doing this on board #1
-
-
-Connect the last GPIO #27 on the ROM pico to the level shifter's
-DIR pin. This is so I can drive the direction with a PIO when the
-ROM is read. Not sure if this will work, so make sure it's easy
-to cut. Don';t use pin 27, that's standard blipper. Any other
-will do.
-: Needs doing
-:: Correction, IO Pico is doing this now, so it's not necessary
 
 
 I need a signal from Pico2 to Pico1. Pico1 can't release the Z80
@@ -85,8 +81,13 @@ to cut so i can reuse the GPIOs if I need to.
 I need to connect the /WAIT signal on the edge connector to GPIO18
 on the Pico.
 - Done on board #2
-: Needs doing on schematic
-: Needs doing on PCB
+- Done on v1.2 of the board
+
+
+Make sure the GPIOs which share the ADC are not used for 5V
+: Needs doing
+
+
 
 
 

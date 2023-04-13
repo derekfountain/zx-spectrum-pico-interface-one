@@ -125,6 +125,7 @@ const uint32_t DBUS_MASK     = ((uint32_t)1 << D0_GP) |
                                ((uint32_t)1 << D6_GP) |
                                ((uint32_t)1 << D7_GP);
 
+/* Input from Z80 indicating an I/O request is happening */
 const uint8_t  IORQ_GP                  = 8;
 const uint32_t IORQ_BIT_MASK            = ((uint32_t)1 << IORQ_GP);
 
@@ -196,13 +197,14 @@ const uint32_t PORT_EF_WRITE = ((uint32_t)0 << IORQ_GP) |
 
 /*
  * ROM read logic input, goes 0 when the MREQ to ROM is happening.
- * This is configured as input from the PIO init code
+ * This is configured as input from the PIO code which is where it's
+ * used. It's not used in this C.
  */
 const uint8_t  ROM_READ_GP              = 27;
 const uint32_t ROM_READ_BIT_MASK        = ((uint32_t)1 << ROM_READ_GP);
 
 /*
- * Data bus leve shifter direction pin, 1 is zx->pico, which is the normal
+ * Data bus level shifter direction pin, 1 is zx->pico, which is the normal
  * position, 0 means pico->zx which is temporarily switched to when the
  * Pico wants to send a data byte back to the Spectrum. This is now unused
  * in this code because the PIO does it, see mreq_dir.pio
@@ -233,7 +235,8 @@ uint16_t address_indirection_table[ 256 ];
 
 /*
  * Given the GPIOs with an address bus value on them, this packs the
- * 14 address bits down into the least significant 14 bits
+ * 14 address bits down into the least significant 14 bits. Only the
+ * lower 8 are used in this code.
  */
 inline uint16_t pack_address_gpios( uint32_t gpios )
 {
@@ -541,6 +544,10 @@ int __time_critical_func(main)( void )
   gpio_init( WR_GP ); gpio_set_dir( WR_GP, GPIO_IN );
   gpio_pull_up( WR_GP );
 
+  /*
+   * Wait an output from here to the Z80. Set as an input to sink the +5V
+   * that's on it when it's not being used.
+   */
   gpio_init( WAIT_GP ); gpio_set_dir( WAIT_GP, GPIO_IN );
 
   gpio_init(TEST_OUTPUT_GP); gpio_set_dir(TEST_OUTPUT_GP, GPIO_OUT);

@@ -1462,7 +1462,6 @@
   (no_connect (at 54.61 57.15) (uuid 61e4feb8-27f1-45de-8b5d-2db6e4696f50))
   (no_connect (at 242.57 36.83) (uuid 6be43848-0936-45da-abde-95f5e71b2f32))
   (no_connect (at 142.24 46.99) (uuid 6c70f3f9-e155-420f-8e4f-8a79d495b4f8))
-  (no_connect (at 26.67 72.39) (uuid 6cdf8a4b-3863-40bb-a305-9593d8eeb647))
   (no_connect (at 26.67 69.85) (uuid 7280d457-8337-4d9b-b1fc-0a74599270a7))
   (no_connect (at 54.61 52.07) (uuid 7fe4baf8-3716-41b0-bde8-e669368c0a80))
   (no_connect (at 26.67 74.93) (uuid 8daa9b44-65bc-4b57-b717-6921ddfd9e83))
@@ -1843,12 +1842,12 @@
     (uuid fe9a06bd-38e6-47a0-9bd4-30ea5615fc4b)
   )
 
-  (text "Pico receives the ROM read signal. This tells it that the Spectrum is reading the ROM. A write\nto ROM will be ignored by the Pico and the level shifter direction, driven by /RD, won't\nchange.\nPico has an output to pull the Z80 /RESET line low. /M1 is input so the ROM emulator can handle\nthe Interface One ROM paging correctly."
+  (text "Pico receives the ROM read signal. This tells it that the Spectrum is reading the ROM. A write\nto ROM will be ignored by the Pico. When the ROM read signal comes in this Pico works out the\nresponse byte and puts it on the data bus. It's the IO Pico which does the level shifter\ndirection change, this Pico blindly trusts that to happen.\n\nThis Pico has an output to pull the Z80 /RESET line low. /M1 is input so the ROM emulator can handle\nthe Interface One ROM paging correctly."
     (at 176.53 124.46 0)
     (effects (font (size 1.27 1.27)) (justify left bottom))
     (uuid 67deadba-cca1-4707-9f6d-b6ff3f95c764)
   )
-  (text "Level shifter for the data bus. Permanently enabled (unlike in the ROM\nemulator project). Direction is driven by the ROM_READ_INV signal. Most\ntimes that's high so the direction is ZX->Pico. The Pico therefore gets to\nsee any data the ZX writes pretty much immediately. During a read, either\n/MREQ or /IORQ, the direction is reversed by the hardware signal. The\nvalue the Pico is putting on the data bus is therefore passed straight back\nto the ZX."
+  (text "Level shifter for the data bus. Permanently enabled (unlike in the ROM\nemulator project). Direction is driven by the DBUS_DIRECTION signal. Most\ntimes that's high so the direction is ZX->Pico. The Pico therefore gets to\nsee any data the ZX writes pretty much immediately. During a read, either\n/MREQ or /IORQ, the direction is reversed by the signal which is generated\nvia a PIO program running on the IO Pico. That PIO responds to either the\n/MREQ or /IORQ, both of which the IO Pico can see."
     (at 15.24 175.26 0)
     (effects (font (size 1.27 1.27)) (justify left bottom))
     (uuid 713465e8-294e-484a-8412-2f4c9a034a58)
@@ -2025,10 +2024,10 @@
       (effects (font (size 1.27 1.27)) (justify left) hide)
     )
   )
-  (global_label "ROM_READ_INV" (shape input) (at 40.64 146.05 180) (fields_autoplaced)
+  (global_label "DBUS_DIRECTION" (shape input) (at 40.64 146.05 180) (fields_autoplaced)
     (effects (font (size 1.27 1.27)) (justify right))
     (uuid 3ffd1032-222f-43be-a4d7-98932e05ae11)
-    (property "Intersheet References" "${INTERSHEET_REFS}" (id 0) (at 24.4383 145.9706 0)
+    (property "Intersheet References" "${INTERSHEET_REFS}" (id 0) (at 22.3821 145.9706 0)
       (effects (font (size 1.27 1.27)) (justify right) hide)
     )
   )
@@ -2289,6 +2288,13 @@
     (uuid 9ef97e4f-3eb3-4684-a72f-8ec491f06c56)
     (property "Intersheet References" "${INTERSHEET_REFS}" (id 0) (at 163.5217 26.5906 0)
       (effects (font (size 1.27 1.27)) (justify left) hide)
+    )
+  )
+  (global_label "ZXWAIT" (shape input) (at 26.67 72.39 180) (fields_autoplaced)
+    (effects (font (size 1.27 1.27)) (justify right))
+    (uuid a5c12bb0-a596-41cd-8f86-6beb98f5e8fb)
+    (property "Intersheet References" "${INTERSHEET_REFS}" (id 0) (at 17.7255 72.3106 0)
+      (effects (font (size 1.27 1.27)) (justify right) hide)
     )
   )
   (global_label "ZXA9" (shape input) (at 242.57 69.85 0) (fields_autoplaced)
@@ -3376,12 +3382,6 @@
     (path "/95a6eb69-d4c1-4a7e-a8e8-144430faf0e2/b4561307-559f-491e-95d1-1c57e89e9bd0"
       (reference "#PWR0203") (unit 1) (value "GND") (footprint "")
     )
-    (path "/95a6eb69-d4c1-4a7e-a8e8-144430faf0e2/e68adfe0-aa89-4590-b5db-e19a876b810c"
-      (reference "#PWR0204") (unit 1) (value "GND") (footprint "")
-    )
-    (path "/95a6eb69-d4c1-4a7e-a8e8-144430faf0e2/74d2792e-dc2e-4c26-bfe0-64794fa1d06e"
-      (reference "#PWR0207") (unit 1) (value "GND") (footprint "")
-    )
     (path "/95a6eb69-d4c1-4a7e-a8e8-144430faf0e2/81c696b0-3ffd-4923-88b9-a1f31d8f461a"
       (reference "#PWR0208") (unit 1) (value "GND") (footprint "")
     )
@@ -3408,9 +3408,6 @@
     )
     (path "/47cce07b-aa89-4d58-afa6-cb47226874e7"
       (reference "C3") (unit 1) (value "C_Small") (footprint "Capacitor_SMD:C_1206_3216Metric")
-    )
-    (path "/95a6eb69-d4c1-4a7e-a8e8-144430faf0e2/56c885f4-71dc-4c6a-84ef-761a4fa1779f"
-      (reference "C201") (unit 1) (value "C_Small") (footprint "Capacitor_SMD:C_1206_3216Metric")
     )
     (path "/986f0686-4dd2-4d11-a20b-857347ffd112"
       (reference "D1") (unit 1) (value "D_Schottky") (footprint "Diode_SMD:D_1206_3216Metric_Pad1.42x1.75mm_HandSolder")
@@ -3480,9 +3477,6 @@
     )
     (path "/95a6eb69-d4c1-4a7e-a8e8-144430faf0e2/dd0d3265-5018-4433-91d4-2a45903bf490"
       (reference "U201") (unit 1) (value "Pico-2 IO") (footprint "pico-foot:RPi_Pico_SMD_TH")
-    )
-    (path "/95a6eb69-d4c1-4a7e-a8e8-144430faf0e2/45b2489c-7676-4f1b-a4c2-b602d5fb3354"
-      (reference "U202") (unit 1) (value "74LS245") (footprint "Package_SO:SO-20_5.3x12.6mm_P1.27mm")
     )
     (path "/acda4c69-0a65-473b-ab4f-e765252d7da2/c3e5d4fc-20f0-4b23-a2a5-ed2745d1c377"
       (reference "U301") (unit 1) (value "Pico-3 UI") (footprint "pico-foot:RPi_Pico_SMD_TH")
