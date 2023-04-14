@@ -215,7 +215,7 @@ const uint8_t  DIR_OUTPUT_GP            = 28;
  * This one's attached to the Z80's /WAIT line, open collector,
  * pull low to set the Z80 waiting
  */
-const uint8_t  WAIT_GP                  = 18;
+const uint8_t  WAIT_GP                  = 15;
 
 /* Test pin is one of the UART pins for now because there's a test point */
 const uint8_t  TEST_OUTPUT_GP           = 17;
