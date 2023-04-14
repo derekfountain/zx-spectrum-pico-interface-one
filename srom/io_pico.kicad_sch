@@ -6,8 +6,8 @@
 
   (title_block
     (title "Pico Interface One")
-    (date "2023-03-01")
-    (rev "v1.1 to v1.2 WIP")
+    (date "2023-04-13")
+    (rev "v1.2 to v1.3 WIP")
   )
 
   (lib_symbols
@@ -659,10 +659,10 @@
       (effects (font (size 1.27 1.27)) (justify right) hide)
     )
   )
-  (global_label "ROM_READ_INV" (shape input) (at 162.56 69.85 0) (fields_autoplaced)
+  (global_label "ROM_READ_INV_3V3" (shape input) (at 162.56 69.85 0) (fields_autoplaced)
     (effects (font (size 1.27 1.27)) (justify left))
     (uuid bcc240b4-d726-4431-a260-1ba657be11d3)
-    (property "Intersheet References" "${INTERSHEET_REFS}" (id 0) (at 178.7617 69.7706 0)
+    (property "Intersheet References" "${INTERSHEET_REFS}" (id 0) (at 183.2369 69.7706 0)
       (effects (font (size 1.27 1.27)) (justify left) hide)
     )
   )
