@@ -116,7 +116,7 @@ static uint8_t     cartridge_data_modified;
 static uint8_t if1_ula_comms_clk;
 
 extern const uint8_t LED_PIN;
-extern const uint8_t TEST_OUTPUT_GP;
+//extern const uint8_t TEST_OUTPUT_GP;
 
 
 static void __time_critical_func(microdrives_restart)( void );
@@ -124,6 +124,8 @@ static void __time_critical_func(microdrives_restart)( void );
 
 static void __time_critical_func(blip_test_pin)( void )
 {
+#if 0
+// No GPIOs left
   gpio_put( TEST_OUTPUT_GP, 1 );
   __asm volatile ("nop");
   __asm volatile ("nop");
@@ -134,6 +136,7 @@ static void __time_critical_func(blip_test_pin)( void )
   __asm volatile ("nop");
   __asm volatile ("nop");
   __asm volatile ("nop");
+#endif
 }
 
 typedef struct

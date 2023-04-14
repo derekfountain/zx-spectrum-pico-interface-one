@@ -39,6 +39,7 @@
 #include "pico/multicore.h"
 #include "pico/platform.h"
 #include "hardware/timer.h"
+#include "hardware/spi.h"
 
 #include "if1.h"
 
@@ -53,6 +54,20 @@
 
 #define OVERCLOCK 150000
 //#define OVERCLOCK 270000
+
+/* Pseudo SRAM is on SPI0 */
+#define PICO_SPI_RX_PIN        16
+#define PICO_SPI_TX_PIN        19
+#define PICO_SPI_SCK_PIN       18
+#define PICO_SPI_CSN_PIN       17
+
+/* Commands for the memory chip I'm using */
+#define PRAM_CMD_WRITE         0x02
+#define PRAM_CMD_READ          0x03
+#define PRAM_CMD_FAST_READ     0x0B
+#define PRAM_CMD_RESET_ENABLE  0x66
+#define PRAM_CMD_RESET         0x99
+#define PRAM_CMD_READ_ID       0x9F
 
 const uint8_t LED_PIN = PICO_DEFAULT_LED_PIN;
 
@@ -218,7 +233,7 @@ const uint8_t  DIR_OUTPUT_GP            = 28;
 const uint8_t  WAIT_GP                  = 15;
 
 /* Test pin is one of the UART pins for now because there's a test point */
-const uint8_t  TEST_OUTPUT_GP           = 17;
+// No GPIOs left const uint8_t  TEST_OUTPUT_GP           = 17;
 
 /* Rudimentary trace table for whole program */
 TRACE_TYPE trace[256];
@@ -550,13 +565,65 @@ int __time_critical_func(main)( void )
    */
   gpio_init( WAIT_GP ); gpio_set_dir( WAIT_GP, GPIO_IN );
 
-  gpio_init(TEST_OUTPUT_GP); gpio_set_dir(TEST_OUTPUT_GP, GPIO_OUT);
-  gpio_put(TEST_OUTPUT_GP, 0);
-
   gpio_init(LED_PIN);
   gpio_set_dir(LED_PIN, GPIO_OUT);
 
   TRACE(TRC_GPIOS_INIT);
+
+  /*
+   * Enable SPI 0 at <n> MHz and connect to GPIOs. Second param is a baudrate, giving it
+   * a frequency like this seems rather silly. You get what the hardware can give you.
+   * Might as well ask for the theoretical maximum though.
+   */
+  spi_init(spi0, 62 * 1000 * 1000);
+  gpio_set_function(PICO_SPI_RX_PIN, GPIO_FUNC_SPI);
+  gpio_set_function(PICO_SPI_SCK_PIN, GPIO_FUNC_SPI);
+  gpio_set_function(PICO_SPI_TX_PIN, GPIO_FUNC_SPI);
+
+  /* Output for chip select on slave, starts high (unselected) */
+  gpio_init(PICO_SPI_CSN_PIN);
+  gpio_set_dir(PICO_SPI_CSN_PIN, GPIO_OUT);
+  gpio_put(PICO_SPI_CSN_PIN, 1);
+
+  /* Datasheet says 150uS between power up and the reset command */
+  busy_wait_us_32(200);
+
+  /* All examples I've seen don't bother with this reset, might be optional */
+  uint8_t reset_cmd[] = { PRAM_CMD_RESET_ENABLE, 
+			  PRAM_CMD_RESET };
+  gpio_put(PICO_SPI_CSN_PIN, 0); 
+  spi_write_blocking(spi0, reset_cmd, 2);
+  gpio_put(PICO_SPI_CSN_PIN, 1);   
+
+  /* Test SPI RAM is present */
+  gpio_put(PICO_SPI_CSN_PIN, 0);
+
+  /* Read ID, on the chip I'm using takes 0x9F as the command followed by 3 "don't care"s */
+  uint8_t read_cmd[] = { PRAM_CMD_READ_ID,
+			 0, 0, 0 };
+  spi_write_blocking(spi0, read_cmd, sizeof(read_cmd)); 
+			
+  /* Chip I'm using returns 0x0D, 0x5D according to the datasheet */
+  uint8_t id1, id2;
+  spi_read_blocking(spi0, 0, &id1, 1 ); 
+  spi_read_blocking(spi0, 0, &id2, 1 ); 
+  gpio_put(PICO_SPI_CSN_PIN, 1);
+
+  if( (id1 != 0x0D) || (id2 != 0x5D) )
+  {
+    while(1)
+    {
+      gpio_put(LED_PIN, 1);
+      busy_wait_us_32(1000000);
+      gpio_put(LED_PIN, 0);
+      busy_wait_us_32(500000);
+    }
+  }
+
+//  gpio_init(TEST_OUTPUT_GP); gpio_set_dir(TEST_OUTPUT_GP, GPIO_OUT);
+//  gpio_put(TEST_OUTPUT_GP, 0);
+
+  TRACE(TRC_SPI_INIT);
 
   /* Use PIO to switch the level shifter's DIRection */
   pio              = pio0;
