@@ -202,7 +202,7 @@ const uint32_t PORT_EF_WRITE = ((uint32_t)0 << IORQ_GP) |
  * This is configured as input from the PIO code which is where it's
  * used. It's not used in this C.
  */
-const uint8_t  ROM_READ_GP              = 27;
+const uint8_t  ROM_READ_GP              = 15;
 const uint32_t ROM_READ_BIT_MASK        = ((uint32_t)1 << ROM_READ_GP);
 
 /*
@@ -217,7 +217,7 @@ const uint8_t  DIR_OUTPUT_GP            = 28;
  * This one's attached to the Z80's /WAIT line, open collector,
  * pull low to set the Z80 waiting
  */
-const uint8_t  WAIT_GP                  = 15;
+const uint8_t  WAIT_GP                  = 27;
 
 /* Test pin is one of the UART pins for now because there's a test point */
 // No GPIOs left const uint8_t  TEST_OUTPUT_GP           = 17;
