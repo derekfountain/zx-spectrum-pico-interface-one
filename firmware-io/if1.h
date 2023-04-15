@@ -103,8 +103,32 @@ typedef struct _microdrive_t
   libspectrum_byte gap;
   libspectrum_byte sync;
 
+  /*
+   * Offset in PSRAM to the byte array representing the tape, approx 97KB for a 180 sector
+   * tape. About 135KB for a 254 sector tape.
+   *
+   * The following is obsolete because the external RAM can't be examined
+   * directly using the debugger. Might be useful though:
+   *
+   * Copy and paste out to a text file with:
+   *
+   * (gdb) set print repeats 0
+   * (gdb) set print elements unlimited
+   * (gdb) set pagination off
+   * (gdb) p/x cartridge_data
+   * (gdb) set max-value-size unlimited
+   *
+   * Convert to MDR image with:
+   *
+   * > perl -ne 'map { print chr(hex($_)) } split(/, /, $_)' < mm_reformated_in_zx.txt > mm_reformated_in_zx.mdr
+   *
+   * mm_reformated_in_zx.mdr will then load into FUSE as a normal
+   * MDR file.
+   *
+   */
   uint32_t         cartridge_data_psram_offset;
 
+  uint8_t          cartridge_data_modified;
   libspectrum_byte cartridge_write_protect;
   libspectrum_byte cartridge_len_in_blocks;
 
@@ -122,7 +146,7 @@ typedef int32_t flash_mdr_image_index_t;
 
 
 int32_t if1_init( void );
-int32_t if1_mdr_insert( const microdrive_index_t which, const uint8_t load_data );
+int32_t if1_mdr_insert( const microdrive_index_t which );
 
 libspectrum_byte port_ctr_in( void );
 void port_ctr_out( libspectrum_byte val );

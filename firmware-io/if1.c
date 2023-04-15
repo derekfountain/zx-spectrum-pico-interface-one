@@ -76,53 +76,20 @@ static flash_mdr_image_t flash_mdr_image[NUM_MICRODRIVES] =
   { tape8_image, tape8_image_len },
 };
 
-/*
- * There are 8 cartridge data images in flash. Only one of them can
- * be in RAM at once. This holds the index of the one that's in RAM.
- */
-flash_mdr_image_index_t flash_image_loaded;
-
-#define NO_FLASH_IMAGE  ((flash_mdr_image_index_t)(-1))
 
 /*
  * These are the microdrives, typically 8 of them. This structure
- * keeps track of the motor, the head position, gaps, preambles,
- * things like that.
+ * keeps track of the data (in external PSRAM), motor, the head
+ * position, gaps, preambles, things like that.
  */
 static microdrive_t microdrive[NUM_MICRODRIVES];
-
-/*
- * Byte array representing the tape, approx 97KB for a 180 sector
- * tape. About 135KB for a 254 sector tape.
- *
- * Copy and paste out to a text file with:
- *
- * (gdb) set print repeats 0
- * (gdb) set print elements unlimited
- * (gdb) set pagination off
- * (gdb) p/x cartridge_data
- * (gdb) set max-value-size unlimited
- *
- * Convert to MDR image with:
- *
- * > perl -ne 'map { print chr(hex($_)) } split(/, /, $_)' < mm_reformated_in_zx.txt > mm_reformated_in_zx.mdr
- *
- * mm_reformated_in_zx.mdr will then load into FUSE as a normal
- * MDR file.
- *
- */
-//static tape_byte_t  __attribute__((aligned(4))) cartridge_data[LIBSPECTRUM_MICRODRIVE_CARTRIDGE_LENGTH];
-static uint8_t     cartridge_data_modified;
 
 /* Clock bit in the ULA */
 static uint8_t if1_ula_comms_clk;
 
 extern const uint8_t LED_PIN;
 
-
-
 static void __time_critical_func(microdrives_restart)( void );
-
 
 static void __time_critical_func(blip_test_pin)( void )
 {
@@ -142,19 +109,6 @@ static void __time_critical_func(blip_test_pin)( void )
 #endif
 }
 
-typedef struct
-{
-  uint32_t     flash_offset;       /* Area of flash from XIP_BASE which gets erased */
-  size_t       erase_length;
-  tape_byte_t *src_address;        /* Area from RAM which gets programmed into flash */
-  size_t       program_length;
-}
-erase_trace_entry_t;
-
-static erase_trace_entry_t erase_trace[10];
-static uint32_t erase_trace_index;
-
-
 
 /*
  * Initialise Interface One structure. Create the 8 microdrive images.
@@ -162,15 +116,8 @@ static uint32_t erase_trace_index;
  */
 int32_t if1_init( void )
 {
-  erase_trace_index = 0;
-
   if1_ula_comms_clk = 0;
 
-  /* 
-   * There's only one microdrive image in RAM. I don't have enough RAM 
-   * for more than one. The "not currently being used" images are held
-   * in flash and "paged" in.
-   */
   for( microdrive_index_t m=0; m<NUM_MICRODRIVES; m++ )
   {
     microdrive[m].inserted   = 0;
@@ -181,77 +128,20 @@ int32_t if1_init( void )
     microdrive[m].sync       = 15;
     microdrive[m].transfered = 0;
 
-    microdrive[m].cartridge_write_protect = 0;
-    microdrive[m].cartridge_len_in_blocks = 0;
+    microdrive[m].cartridge_data_psram_offset = 0;
+    microdrive[m].cartridge_data_modified     = 0;
+    microdrive[m].cartridge_write_protect     = 0;
+    microdrive[m].cartridge_len_in_blocks     = 0;
   }
-
-  flash_image_loaded = NO_FLASH_IMAGE;
-
-  return 0;
-}
-
-
-static int32_t __time_critical_func(unload_flash_mdr_image)( void )
-{
-  if( cartridge_data_modified == 0 )
-    return 0;
-
-  if( flash_image_loaded == NO_FLASH_IMAGE )
-    return 0;
-
-  /* Write tape image back out to flash - erase flash first */
-  uint32_t offset = (uint32_t)(((uint8_t*)(flash_mdr_image[flash_image_loaded].flash_address)) - XIP_BASE);
-  size_t   bytes  = (size_t)(((flash_mdr_image[flash_image_loaded].length +
-					                              FLASH_SECTOR_SIZE) / FLASH_SECTOR_SIZE) * FLASH_SECTOR_SIZE);
-
-  /*
-   * With just the erase, /IORQ lasts about 450ms
-   *  Pre-erase starts about 2us from /IORQ low
-   *  Post-erase comes in about 8.25ms from /IORQ high
-   * With just the program, /IORQ lasts about 65ms
-   *  Pre-program comes in about 2.5us from /IORQ low
-   *  Post-program comes in about 9ms from /IORQ high
-   * With both, /IORQ lasts about 625ms
-   *  Pre-erase starts about 2us from /IORQ low
-   *  Post-program comes in about 9ms from /IORQ high
-   *
-   * All timings at 150MHz. The erase is the slow bit, programming is much faster.
-   * The "bytes" recalculation explains the difference between the two singular
-   * data points and the whole lot in one go.
-   * 
-   * Running flash_range_erase() and flash_range_program() a second time without
-   * reseting the Pico doesn't change anything, so they must be running from RAM.
-   */
-#define ENABLED_FLASH_WRITE_BACK 0
-/* Disabled, it takes far too long and crashes the Z80 which is in /WAIT */
-#if ENABLED_FLASH_WRITE_BACK
-  flash_range_erase( offset, bytes );
-
-  erase_trace[erase_trace_index].flash_offset = offset;
-  erase_trace[erase_trace_index].erase_length = bytes;
-
-  /* Now write out the current tape contents */
-  bytes  = (size_t)(((flash_mdr_image[flash_image_loaded].length+FLASH_PAGE_SIZE) / FLASH_PAGE_SIZE) * FLASH_PAGE_SIZE);
-  flash_range_program( offset, cartridge_data, bytes );
-
-  erase_trace[erase_trace_index].src_address    = cartridge_data;
-  erase_trace[erase_trace_index].program_length = bytes;
-  erase_trace_index++;
-#endif
-
-  TRACE_DATA(TRC_UNLOAD_IMAGE, flash_image_loaded);
-
-  /* I don't actually clear the cartridge RAM memory, just the metadata */
-  flash_image_loaded      = NO_FLASH_IMAGE;
-  cartridge_data_modified = 0;
 
   return 0;
 }
 
 
 /*
- * Load one of the tape images from flash into the RAM buffer.
- * This updates the 'flash_image_loaded' static variable.
+ * Load one of the tape images from flash into the PSRAM buffer.
+ * The UI Pico will do this job at some point but I don't yet
+ * know how
  */
 static int32_t load_flash_tape_image( flash_mdr_image_index_t which )
 {
@@ -262,13 +152,6 @@ static int32_t load_flash_tape_image( flash_mdr_image_index_t which )
   /* Check requested image will fit in buffer */
   if( flash_mdr_image[which].length > LIBSPECTRUM_MICRODRIVE_CARTRIDGE_LENGTH )
     return -1;
-
-  /* If change of tape image in memory, write current tape data back out to flash */
-  if( (flash_image_loaded != NO_FLASH_IMAGE) && (flash_image_loaded != which) )
-  {
-    if( unload_flash_mdr_image() == -1 )
-      return -1;
-  }
 
   /*
    * Copy cartridge image data from flash into the SPI PSRAM which is where it's
@@ -326,30 +209,28 @@ static int32_t load_flash_tape_image( flash_mdr_image_index_t which )
 
   /* Note where the cartridge image data has been put in the PSRAM */
   microdrive[which].cartridge_data_psram_offset = psram_offset;
+
+  /* Note how many blocks it is */
+  size_t length_in_bytes = flash_mdr_image[which].length - ( flash_mdr_image[which].length % LIBSPECTRUM_MICRODRIVE_BLOCK_LEN );
+  microdrive[which].cartridge_len_in_blocks = (length_in_bytes / LIBSPECTRUM_MICRODRIVE_BLOCK_LEN);
  
   TRACE_DATA(TRC_LOAD_IMAGE, which);
-  flash_image_loaded      = which;
-  cartridge_data_modified = 0;
 
   return which;
 }
 
 
-
-
-int32_t if1_mdr_insert( const microdrive_index_t which, const uint8_t load_data )
+int32_t if1_mdr_insert( const microdrive_index_t which )
 {
-  size_t length_in_bytes = flash_mdr_image[which].length - ( flash_mdr_image[which].length % LIBSPECTRUM_MICRODRIVE_BLOCK_LEN );
+  /*
+   * This loads the test cartridge data from flash. It'll come via
+   * the UI Pico at some point
+   */
+  if( load_flash_tape_image( which ) == -1 )
+    return -1;
 
-  microdrive[which].cartridge_len_in_blocks = (length_in_bytes / LIBSPECTRUM_MICRODRIVE_BLOCK_LEN);
   microdrive[which].inserted = 1;
   microdrive[which].modified = 0;
-
-  if( load_data )
-  {
-    if( load_flash_tape_image( which ) == -1 )
-      return -1;
-  }
 
   /*
    * pream is 512 bytes in the microdrive_t structure.
@@ -408,7 +289,7 @@ static microdrive_index_t __time_critical_func(query_active_microdrive)( void )
  * status that can be seen as an indication that the IF1 is going to want
  * to read the tape. On the real device this action will be a poll, "is
  * the data ready? is the data ready? is the data ready?..." For this
- * emulation we can immediately mkae it ready and respond "yes, ready".
+ * emulation we can immediately make it ready and respond "yes, ready".
  */
 static void __time_critical_func(microdrives_restart)( void )
 {
@@ -449,15 +330,11 @@ inline libspectrum_byte __time_critical_func(port_ctr_in)( void )
     return ret;  /* "Can't happen" with IF1 ROM code */
   }
 
-  /* This routine doesn't access the tape data, no need to page that */
-
-  int block;
-
   if( microdrive[active_microdrive_index].motor_on && microdrive[active_microdrive_index].inserted )
   {
     /* Calculate the block under the head */
     /* max_bytes is the number of bytes which can be read from the current block */
-    block = microdrive[active_microdrive_index].head_pos / 543 + ( microdrive[active_microdrive_index].max_bytes == 15 ? 0 : 256 );
+    int block = microdrive[active_microdrive_index].head_pos / 543 + ( microdrive[active_microdrive_index].max_bytes == 15 ? 0 : 256 );
 
     /* pream might be an array of flags, one for each block, indicating something... */
     /* Original comment suggests formatted? Of the block? */
@@ -636,16 +513,7 @@ inline libspectrum_byte __time_critical_func(port_mdr_in)( void )
      */
     if( microdrive[active_microdrive_index].transfered < microdrive[active_microdrive_index].max_bytes )
     {
-#if 0
-      if( flash_image_loaded != active_microdrive_index )
-      {
-	if( load_flash_tape_image( active_microdrive_index ) == -1 )
-	{
-	  blip_test_pin(); blip_test_pin(); blip_test_pin();
-	  return 0xFF;     /* "Can't happen" and there really aren't any good options here */
-	}
-      }
-#endif
+      /* Fetch the required byte from the PSRAM device on the SPI bus */
 
       gpio_put( PICO_SPI_CSN_PIN, 0 );
 
@@ -653,6 +521,7 @@ inline libspectrum_byte __time_critical_func(port_mdr_in)( void )
       uint32_t psram_offset = microdrive[active_microdrive_index].cartridge_data_psram_offset
 	                      +
 	                      microdrive[active_microdrive_index].head_pos;
+
       uint8_t read_cmd[] = { PRAM_CMD_READ,
 			     psram_offset >> 16, psram_offset >> 8, psram_offset };
       spi_write_blocking(PICO_SPI, read_cmd, sizeof(read_cmd));
@@ -701,8 +570,6 @@ inline libspectrum_byte __time_critical_func(port_mdr_in)( void )
  */
 inline void __time_critical_func(port_mdr_out)( libspectrum_byte val )
 {
-  int block;
-
   microdrive_index_t active_microdrive_index;
   if( (active_microdrive_index=query_active_microdrive()) == NO_ACTIVE_MICRODRIVE )
   {
@@ -714,7 +581,7 @@ inline void __time_critical_func(port_mdr_out)( libspectrum_byte val )
   {
     /* Calculate the block under the head */
     /* max_bytes is the number of bytes which can be read from the current block */
-    block = microdrive[active_microdrive_index].head_pos / 543 + ( microdrive[active_microdrive_index].max_bytes == 15 ? 0 : 256 );
+    int block = microdrive[active_microdrive_index].head_pos / 543 + ( microdrive[active_microdrive_index].max_bytes == 15 ? 0 : 256 );
 
     /*
      * Preamble handling
@@ -755,7 +622,8 @@ inline void __time_critical_func(port_mdr_out)( libspectrum_byte val )
 	&&
 	(microdrive[active_microdrive_index].transfered < (microdrive[active_microdrive_index].max_bytes + 12)) )
     {
-
+      /* OK, write the byte to "tape" which is really the PSRAM on the SPI bus */
+      
       gpio_put( PICO_SPI_CSN_PIN, 0 );
 
       /* Work out where the byte under the active microdrive's head is stored in the PSRAM */
@@ -772,9 +640,8 @@ inline void __time_critical_func(port_mdr_out)( libspectrum_byte val )
       gpio_put( PICO_SPI_CSN_PIN, 1 );
 
       increment_head(active_microdrive_index);
-      cartridge_data_modified = 1;
 
-      microdrive[active_microdrive_index].modified = 1; // Unused for now
+      microdrive[active_microdrive_index].cartridge_data_modified = 1;
     }
 
     /* transfered does include the preamble */

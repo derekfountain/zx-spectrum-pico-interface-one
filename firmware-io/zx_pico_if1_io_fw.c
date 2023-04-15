@@ -331,14 +331,14 @@ void __time_critical_func(core1_main)( void )
   TRACE(TRC_IF1_INIT);
 
   /* Insert the test images into the Microdrives */
-  if( (if1_mdr_insert( 0, 1 ) != LIBSPECTRUM_ERROR_NONE) ||
-      (if1_mdr_insert( 1, 1 ) != LIBSPECTRUM_ERROR_NONE) ||
-      (if1_mdr_insert( 2, 1 ) != LIBSPECTRUM_ERROR_NONE) ||
-      (if1_mdr_insert( 3, 1 ) != LIBSPECTRUM_ERROR_NONE) ||
-      (if1_mdr_insert( 4, 1 ) != LIBSPECTRUM_ERROR_NONE) ||
-      (if1_mdr_insert( 5, 1 ) != LIBSPECTRUM_ERROR_NONE) ||
-      (if1_mdr_insert( 6, 1 ) != LIBSPECTRUM_ERROR_NONE) ||
-      (if1_mdr_insert( 7, 1 ) != LIBSPECTRUM_ERROR_NONE) )
+  if( (if1_mdr_insert( 0 ) != LIBSPECTRUM_ERROR_NONE) ||
+      (if1_mdr_insert( 1 ) != LIBSPECTRUM_ERROR_NONE) ||
+      (if1_mdr_insert( 2 ) != LIBSPECTRUM_ERROR_NONE) ||
+      (if1_mdr_insert( 3 ) != LIBSPECTRUM_ERROR_NONE) ||
+      (if1_mdr_insert( 4 ) != LIBSPECTRUM_ERROR_NONE) ||
+      (if1_mdr_insert( 5 ) != LIBSPECTRUM_ERROR_NONE) ||
+      (if1_mdr_insert( 6 ) != LIBSPECTRUM_ERROR_NONE) ||
+      (if1_mdr_insert( 7 ) != LIBSPECTRUM_ERROR_NONE) )
   {
     while(1)
     {
