@@ -26,9 +26,11 @@
 #include "pico/platform.h"
 #include "hardware/flash.h"
 #include "hardware/dma.h"
+#include "hardware/spi.h"
 
 #include "libspectrum.h"
 #include "if1.h"
+#include "spi.h"
 
 /* This file is generated from test data, don't change what's in it manually */
 #include "flash_images.h"
@@ -109,14 +111,14 @@ static microdrive_t microdrive[NUM_MICRODRIVES];
  * MDR file.
  *
  */
-static tape_byte_t  __attribute__((aligned(4))) cartridge_data[LIBSPECTRUM_MICRODRIVE_CARTRIDGE_LENGTH];
+//static tape_byte_t  __attribute__((aligned(4))) cartridge_data[LIBSPECTRUM_MICRODRIVE_CARTRIDGE_LENGTH];
 static uint8_t     cartridge_data_modified;
 
 /* Clock bit in the ULA */
 static uint8_t if1_ula_comms_clk;
 
 extern const uint8_t LED_PIN;
-//extern const uint8_t TEST_OUTPUT_GP;
+
 
 
 static void __time_critical_func(microdrives_restart)( void );
@@ -124,8 +126,9 @@ static void __time_critical_func(microdrives_restart)( void );
 
 static void __time_critical_func(blip_test_pin)( void )
 {
-#if 0
 // No GPIOs left
+#if 0
+  extern const uint8_t TEST_OUTPUT_GP;
   gpio_put( TEST_OUTPUT_GP, 1 );
   __asm volatile ("nop");
   __asm volatile ("nop");
@@ -250,7 +253,7 @@ static int32_t __time_critical_func(unload_flash_mdr_image)( void )
  * Load one of the tape images from flash into the RAM buffer.
  * This updates the 'flash_image_loaded' static variable.
  */
-static int32_t __time_critical_func(load_flash_tape_image)( flash_mdr_image_index_t which )
+static int32_t load_flash_tape_image( flash_mdr_image_index_t which )
 {
   /* Check requested image exists */
   if( (which < 0) || (which > LAST_MICRODRIVE_INDEX) )
@@ -268,24 +271,28 @@ static int32_t __time_critical_func(load_flash_tape_image)( flash_mdr_image_inde
   }
 
   /*
-   * Copy data in from flash. What's currently at the address is the tape data, but
-   * that might change as what's held in flash develops
+   * Copy cartridge image data from flash into the SPI PSRAM which is where it's
+   * normally used from. I can't DMA (or memcpy()) into the SPI device, so this
+   * goes in 2 steps: flash into onboard RAM, onboard RAM into PSRAM
    */
   TRACE_DATA(TRC_LOAD_IMAGE, which);
-blip_test_pin();
 
   /*
+   * Step 1, pull from flash into onboard RAM
+   *
    * memcpy( cartridge_data, (tape_byte_t*)flash_mdr_image[which].flash_address, flash_mdr_image[which].length );
    *
    * Using DMA, but in practise this is only about 1ms faster than the memcpy()
-   * It still takes about 8ms which is too long for an IORQ. It can be backgrounded
-   * if that's ever useful?
+   * It still takes about 8ms.
    */
   int chan             = dma_claim_unused_channel( true );
   dma_channel_config c = dma_channel_get_default_config( chan );
   channel_config_set_transfer_data_size( &c, DMA_SIZE_32 );
   channel_config_set_read_increment( &c, true );
   channel_config_set_write_increment( &c, true );
+
+  /* Lopping this lot off the stack might cause a problem if the program grows? */
+  tape_byte_t  __attribute__((aligned(4))) cartridge_data[LIBSPECTRUM_MICRODRIVE_CARTRIDGE_LENGTH];
 
   dma_channel_configure(
     chan,                                  // Channel to be configured
@@ -299,7 +306,27 @@ blip_test_pin();
   dma_channel_wait_for_finish_blocking( chan );
   dma_channel_unclaim( chan );
 
-blip_test_pin();
+  /* OK, cartridge data is DMA'ed from flash in onboard RAM, step 2 is to copy from RAM into PSRAM */
+  gpio_put( PICO_SPI_CSN_PIN, 0 );
+
+  /*
+   * Write cartridge data bytes into SPI PSRAM. Don't worry about exact size, there's
+   * plenty of room in the PSRAM. Each cartridge takes up the maximum possible number
+   * of bytes
+   */
+  uint32_t psram_offset = which * LIBSPECTRUM_MICRODRIVE_CARTRIDGE_LENGTH;
+
+  uint8_t write_cmd[] = { PRAM_CMD_WRITE,
+			  psram_offset >> 16, psram_offset >> 8 , psram_offset
+			};
+  spi_write_blocking(PICO_SPI, write_cmd, sizeof(write_cmd));
+  spi_write_blocking(PICO_SPI, cartridge_data, LIBSPECTRUM_MICRODRIVE_CARTRIDGE_LENGTH);
+
+  gpio_put( PICO_SPI_CSN_PIN, 1 );
+
+  /* Note where the cartridge image data has been put in the PSRAM */
+  microdrive[which].cartridge_data_psram_offset = psram_offset;
+ 
   TRACE_DATA(TRC_LOAD_IMAGE, which);
   flash_image_loaded      = which;
   cartridge_data_modified = 0;
@@ -609,6 +636,7 @@ inline libspectrum_byte __time_critical_func(port_mdr_in)( void )
      */
     if( microdrive[active_microdrive_index].transfered < microdrive[active_microdrive_index].max_bytes )
     {
+#if 0
       if( flash_image_loaded != active_microdrive_index )
       {
 	if( load_flash_tape_image( active_microdrive_index ) == -1 )
@@ -617,8 +645,22 @@ inline libspectrum_byte __time_critical_func(port_mdr_in)( void )
 	  return 0xFF;     /* "Can't happen" and there really aren't any good options here */
 	}
       }
+#endif
 
-      ret = cartridge_data[microdrive[active_microdrive_index].head_pos];
+      gpio_put( PICO_SPI_CSN_PIN, 0 );
+
+      /* Work out where the byte under the active microdrive's head is stored in the PSRAM */
+      uint32_t psram_offset = microdrive[active_microdrive_index].cartridge_data_psram_offset
+	                      +
+	                      microdrive[active_microdrive_index].head_pos;
+      uint8_t read_cmd[] = { PRAM_CMD_READ,
+			     psram_offset >> 16, psram_offset >> 8, psram_offset };
+      spi_write_blocking(PICO_SPI, read_cmd, sizeof(read_cmd));
+
+      /* Read the byte at that address, that's the one the IF1 wants */
+      spi_read_blocking(PICO_SPI, 0, (uint8_t*)&ret, 1 ); 
+      
+      gpio_put( PICO_SPI_CSN_PIN, 1 );
 
       /* Move tape on, with wrap */
       increment_head(active_microdrive_index);
@@ -714,18 +756,23 @@ inline void __time_critical_func(port_mdr_out)( libspectrum_byte val )
 	(microdrive[active_microdrive_index].transfered < (microdrive[active_microdrive_index].max_bytes + 12)) )
     {
 
-      if( flash_image_loaded != active_microdrive_index )
-      {
-	if( load_flash_tape_image( active_microdrive_index ) == NO_ACTIVE_MICRODRIVE )
-	{
-	  blip_test_pin(); blip_test_pin(); blip_test_pin(); blip_test_pin(); blip_test_pin();
-	  return;     /* "Can't happen" with IF1 ROM code */
-	}
-      }
+      gpio_put( PICO_SPI_CSN_PIN, 0 );
 
-      cartridge_data[microdrive[active_microdrive_index].head_pos] = val;
-      cartridge_data_modified = 1;
+      /* Work out where the byte under the active microdrive's head is stored in the PSRAM */
+      uint32_t psram_offset = microdrive[active_microdrive_index].cartridge_data_psram_offset
+	                      +
+	                      microdrive[active_microdrive_index].head_pos;
+      uint8_t write_cmd[] = { PRAM_CMD_WRITE,
+			      psram_offset >> 16, psram_offset >> 8, psram_offset,
+                              val };
+
+      /* Write the IF1's byte to that location in PSRAM */
+      spi_write_blocking(PICO_SPI, write_cmd, sizeof(write_cmd));
+
+      gpio_put( PICO_SPI_CSN_PIN, 1 );
+
       increment_head(active_microdrive_index);
+      cartridge_data_modified = 1;
 
       microdrive[active_microdrive_index].modified = 1; // Unused for now
     }

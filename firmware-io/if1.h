@@ -103,6 +103,8 @@ typedef struct _microdrive_t
   libspectrum_byte gap;
   libspectrum_byte sync;
 
+  uint32_t         cartridge_data_psram_offset;
+
   libspectrum_byte cartridge_write_protect;
   libspectrum_byte cartridge_len_in_blocks;
 

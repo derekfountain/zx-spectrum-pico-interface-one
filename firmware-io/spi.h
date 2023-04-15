@@ -1,0 +1,39 @@
+/*
+ * ZX Pico IF1 Firmware, a Raspberry Pi Pico based ZX Interface One emulator
+ * Copyright (C) 2023 Derek Fountain
+ * 
+ * This program is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU General Public License
+ * as published by the Free Software Foundation; either version 2
+ * of the License, or (at your option) any later version.
+ * 
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ * 
+ * You should have received a copy of the GNU General Public License
+ * along with this program; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
+ */
+
+#ifndef __SPI_H
+#define __SPI_H
+
+/* Pseudo SRAM is on SPI0 */
+#define PICO_SPI               spi0
+
+#define PICO_SPI_RX_PIN        16
+#define PICO_SPI_TX_PIN        19
+#define PICO_SPI_SCK_PIN       18
+#define PICO_SPI_CSN_PIN       17
+
+/* Commands for the memory chip I'm using */
+#define PRAM_CMD_WRITE         0x02
+#define PRAM_CMD_READ          0x03
+#define PRAM_CMD_FAST_READ     0x0B
+#define PRAM_CMD_RESET_ENABLE  0x66
+#define PRAM_CMD_RESET         0x99
+#define PRAM_CMD_READ_ID       0x9F
+
+#endif

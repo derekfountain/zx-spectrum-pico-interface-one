@@ -42,6 +42,7 @@
 #include "hardware/spi.h"
 
 #include "if1.h"
+#include "spi.h"
 
 #include "hardware/pio.h"
 #include "hardware/clocks.h"
@@ -54,20 +55,6 @@
 
 #define OVERCLOCK 150000
 //#define OVERCLOCK 270000
-
-/* Pseudo SRAM is on SPI0 */
-#define PICO_SPI_RX_PIN        16
-#define PICO_SPI_TX_PIN        19
-#define PICO_SPI_SCK_PIN       18
-#define PICO_SPI_CSN_PIN       17
-
-/* Commands for the memory chip I'm using */
-#define PRAM_CMD_WRITE         0x02
-#define PRAM_CMD_READ          0x03
-#define PRAM_CMD_FAST_READ     0x0B
-#define PRAM_CMD_RESET_ENABLE  0x66
-#define PRAM_CMD_RESET         0x99
-#define PRAM_CMD_READ_ID       0x9F
 
 const uint8_t LED_PIN = PICO_DEFAULT_LED_PIN;
 
@@ -345,13 +332,13 @@ void __time_critical_func(core1_main)( void )
 
   /* Insert the test images into the Microdrives */
   if( (if1_mdr_insert( 0, 1 ) != LIBSPECTRUM_ERROR_NONE) ||
-      (if1_mdr_insert( 1, 0 ) != LIBSPECTRUM_ERROR_NONE) ||
-      (if1_mdr_insert( 2, 0 ) != LIBSPECTRUM_ERROR_NONE) ||
-      (if1_mdr_insert( 3, 0 ) != LIBSPECTRUM_ERROR_NONE) ||
-      (if1_mdr_insert( 4, 0 ) != LIBSPECTRUM_ERROR_NONE) ||
-      (if1_mdr_insert( 5, 0 ) != LIBSPECTRUM_ERROR_NONE) ||
-      (if1_mdr_insert( 6, 0 ) != LIBSPECTRUM_ERROR_NONE) ||
-      (if1_mdr_insert( 7, 0 ) != LIBSPECTRUM_ERROR_NONE) )
+      (if1_mdr_insert( 1, 1 ) != LIBSPECTRUM_ERROR_NONE) ||
+      (if1_mdr_insert( 2, 1 ) != LIBSPECTRUM_ERROR_NONE) ||
+      (if1_mdr_insert( 3, 1 ) != LIBSPECTRUM_ERROR_NONE) ||
+      (if1_mdr_insert( 4, 1 ) != LIBSPECTRUM_ERROR_NONE) ||
+      (if1_mdr_insert( 5, 1 ) != LIBSPECTRUM_ERROR_NONE) ||
+      (if1_mdr_insert( 6, 1 ) != LIBSPECTRUM_ERROR_NONE) ||
+      (if1_mdr_insert( 7, 1 ) != LIBSPECTRUM_ERROR_NONE) )
   {
     while(1)
     {
@@ -575,7 +562,7 @@ int __time_critical_func(main)( void )
    * a frequency like this seems rather silly. You get what the hardware can give you.
    * Might as well ask for the theoretical maximum though.
    */
-  spi_init(spi0, 62 * 1000 * 1000);
+  spi_init(PICO_SPI, 62 * 1000 * 1000);
   gpio_set_function(PICO_SPI_RX_PIN, GPIO_FUNC_SPI);
   gpio_set_function(PICO_SPI_SCK_PIN, GPIO_FUNC_SPI);
   gpio_set_function(PICO_SPI_TX_PIN, GPIO_FUNC_SPI);
@@ -592,7 +579,7 @@ int __time_critical_func(main)( void )
   uint8_t reset_cmd[] = { PRAM_CMD_RESET_ENABLE, 
 			  PRAM_CMD_RESET };
   gpio_put(PICO_SPI_CSN_PIN, 0); 
-  spi_write_blocking(spi0, reset_cmd, 2);
+  spi_write_blocking(PICO_SPI, reset_cmd, 2);
   gpio_put(PICO_SPI_CSN_PIN, 1);   
 
   /* Test SPI RAM is present */
@@ -601,12 +588,12 @@ int __time_critical_func(main)( void )
   /* Read ID, on the chip I'm using takes 0x9F as the command followed by 3 "don't care"s */
   uint8_t read_cmd[] = { PRAM_CMD_READ_ID,
 			 0, 0, 0 };
-  spi_write_blocking(spi0, read_cmd, sizeof(read_cmd)); 
+  spi_write_blocking(PICO_SPI, read_cmd, sizeof(read_cmd)); 
 			
   /* Chip I'm using returns 0x0D, 0x5D according to the datasheet */
   uint8_t id1, id2;
-  spi_read_blocking(spi0, 0, &id1, 1 ); 
-  spi_read_blocking(spi0, 0, &id2, 1 ); 
+  spi_read_blocking(PICO_SPI, 0, &id1, 1 ); 
+  spi_read_blocking(PICO_SPI, 0, &id2, 1 ); 
   gpio_put(PICO_SPI_CSN_PIN, 1);
 
   if( (id1 != 0x0D) || (id2 != 0x5D) )
