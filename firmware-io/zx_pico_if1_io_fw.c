@@ -557,6 +557,15 @@ int __time_critical_func(main)( void )
 
   TRACE(TRC_GPIOS_INIT);
 
+  /* Use PIO to switch the level shifter's DIRection */
+  pio              = pio0;
+  sm_mreq          = pio_claim_unused_sm( pio, true );
+  uint offset_mreq = pio_add_program( pio, &mreq_dir_program );
+  mreq_dir_program_init( pio, sm_mreq, offset_mreq, ROM_READ_GP, DIR_OUTPUT_GP );
+  pio_sm_set_enabled(pio, sm_mreq, true);
+
+  TRACE(TRC_PIOS_INIT);
+
   /*
    * Enable SPI 0 at <n> MHz and connect to GPIOs. Second param is a baudrate, giving it
    * a frequency like this seems rather silly. You get what the hardware can give you.
@@ -611,15 +620,6 @@ int __time_critical_func(main)( void )
 //  gpio_put(TEST_OUTPUT_GP, 0);
 
   TRACE(TRC_SPI_INIT);
-
-  /* Use PIO to switch the level shifter's DIRection */
-  pio              = pio0;
-  sm_mreq          = pio_claim_unused_sm( pio, true );
-  uint offset_mreq = pio_add_program( pio, &mreq_dir_program );
-  mreq_dir_program_init( pio, sm_mreq, offset_mreq, ROM_READ_GP, DIR_OUTPUT_GP );
-  pio_sm_set_enabled(pio, sm_mreq, true);
-
-  TRACE(TRC_PIOS_INIT);
 
 #if CORE1_IN_USE
   /*
