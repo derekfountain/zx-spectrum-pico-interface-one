@@ -65,51 +65,39 @@ on the IO Pico.
 v1.2
 ====
 
-I need to work out whether Pico1 can tell Pico2 that one of its
-ports (0xE7 or 0xEF) is on the address bus.
-: Connect Pico1 GPIO27 out to Pico2 GPIO19
-:: Then write the PIO program to set GPIO27 if the pattern is
-   on the address bus.
-::: If that works disconnect A0/1/2/4/5/6/7 from Pico2.
-    The new signal plus A3 should be enough.
-    This will free up a lot of GPIOs which should make the
-    following easier to deal with.
-
 Make sure the GPIOs which share the ADC are not used for 5V. IO Pico
 has ROM_READ_INV going into GPIO27. I need another level shifter.
 I'm out of GPIOs.
-: Needs doing on board #2
-:: I won't do it on board #2, adding the level shifter will be too
-   difficult.
 - Level shifter has been added on v1.2 schematic
-: Need to move ROM_READ_INV_3V3 from GPIO8 to GPIO27 on Pico1
-  on schematic
-:: Can't do it until I have the level shifter
-:: Change ROM_READ_GP in fw from GPIO8 to GPIO27 when new board
-   is made. This one's already on GPIO27 on io_fw so no change
-   required there.
-: Need to move A7 from Pico1 GPIO26
-:: It can go through the level shifter, but it makes more sense
-   to wait until I've untangled the pins (see next item)
-: On Pico2 move the ZXWAIT output from GPIO18 to GPIO26
-:: Will need to move A7 first
+: I won't do it on board #1, adding the level shifter will be too
+   difficult.
+Make IO PIco GPIO27 an output (it's an ADC GPIO)
+- Moved ROM_READ_INV to GPIO15 and ZXWAIT to GPIO27. That makes
+  the signal on GPIO27 an output
+- Done on board #1 and schematic
+Set up the PSRAM connection on SPI0. That's GPIOs 16 to 19.
+- Done on board #1 and schematic
 
 
 Untangle the bus pins on all the Picos. Make databus D0 to D7
-in sequence, then address lines, then control bus lines. I
-thought simplifying the layout process would make things easier,
-but actually, keeping the software simple and fast has more
-benefit.
-: Needs doing
-: Make sure the GPIOs which share the ADC are not used for 5V
-: Won't be doing this on board #1
+in sequence, then address lines. I thought simplifying the layout
+process would make things easier, but actually, keeping the
+software simple and fast has more benefit.
+- Done on schematic, both Pico1 and Pico2
+: Won't be doing this on board #1, too distruptive
+
+
+Have Pico1 tell Pico2 that one of its ports (0xE7 or 0xEF) is on the
+address bus. Then Pico2 can do away with 7 address lines.
+- Done on board #1
+- Signal from Pico1 GPIO27 to Pico2 GPIO13 done on board #1
+- Keep A3 in place on Pico2
 
 
 I need a signal from Pico2 to Pico1. Pico1 can't release the Z80
 until Pico2 is ready to go. Pico2 changes the level shifter
 direction, so Pico1 can't be the ROM until Pico2 is ready to go.
-: Needs doing
-:: Not required. If Pico1 boots slower than Pico2, then
+: Not required. If Pico1 boots slower than Pico2, then
    Pico2 will be running by the time Pico1 releases the Z80.
    I can just put a delay in the Pico1 code. Bit yuk, but I don't
    have the GPIO spare on Pico1.
@@ -121,8 +109,9 @@ if it's responding to IOs. Low priority, but if I have a couple
 of GPIOs left this will be handy. Make sure the tracks are easy
 to cut so i can reuse the GPIOs if I need to.
 : Needs doing
-
-
+:: No GPIO available, but I could connect an LED to the SPI
+   slave enable signal? Check with AM whether that would 
+   cause a problem
 
 
 
@@ -138,3 +127,6 @@ IORQ, RD and WR, make sure they're still available, they're useful
 DIR_CHANGE from Pico2, currently pin 28. I need to be able to see when
                        Pico2 is changing the dbus direction.
 : All need doing
+
+
+v1.3 Final is for fabrication as board #2

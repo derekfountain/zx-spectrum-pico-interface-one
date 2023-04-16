@@ -37,6 +37,7 @@
 #include "hardware/gpio.h"
 #include "pico/binary_info.h"
 #include "hardware/timer.h"
+#include "pico/multicore.h"
 
 
 /* 1 instruction on the 133MHz microprocessor is 7.5ns */
@@ -132,7 +133,7 @@ const uint32_t ROM_READ_BIT_MASK        = ((uint32_t)1 << ROM_READ_GP);
 const uint8_t  M1_GP                    = 15;
 const uint32_t M1_INPUT_BIT_MASK        = ((uint32_t)1 << M1_GP);
 
-const uint8_t  TEST_OUTPUT_GP           = 27;
+const uint8_t  IF1_PORT_ACTIVE_OUTPUT_GP = 27;
 
 /* This pin triggers a transistor which shorts the Z80's /RESET to ground */
 const uint8_t  PICO_RESET_Z80_GP        = 28;
@@ -315,6 +316,63 @@ RECORDER address_recorder[ RECORDER_SIZE ];
 
 #endif
 
+void __time_critical_func(core1_main)( void )
+{
+  const uint32_t ABUS_MASK     =
+    ((uint32_t)1 << A0_GP) |
+    ((uint32_t)1 << A1_GP) |
+    ((uint32_t)1 << A2_GP) |
+
+    ((uint32_t)1 << A4_GP) |
+    ((uint32_t)1 << A5_GP) |
+    ((uint32_t)1 << A6_GP) |
+    ((uint32_t)1 << A7_GP);
+
+  const uint32_t IF1_PORT     =
+    ((uint32_t)1 << A0_GP)   |
+    ((uint32_t)1 << A1_GP)   |
+    ((uint32_t)1 << A2_GP)   |
+
+    ((uint32_t)0 << A4_GP)   |
+    ((uint32_t)1 << A5_GP)   |
+    ((uint32_t)1 << A6_GP)   |
+    ((uint32_t)1 << A7_GP);
+
+  /*
+   * This is a basic loop which sets a GPIO low if the pattern
+   * 1110x111 is on the lower address bus. That signals to the
+   * IO Pico that the Z80 is addressing something that might
+   * be one of the IF1's IO ports. The other Pico worries about
+   * that extra bit, and the IORQ line, etc.
+   * This is crude, but fast enough at 150MHz. It'd be good if I
+   * could replace this with a PIO program. That would free up
+   * this core again.
+   */
+  while(1)
+  {
+    register uint32_t gpios_state = gpio_get_all();
+
+    /* If we're currently dealing with a ROM read then it's not an IO */
+    if( (gpios_state & ROM_READ_BIT_MASK) == 0 )
+    {
+      gpio_put( IF1_PORT_ACTIVE_OUTPUT_GP, 1 );
+      continue;
+    }
+
+
+    if( (gpios_state & ABUS_MASK) == IF1_PORT )
+    {
+      /* It's one of ours, signal to the other Pico */
+      gpio_put( IF1_PORT_ACTIVE_OUTPUT_GP, 0 );
+    }
+    else
+    {
+      /* It's not one of ours, turn the signal off */
+      gpio_put( IF1_PORT_ACTIVE_OUTPUT_GP, 1 );
+    }
+  }
+}
+
 
 int main()
 {
@@ -379,10 +437,6 @@ int main()
   gpio_init( M1_GP ); gpio_set_dir( M1_GP, GPIO_IN );
   gpio_pull_up( M1_GP );
 
-  /* Set up test pin as output */
-  gpio_init(TEST_OUTPUT_GP); gpio_set_dir(TEST_OUTPUT_GP, GPIO_OUT);
-  gpio_put(TEST_OUTPUT_GP, 0);
-
   /* Blip LED to show we're running */
   gpio_init(LED_PIN);
   gpio_set_dir(LED_PIN, GPIO_OUT);
@@ -402,6 +456,11 @@ int main()
    */
   add_alarm_in_ms( 5, start_z80_alarm_func, NULL, 0 );
 
+  /* Signal to the IO Pico that an IF1 port is on A0 to A7 (active low) */
+  gpio_init( IF1_PORT_ACTIVE_OUTPUT_GP ); gpio_set_dir( IF1_PORT_ACTIVE_OUTPUT_GP, GPIO_OUT );
+  gpio_put( IF1_PORT_ACTIVE_OUTPUT_GP, 1 );
+
+  multicore_launch_core1( core1_main );
 
   gpio_set_dir_in_masked( DBUS_MASK );
   while(1)

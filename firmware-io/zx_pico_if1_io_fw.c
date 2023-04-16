@@ -59,46 +59,16 @@
 const uint8_t LED_PIN = PICO_DEFAULT_LED_PIN;
 
 /*
- * These pin values are the GPxx ones in green background on the pinout diagram.
- * See schematic for how the signals are fed into the Pico's GPIOs
+ * The IF1 port signal comes from the ROM Pico which has can see the
+ * address lines. When that's active (low) the Z80 has 0xEF or 0xE7
+ * on the lower address lines. The extra bit is A3 which this Pico
+ * still needs to be able to see to differentiate them
  */
-const uint8_t A0_GP          = 11;
-const uint8_t A1_GP          = 12;
-const uint8_t A2_GP          = 13;
-const uint8_t A3_GP          = 14;
-const uint8_t A4_GP          = 20;
-const uint8_t A5_GP          = 21;
-const uint8_t A6_GP          = 22;
-const uint8_t A7_GP          = 26;
+const uint8_t  IF1_PORT_SIGNAL_GP         = 13;
+const uint8_t  A3_GP                      = 14;
 
-const uint32_t  A0_BIT_MASK  = ((uint32_t)1 <<  A0_GP);
-const uint32_t  A1_BIT_MASK  = ((uint32_t)1 <<  A1_GP);
-const uint32_t  A2_BIT_MASK  = ((uint32_t)1 <<  A2_GP);
-const uint32_t  A3_BIT_MASK  = ((uint32_t)1 <<  A3_GP);
-const uint32_t  A4_BIT_MASK  = ((uint32_t)1 <<  A4_GP);
-const uint32_t  A5_BIT_MASK  = ((uint32_t)1 <<  A5_GP);
-const uint32_t  A6_BIT_MASK  = ((uint32_t)1 <<  A6_GP);
-const uint32_t  A7_BIT_MASK  = ((uint32_t)1 <<  A7_GP);
-
-/*
- * Given value i, this calculates the pattern of the GPIOs if
- * value i were to appear on the Z80 address bus.
- */
-uint32_t create_gpios_for_address( uint32_t i )
-{
-  uint32_t gpio_pattern = 
-    ( ((i & 0x0001) >>  0) <<  A0_GP ) |
-    ( ((i & 0x0002) >>  1) <<  A1_GP ) |
-    ( ((i & 0x0004) >>  2) <<  A2_GP ) |
-    ( ((i & 0x0008) >>  3) <<  A3_GP ) |
-    ( ((i & 0x0010) >>  4) <<  A4_GP ) |
-    ( ((i & 0x0020) >>  5) <<  A5_GP ) |
-    ( ((i & 0x0040) >>  6) <<  A6_GP ) |
-    ( ((i & 0x0080) >>  7) <<  A7_GP );
-
-  return gpio_pattern;
-}
-
+const uint32_t IF1_PORT_SIGNAL_BIT_MASK = ((uint32_t)1 <<  IF1_PORT_SIGNAL_GP);
+const uint32_t A3_BIT_MASK              = ((uint32_t)1 <<  A3_GP);
 
 const uint8_t  D0_GP          = 0;
 const uint8_t  D1_GP          = 1;
@@ -109,14 +79,14 @@ const uint8_t  D5_GP          = 3;
 const uint8_t  D6_GP          = 5;
 const uint8_t  D7_GP          = 7;
 
-const uint32_t  D0_BIT_MASK  = ((uint32_t)1 <<  D0_GP);
-const uint32_t  D1_BIT_MASK  = ((uint32_t)1 <<  D1_GP);
-const uint32_t  D2_BIT_MASK  = ((uint32_t)1 <<  D2_GP);
-const uint32_t  D3_BIT_MASK  = ((uint32_t)1 <<  D3_GP);
-const uint32_t  D4_BIT_MASK  = ((uint32_t)1 <<  D4_GP);
-const uint32_t  D5_BIT_MASK  = ((uint32_t)1 <<  D5_GP);
-const uint32_t  D6_BIT_MASK  = ((uint32_t)1 <<  D6_GP);
-const uint32_t  D7_BIT_MASK  = ((uint32_t)1 <<  D7_GP);
+const uint32_t D0_BIT_MASK  = ((uint32_t)1 <<  D0_GP);
+const uint32_t D1_BIT_MASK  = ((uint32_t)1 <<  D1_GP);
+const uint32_t D2_BIT_MASK  = ((uint32_t)1 <<  D2_GP);
+const uint32_t D3_BIT_MASK  = ((uint32_t)1 <<  D3_GP);
+const uint32_t D4_BIT_MASK  = ((uint32_t)1 <<  D4_GP);
+const uint32_t D5_BIT_MASK  = ((uint32_t)1 <<  D5_GP);
+const uint32_t D6_BIT_MASK  = ((uint32_t)1 <<  D6_GP);
+const uint32_t D7_BIT_MASK  = ((uint32_t)1 <<  D7_GP);
 
 const uint32_t DBUS_MASK     = ((uint32_t)1 << D0_GP) |
                                ((uint32_t)1 << D1_GP) |
@@ -137,65 +107,39 @@ const uint32_t RD_BIT_MASK              = ((uint32_t)1 << RD_GP);
 const uint8_t  WR_GP                    = 10;
 const uint32_t WR_BIT_MASK              = ((uint32_t)1 << WR_GP);
 
+/*
+ * These are the bits which allow us to decide whether what is
+ * on the Z80 buses is IF1 related
+ */
 const uint32_t IF1_IOPORT_ACCESS_BIT_MASK = IORQ_BIT_MASK |
                                             RD_BIT_MASK |
                                             WR_BIT_MASK |
-                                            A0_BIT_MASK |
-                                            A1_BIT_MASK |
-                                            A2_BIT_MASK |
-                                            A3_BIT_MASK |
-                                            A4_BIT_MASK |
-                                            A5_BIT_MASK |
-                                            A6_BIT_MASK |
-                                            A7_BIT_MASK;
+                                            IF1_PORT_SIGNAL_BIT_MASK |
+                                            A3_BIT_MASK;
 
 const uint32_t PORT_E7_READ =  ((uint32_t)0 << IORQ_GP) |
                                ((uint32_t)0 << RD_GP)   |
                                ((uint32_t)1 << WR_GP)   |
-                               ((uint32_t)1 << A0_GP)   |
-                               ((uint32_t)1 << A1_GP)   |
-                               ((uint32_t)1 << A2_GP)   |
-                               ((uint32_t)0 << A3_GP)   |
-                               ((uint32_t)0 << A4_GP)   |
-                               ((uint32_t)1 << A5_GP)   |
-                               ((uint32_t)1 << A6_GP)   |
-                               ((uint32_t)1 << A7_GP);
+                               ((uint32_t)0 << IF1_PORT_SIGNAL_GP)   |
+                               ((uint32_t)0 << A3_GP);
 
 const uint32_t PORT_EF_READ =  ((uint32_t)0 << IORQ_GP) |
                                ((uint32_t)0 << RD_GP)   |
                                ((uint32_t)1 << WR_GP)   |
-                               ((uint32_t)1 << A0_GP)   |
-                               ((uint32_t)1 << A1_GP)   |
-                               ((uint32_t)1 << A2_GP)   |
-                               ((uint32_t)1 << A3_GP)   |
-                               ((uint32_t)0 << A4_GP)   |
-                               ((uint32_t)1 << A5_GP)   |
-                               ((uint32_t)1 << A6_GP)   |
-                               ((uint32_t)1 << A7_GP);
+                               ((uint32_t)0 << IF1_PORT_SIGNAL_GP)   |
+                               ((uint32_t)1 << A3_GP);
 
 const uint32_t PORT_E7_WRITE = ((uint32_t)0 << IORQ_GP) |
                                ((uint32_t)1 << RD_GP)   |
                                ((uint32_t)0 << WR_GP)   |
-                               ((uint32_t)1 << A0_GP)   |
-                               ((uint32_t)1 << A1_GP)   |
-                               ((uint32_t)1 << A2_GP)   |
-                               ((uint32_t)0 << A3_GP)   |
-                               ((uint32_t)0 << A4_GP)   |
-                               ((uint32_t)1 << A5_GP)   |
-                               ((uint32_t)1 << A6_GP)   |
-                               ((uint32_t)1 << A7_GP);
+                               ((uint32_t)0 << IF1_PORT_SIGNAL_GP)   |
+                               ((uint32_t)0 << A3_GP);
 
 const uint32_t PORT_EF_WRITE = ((uint32_t)0 << IORQ_GP) |
                                ((uint32_t)1 << RD_GP)   |
                                ((uint32_t)0 << WR_GP)   |
-                               ((uint32_t)1 << A0_GP)   |
-                               ((uint32_t)1 << A1_GP)   |
-                               ((uint32_t)1 << A2_GP)   |
-                               ((uint32_t)1 << A3_GP)   |
-                               ((uint32_t)0 << A4_GP)   |
-                               ((uint32_t)1 << A5_GP)   |
-                               ((uint32_t)1 << A6_GP)   |
-                               ((uint32_t)1 << A7_GP);
+                               ((uint32_t)0 << IF1_PORT_SIGNAL_GP)   |
+                               ((uint32_t)1 << A3_GP);
 
 /*
  * ROM read logic input, goes 0 when the MREQ to ROM is happening.
@@ -219,8 +163,9 @@ const uint8_t  DIR_OUTPUT_GP            = 28;
  */
 const uint8_t  WAIT_GP                  = 27;
 
-/* Test pin is one of the UART pins for now because there's a test point */
-// No GPIOs left const uint8_t  TEST_OUTPUT_GP           = 17;
+/* Test pin */
+// Ensure this is suitable for output on test board, 11 is the old A0 and isn't!
+//const uint8_t  TEST_OUTPUT_GP           = 11;
 
 /* Rudimentary trace table for whole program */
 TRACE_TYPE trace[256];
@@ -234,37 +179,6 @@ uint8_t trace_index=0;     /* 8 bit index, auto-wraps */
  * Here it's an 8 bit IO address, so a smaller table than in the ROM code.
  */
 uint16_t address_indirection_table[ 256 ];
-
-/*
- * Given the GPIOs with an address bus value on them, this packs the
- * 14 address bits down into the least significant 14 bits. Only the
- * lower 8 are used in this code.
- */
-inline uint16_t pack_address_gpios( uint32_t gpios )
-{
-  /*     Bits 0,1,2,3,4,5       Bits 6,7,8,9,10,11,12     Bit 13                   */
-  return ((gpios>>9) & 0x03F) | ((gpios>>10) & 0x1FC0) | ((gpios & 0x4000000) >> 13);
-}
-
-/*
- * Populate the address bus indirection table.
- */
-void create_indirection_table( void )
-{
-  uint32_t i;
-
-  for( i=0; i<256; i++ )
-  {
-    uint32_t raw_bit_pattern = create_gpios_for_address( i );
-
-    uint32_t packed_bit_pattern = pack_address_gpios( raw_bit_pattern );
-
-    address_indirection_table[packed_bit_pattern] = i;
-  }
-
-  return;
-}
-
 
 /*
  * Instead of shuffling the bits of an output value around at the point
@@ -513,20 +427,11 @@ int __time_critical_func(main)( void )
   /* Build the preconverted data table */
   preconvert_data();
 
-  /* Create address indirection table, this is the address bus optimisation  */
-  create_indirection_table();
-
   TRACE(TRC_DATA_CONV);
 
-  /* Pull the buses to zeroes */
-  gpio_init( A0_GP  ); gpio_set_dir( A0_GP,  GPIO_IN );  gpio_pull_down( A0_GP  );
-  gpio_init( A1_GP  ); gpio_set_dir( A1_GP,  GPIO_IN );  gpio_pull_down( A1_GP  );
-  gpio_init( A2_GP  ); gpio_set_dir( A2_GP,  GPIO_IN );  gpio_pull_down( A2_GP  );
+  /* Pull the buses to zeroes. Most of the address bus info comes from the ROM Pico */
+  gpio_init( IF1_PORT_SIGNAL_GP  ); gpio_set_dir( IF1_PORT_SIGNAL_GP,  GPIO_IN );
   gpio_init( A3_GP  ); gpio_set_dir( A3_GP,  GPIO_IN );  gpio_pull_down( A3_GP  );
-  gpio_init( A4_GP  ); gpio_set_dir( A4_GP,  GPIO_IN );  gpio_pull_down( A4_GP  );
-  gpio_init( A5_GP  ); gpio_set_dir( A5_GP,  GPIO_IN );  gpio_pull_down( A5_GP  );
-  gpio_init( A6_GP  ); gpio_set_dir( A6_GP,  GPIO_IN );  gpio_pull_down( A6_GP  );
-  gpio_init( A7_GP  ); gpio_set_dir( A7_GP,  GPIO_IN );  gpio_pull_down( A7_GP  );
 
   gpio_init( D0_GP  ); gpio_set_dir( D0_GP,  GPIO_IN );  gpio_pull_down( D0_GP  );
   gpio_init( D1_GP  ); gpio_set_dir( D1_GP,  GPIO_IN );  gpio_pull_down( D1_GP  );
@@ -547,7 +452,7 @@ int __time_critical_func(main)( void )
   gpio_pull_up( WR_GP );
 
   /*
-   * Wait an output from here to the Z80. Set as an input to sink the +5V
+   * Wait is an output from here to the Z80. Set as an input to sink the +5V
    * that's on it when it's not being used.
    */
   gpio_init( WAIT_GP ); gpio_set_dir( WAIT_GP, GPIO_IN );
