@@ -115,6 +115,9 @@ to cut so i can reuse the GPIOs if I need to.
 
 
 
+No pop the level shifter, I can probably just put a series resistor
+on that signal line.
+
 
 Test points required, bring them out to plated holes:
 Test pin on Pico1, use pin 27, needed to trigger scope on particular
