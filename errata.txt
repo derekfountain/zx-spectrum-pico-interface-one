@@ -124,11 +124,9 @@ Test pin on Pico1, use pin 27, needed to trigger scope on particular
                    instruction, like INIR
 Test pin on Pico2, use pin 27 here too, although there are more options
 Test pin on Pico3, might as well use pin27 here too
-ROM_READ_INV (GP8 on Pico1), so I can see when Pico1 is telling Pico2
-                             to change DIR
+ROM_READ_INV so I can see when Pico1 is telling Pico2 to change DIR
 IORQ, RD and WR, make sure they're still available, they're useful
-DIR_CHANGE from Pico2, currently pin 28. I need to be able to see when
-                       Pico2 is changing the dbus direction.
+DIR_CHANGE from Pico2. I need to be able to see when Pico2 is changing the dbus direction.
 : All need doing
 
 
