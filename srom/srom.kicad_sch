@@ -3845,8 +3845,8 @@
     (path "/95a6eb69-d4c1-4a7e-a8e8-144430faf0e2/7fe63843-f758-4c7e-a4e3-75a239e41188"
       (reference "J201") (unit 1) (value "Conn_01x03_Female") (footprint "Connector_PinHeader_2.54mm:PinHeader_1x03_P2.54mm_Vertical")
     )
-    (path "/95a6eb69-d4c1-4a7e-a8e8-144430faf0e2/cd66f60d-1058-4213-bc50-c2c04efac531"
-      (reference "J202") (unit 1) (value "Conn_01x05_Female") (footprint "Connector_PinHeader_2.54mm:PinHeader_1x05_P2.54mm_Vertical")
+    (path "/95a6eb69-d4c1-4a7e-a8e8-144430faf0e2/ab3bf034-469b-4932-acf6-7702bff9ed96"
+      (reference "J202") (unit 1) (value "Conn_01x06_Female") (footprint "Connector_PinHeader_2.54mm:PinHeader_1x06_P2.54mm_Vertical")
     )
     (path "/acda4c69-0a65-473b-ab4f-e765252d7da2/d6d0c58d-8e9e-45da-ac9c-b6edecaf4587"
       (reference "J301") (unit 1) (value "Conn_01x05_Female") (footprint "Connector_PinHeader_2.54mm:PinHeader_1x05_P2.54mm_Vertical")
