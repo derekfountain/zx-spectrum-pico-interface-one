@@ -78,8 +78,14 @@ typedef struct _trace_type
 }
 TRACE_TYPE;
 
-void trace( TRACE_CODE code );
-void trace_data( TRACE_CODE code, uint8_t data );
+#define NUM_TRACE_ENTRIES   19000
+
+extern TRACE_TYPE trace[];
+extern uint32_t   trace_index;
+#define TRACE(c)        {trace[trace_index].i=trace_index;trace[trace_index].code=c;trace[trace_index].data=0;  \
+                         if( trace_index++ == NUM_TRACE_ENTRIES ) trace_index=0;}
+#define TRACE_DATA(c,d) {trace[trace_index].i=trace_index;trace[trace_index].code=c;trace[trace_index].data=(d);\
+                         if( trace_index++ == NUM_TRACE_ENTRIES ) trace_index=0;}
 
 /* This is used in the preamble */
 enum

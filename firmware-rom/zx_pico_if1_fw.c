@@ -490,11 +490,11 @@ int main()
 //{
 //  rom_value = 0;
 //}
-if( (rom_image_ptr == __ROMs_if1_rom) && (rom_address == 0x1693) )
-{
+//if( (rom_image_ptr == __ROMs_if1_rom) && (rom_address == 0x1693) )
+//{
 // This fixes the format problem for all microdrives except #1
-  rom_value = 1;   // 1 byte is max, 2 fails
-}
+//  rom_value = 1;   // 1 byte is max, 2 fails
+//}
     /*
      * This Pico is about to put a value on the data bus. The "ROM read" logic
      * hardware signal goes to Pico2 (the IO handling Pico) as well as this one.

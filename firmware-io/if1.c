@@ -143,6 +143,9 @@ int32_t if1_init( void )
  * The UI Pico will do this job at some point but I don't yet
  * know how
  */
+/* Lopping this lot off the stack will cause a problem if the program grows. Keep static. Might need to page */
+static tape_byte_t  __attribute__((aligned(4))) cartridge_data[LIBSPECTRUM_MICRODRIVE_CARTRIDGE_LENGTH];
+
 static int32_t load_flash_tape_image( flash_mdr_image_index_t which )
 {
   /* Check requested image exists */
@@ -172,9 +175,6 @@ static int32_t load_flash_tape_image( flash_mdr_image_index_t which )
   channel_config_set_transfer_data_size( &c, DMA_SIZE_32 );
   channel_config_set_read_increment( &c, true );
   channel_config_set_write_increment( &c, true );
-
-  /* Lopping this lot off the stack might cause a problem if the program grows? */
-  tape_byte_t  __attribute__((aligned(4))) cartridge_data[LIBSPECTRUM_MICRODRIVE_CARTRIDGE_LENGTH];
 
   dma_channel_configure(
     chan,                                  // Channel to be configured
@@ -213,7 +213,7 @@ static int32_t load_flash_tape_image( flash_mdr_image_index_t which )
   size_t length_in_bytes = flash_mdr_image[which].length - ( flash_mdr_image[which].length % LIBSPECTRUM_MICRODRIVE_BLOCK_LEN );
   microdrive[which].cartridge_len_in_blocks = (length_in_bytes / LIBSPECTRUM_MICRODRIVE_BLOCK_LEN);
  
-  trace_data(TRC_LOAD_IMAGE, which);
+  TRACE_DATA(TRC_LOAD_IMAGE, which);
 
   return which;
 }
@@ -246,7 +246,7 @@ int32_t if1_mdr_insert( const microdrive_index_t which )
    */
   microdrives_restart();
 
-  trace_data(TRC_IMAGE_INIT, which);
+  TRACE_DATA(TRC_IMAGE_INIT, which);
 
   return 0;
 }
@@ -430,13 +430,13 @@ inline libspectrum_byte __time_critical_func(port_ctr_in)( void )
  */
 inline void __time_critical_func(port_ctr_out)( libspectrum_byte val )
 {
-  trace_data(TRC_PORT_CTR_OUT, val);
+  TRACE_DATA(TRC_PORT_CTR_OUT, val);
 
   /* Look for a falling edge on the CLK line */
   if( ((val & 0x02) == 0) && (if1_ula_comms_clk == 1) )
   {
     /* Falling edge of the clock on bit 0x02  ~~\__ */
-    trace_data(TRC_FALLING_EDGE, if1_ula_comms_clk);
+    TRACE_DATA(TRC_FALLING_EDGE, if1_ula_comms_clk);
 
     /*
      * A falling edge has arrived on the clock bit 0x02. There will
@@ -474,10 +474,7 @@ inline void __time_critical_func(port_ctr_out)( libspectrum_byte val )
 
     gpio_put( LED_PIN, any_motor_on );
 
-if( ! any_motor_on )
-  gpio_put( LED_PIN, 0 );
-
-    trace_data(TRC_MOTORS_ON, (microdrive[7].motor_on << 7) |
+    TRACE_DATA(TRC_MOTORS_ON, (microdrive[7].motor_on << 7) |
 	                      (microdrive[6].motor_on << 6) |
 	                      (microdrive[5].motor_on << 5) |
 	                      (microdrive[4].motor_on << 4) |
