@@ -158,7 +158,6 @@ static int32_t load_flash_tape_image( flash_mdr_image_index_t which )
    * normally used from. I can't DMA (or memcpy()) into the SPI device, so this
    * goes in 2 steps: flash into onboard RAM, onboard RAM into PSRAM
    */
-  TRACE_DATA(TRC_LOAD_IMAGE, which);
 
   /*
    * Step 1, pull from flash into onboard RAM
@@ -214,7 +213,7 @@ static int32_t load_flash_tape_image( flash_mdr_image_index_t which )
   size_t length_in_bytes = flash_mdr_image[which].length - ( flash_mdr_image[which].length % LIBSPECTRUM_MICRODRIVE_BLOCK_LEN );
   microdrive[which].cartridge_len_in_blocks = (length_in_bytes / LIBSPECTRUM_MICRODRIVE_BLOCK_LEN);
  
-  TRACE_DATA(TRC_LOAD_IMAGE, which);
+  trace_data(TRC_LOAD_IMAGE, which);
 
   return which;
 }
@@ -247,7 +246,7 @@ int32_t if1_mdr_insert( const microdrive_index_t which )
    */
   microdrives_restart();
 
-  TRACE_DATA(TRC_IMAGE_INIT, which);
+  trace_data(TRC_IMAGE_INIT, which);
 
   return 0;
 }
@@ -431,10 +430,13 @@ inline libspectrum_byte __time_critical_func(port_ctr_in)( void )
  */
 inline void __time_critical_func(port_ctr_out)( libspectrum_byte val )
 {
+  trace_data(TRC_PORT_CTR_OUT, val);
+
   /* Look for a falling edge on the CLK line */
   if( ((val & 0x02) == 0) && (if1_ula_comms_clk == 1) )
   {
     /* Falling edge of the clock on bit 0x02  ~~\__ */
+    trace_data(TRC_FALLING_EDGE, if1_ula_comms_clk);
 
     /*
      * A falling edge has arrived on the clock bit 0x02. There will
@@ -467,10 +469,22 @@ inline void __time_critical_func(port_ctr_out)( libspectrum_byte val )
       microdrive[m].motor_on = microdrive[m - 1].motor_on;
       any_motor_on |= microdrive[m].motor_on;
     }
-    microdrive[0].motor_on =(val & 0x01) ? 0 : 1;
+    microdrive[0].motor_on = (val & 0x01) ? 0 : 1;
     any_motor_on |= microdrive[0].motor_on;
 
-    gpio_put(LED_PIN, any_motor_on );
+    gpio_put( LED_PIN, any_motor_on );
+
+if( ! any_motor_on )
+  gpio_put( LED_PIN, 0 );
+
+    trace_data(TRC_MOTORS_ON, (microdrive[7].motor_on << 7) |
+	                      (microdrive[6].motor_on << 6) |
+	                      (microdrive[5].motor_on << 5) |
+	                      (microdrive[4].motor_on << 4) |
+                              (microdrive[3].motor_on << 3) |
+	                      (microdrive[2].motor_on << 2) |
+	                      (microdrive[1].motor_on << 1) |
+                              (microdrive[0].motor_on) );
   }
 
   /* Note the level of the CLK line so we can see what it's done next time */

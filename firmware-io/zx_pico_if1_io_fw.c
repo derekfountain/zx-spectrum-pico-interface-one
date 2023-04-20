@@ -167,10 +167,6 @@ const uint8_t  WAIT_GP                  = 27;
 // Ensure this is suitable for output on test board, 11 is the old A0 and isn't!
 //const uint8_t  TEST_OUTPUT_GP           = 11;
 
-/* Rudimentary trace table for whole program */
-TRACE_TYPE trace[256];
-uint8_t trace_index=0;     /* 8 bit index, auto-wraps */
-
 /*
  * The 8 address bus bits arrive on the GPIOs in a weird pattern which is
  * defined by the edge connector layout and the board design. See the
@@ -202,6 +198,43 @@ void preconvert_data( void )
   }
 }
 
+
+/* Rudimentary trace table for whole program */
+static const uint32_t trace_table_start_offset = 0x100000;
+static uint32_t trace_index=0;
+
+void trace_data( TRACE_CODE code, uint8_t data )
+{
+  TRACE_TYPE trace;
+  trace.i   =trace_index;
+  trace.code=code;
+  trace.data=data;
+
+  gpio_put( PICO_SPI_CSN_PIN, 0 );
+
+  uint32_t psram_offset = trace_table_start_offset + (sizeof(TRACE_TYPE)*trace_index);
+
+  uint8_t write_cmd[] = { PRAM_CMD_WRITE,
+			  psram_offset >> 16, psram_offset >> 8, psram_offset };
+
+  spi_write_blocking(PICO_SPI, write_cmd,        sizeof(write_cmd));
+  spi_write_blocking(PICO_SPI, (uint8_t*)&trace, sizeof(trace));
+
+  gpio_put( PICO_SPI_CSN_PIN, 1 );
+
+#define MAX_TRACE_ENTRIES 1048576
+  if( ++trace_index == MAX_TRACE_ENTRIES )
+    trace_index=0;
+
+  return;
+}
+
+void trace( TRACE_CODE code )
+{
+  trace_data( code, 0 );
+}
+
+
 /*
  * This PIO state machine is used to change the data bus level
  * shifter direction when either the ROM handling Pico says it
@@ -228,7 +261,7 @@ void __time_critical_func(core1_main)( void )
   /* All interrupts off in this core, the IO emulation won't work with interrupts enabled */
   irq_set_mask_enabled( 0xFFFFFFFF, 0 );  
 
-  TRACE(TRC_INTS_OFF);
+  trace(TRC_INTS_OFF);
 
   if( if1_init() == -1 )
   {
@@ -242,7 +275,7 @@ void __time_critical_func(core1_main)( void )
     }
   }
 
-  TRACE(TRC_IF1_INIT);
+  trace(TRC_IF1_INIT);
 
   /* Insert the test images into the Microdrives */
   if( (if1_mdr_insert( 0 ) != LIBSPECTRUM_ERROR_NONE) ||
@@ -263,7 +296,7 @@ void __time_critical_func(core1_main)( void )
     }
   }
 
-  TRACE(TRC_IMAGES_INIT);
+  trace(TRC_IMAGES_INIT);
 
   while( 1 )
   {
@@ -288,6 +321,7 @@ void __time_critical_func(core1_main)( void )
                                            ((raw_pattern & 0x40) >> 2);         /* xxxb xxxx */
 
       /* Write the byte out */
+//      trace_data(TRC_WRITE_E7_DATA, z80_written_byte);
       port_mdr_out( z80_written_byte );
 
       /* Done waiting */
@@ -295,8 +329,6 @@ void __time_critical_func(core1_main)( void )
 
       /* Wait for the IO request to complete */
       while( (gpio_get_all() & IORQ_BIT_MASK) == 0 );
-
-      TRACE_DATA(TRC_WRITE_E7_DATA, z80_written_byte);
     }
 
     else if( (gpios_state & IF1_IOPORT_ACCESS_BIT_MASK) == PORT_EF_WRITE )
@@ -317,6 +349,7 @@ void __time_critical_func(core1_main)( void )
                                        ((raw_pattern & 0x10) >> 1) |        /* xxxx bxxx */
 		                       ((raw_pattern & 0x20) << 1) |        /* xbxx xxxx */
 		                       ((raw_pattern & 0x40) >> 2);         /* xxxb xxxx */
+      trace_data(TRC_WRITE_EF_CONTROL, control_byte);
       port_ctr_out( control_byte );
 
       /* Done waiting */
@@ -324,8 +357,6 @@ void __time_critical_func(core1_main)( void )
 
       /* Wait for the IO request to complete */
       while( (gpio_get_all() & IORQ_BIT_MASK) == 0 );
-
-      TRACE_DATA(TRC_WRITE_EF_CONTROL, control_byte);
     }
 
     else if( (gpios_state & IF1_IOPORT_ACCESS_BIT_MASK) == PORT_E7_READ )
@@ -346,6 +377,8 @@ void __time_critical_func(core1_main)( void )
       register uint32_t md_data = preconverted_data[port_mdr_in()];
       gpio_put_masked( DBUS_MASK, md_data );
 
+//      trace_data(TRC_READ_E7_DATA, md_data);
+
       /* Done waiting */
       gpio_set_dir(WAIT_GP, GPIO_IN);
 
@@ -357,8 +390,6 @@ void __time_critical_func(core1_main)( void )
 	  
       /* Put level shifter direction back to ZX->Pico */
       pio_sm_put( pio, sm_mreq, 0 );
-
-      TRACE_DATA(TRC_READ_E7_DATA, md_data);
     }
 
     else if( (gpios_state & IF1_IOPORT_ACCESS_BIT_MASK) == PORT_EF_READ )
@@ -383,6 +414,8 @@ void __time_critical_func(core1_main)( void )
       register uint32_t md_status = preconverted_data[port_ctr_in()];
       gpio_put_masked( DBUS_MASK, md_status );
 
+//      trace_data(TRC_READ_EF_STATUS, md_status);
+
       /* Done waiting */
       gpio_set_dir(WAIT_GP, GPIO_IN);
 
@@ -395,7 +428,6 @@ void __time_critical_func(core1_main)( void )
       /* Put level shifter direction back to ZX->Pico */
       pio_sm_put( pio, sm_mreq, 0 );
 
-      TRACE_DATA(TRC_READ_EF_STATUS, md_status);
 
 #if 0
       strcpy( message, "PORT_EF_READ complete\n\n" );
@@ -409,67 +441,6 @@ void __time_critical_func(core1_main)( void )
 int __time_critical_func(main)( void )
 {
   bi_decl(bi_program_description("ZX Spectrum Pico IF1 board binary."));
-
-  TRACE(TRC_INIT);
-
-#if STDIO_ENABLED
-  stdio_init_all();
-  printf("ZX Spectrum Pico IF1 board binary."); fflush(stdout);
-#else  
-  /* All interrupts off */
-  irq_set_mask_enabled( 0xFFFFFFFF, 0 );  
-#endif  
-
-#ifdef OVERCLOCK
-  set_sys_clock_khz( OVERCLOCK, 1 );
-#endif
-
-  /* Build the preconverted data table */
-  preconvert_data();
-
-  TRACE(TRC_DATA_CONV);
-
-  /* Pull the buses to zeroes. Most of the address bus info comes from the ROM Pico */
-  gpio_init( IF1_PORT_SIGNAL_GP  ); gpio_set_dir( IF1_PORT_SIGNAL_GP,  GPIO_IN );
-  gpio_init( A3_GP  ); gpio_set_dir( A3_GP,  GPIO_IN );  gpio_pull_down( A3_GP  );
-
-  gpio_init( D0_GP  ); gpio_set_dir( D0_GP,  GPIO_IN );  gpio_pull_down( D0_GP  );
-  gpio_init( D1_GP  ); gpio_set_dir( D1_GP,  GPIO_IN );  gpio_pull_down( D1_GP  );
-  gpio_init( D2_GP  ); gpio_set_dir( D2_GP,  GPIO_IN );  gpio_pull_down( D2_GP  );
-  gpio_init( D3_GP  ); gpio_set_dir( D3_GP,  GPIO_IN );  gpio_pull_down( D3_GP  );
-  gpio_init( D4_GP  ); gpio_set_dir( D4_GP,  GPIO_IN );  gpio_pull_down( D4_GP  );
-  gpio_init( D5_GP  ); gpio_set_dir( D5_GP,  GPIO_IN );  gpio_pull_down( D5_GP  );
-  gpio_init( D6_GP  ); gpio_set_dir( D6_GP,  GPIO_IN );  gpio_pull_down( D6_GP  );
-  gpio_init( D7_GP  ); gpio_set_dir( D7_GP,  GPIO_IN );  gpio_pull_down( D7_GP  );
-
-  gpio_init( IORQ_GP ); gpio_set_dir( IORQ_GP, GPIO_IN );
-  gpio_pull_up( IORQ_GP );
-
-  gpio_init( RD_GP ); gpio_set_dir( RD_GP, GPIO_IN );
-  gpio_pull_up( RD_GP );
-
-  gpio_init( WR_GP ); gpio_set_dir( WR_GP, GPIO_IN );
-  gpio_pull_up( WR_GP );
-
-  /*
-   * Wait is an output from here to the Z80. Set as an input to sink the +5V
-   * that's on it when it's not being used.
-   */
-  gpio_init( WAIT_GP ); gpio_set_dir( WAIT_GP, GPIO_IN );
-
-  gpio_init(LED_PIN);
-  gpio_set_dir(LED_PIN, GPIO_OUT);
-
-  TRACE(TRC_GPIOS_INIT);
-
-  /* Use PIO to switch the level shifter's DIRection */
-  pio              = pio0;
-  sm_mreq          = pio_claim_unused_sm( pio, true );
-  uint offset_mreq = pio_add_program( pio, &mreq_dir_program );
-  mreq_dir_program_init( pio, sm_mreq, offset_mreq, ROM_READ_GP, DIR_OUTPUT_GP );
-  pio_sm_set_enabled(pio, sm_mreq, true);
-
-  TRACE(TRC_PIOS_INIT);
 
   /*
    * Enable SPI 0 at <n> MHz and connect to GPIOs. Second param is a baudrate, giving it
@@ -521,10 +492,69 @@ int __time_critical_func(main)( void )
     }
   }
 
+  trace(TRC_SPI_INIT);
+
+#if STDIO_ENABLED
+  stdio_init_all();
+  printf("ZX Spectrum Pico IF1 board binary."); fflush(stdout);
+#else  
+  /* All interrupts off */
+  irq_set_mask_enabled( 0xFFFFFFFF, 0 );  
+#endif  
+
+#ifdef OVERCLOCK
+  set_sys_clock_khz( OVERCLOCK, 1 );
+#endif
+
+  /* Build the preconverted data table */
+  preconvert_data();
+
+  trace(TRC_DATA_CONV);
+
+  /* Pull the buses to zeroes. Most of the address bus info comes from the ROM Pico */
+  gpio_init( IF1_PORT_SIGNAL_GP  ); gpio_set_dir( IF1_PORT_SIGNAL_GP,  GPIO_IN );
+  gpio_init( A3_GP  ); gpio_set_dir( A3_GP,  GPIO_IN );  gpio_pull_down( A3_GP  );
+
+  gpio_init( D0_GP  ); gpio_set_dir( D0_GP,  GPIO_IN );  gpio_pull_down( D0_GP  );
+  gpio_init( D1_GP  ); gpio_set_dir( D1_GP,  GPIO_IN );  gpio_pull_down( D1_GP  );
+  gpio_init( D2_GP  ); gpio_set_dir( D2_GP,  GPIO_IN );  gpio_pull_down( D2_GP  );
+  gpio_init( D3_GP  ); gpio_set_dir( D3_GP,  GPIO_IN );  gpio_pull_down( D3_GP  );
+  gpio_init( D4_GP  ); gpio_set_dir( D4_GP,  GPIO_IN );  gpio_pull_down( D4_GP  );
+  gpio_init( D5_GP  ); gpio_set_dir( D5_GP,  GPIO_IN );  gpio_pull_down( D5_GP  );
+  gpio_init( D6_GP  ); gpio_set_dir( D6_GP,  GPIO_IN );  gpio_pull_down( D6_GP  );
+  gpio_init( D7_GP  ); gpio_set_dir( D7_GP,  GPIO_IN );  gpio_pull_down( D7_GP  );
+
+  gpio_init( IORQ_GP ); gpio_set_dir( IORQ_GP, GPIO_IN );
+  gpio_pull_up( IORQ_GP );
+
+  gpio_init( RD_GP ); gpio_set_dir( RD_GP, GPIO_IN );
+  gpio_pull_up( RD_GP );
+
+  gpio_init( WR_GP ); gpio_set_dir( WR_GP, GPIO_IN );
+  gpio_pull_up( WR_GP );
+
+  /*
+   * Wait is an output from here to the Z80. Set as an input to sink the +5V
+   * that's on it when it's not being used.
+   */
+  gpio_init( WAIT_GP ); gpio_set_dir( WAIT_GP, GPIO_IN );
+
+  gpio_init(LED_PIN);
+  gpio_set_dir(LED_PIN, GPIO_OUT);
+
+  trace(TRC_GPIOS_INIT);
+
+  /* Use PIO to switch the level shifter's DIRection */
+  pio              = pio0;
+  sm_mreq          = pio_claim_unused_sm( pio, true );
+  uint offset_mreq = pio_add_program( pio, &mreq_dir_program );
+  mreq_dir_program_init( pio, sm_mreq, offset_mreq, ROM_READ_GP, DIR_OUTPUT_GP );
+  pio_sm_set_enabled(pio, sm_mreq, true);
+
+  trace(TRC_PIOS_INIT);
+
 //  gpio_init(TEST_OUTPUT_GP); gpio_set_dir(TEST_OUTPUT_GP, GPIO_OUT);
 //  gpio_put(TEST_OUTPUT_GP, 0);
-
-  TRACE(TRC_SPI_INIT);
 
 #if CORE1_IN_USE
   /*
@@ -536,13 +566,46 @@ int __time_critical_func(main)( void )
   /* Init complete, run 2nd core code */
   multicore_launch_core1( core1_main ); 
 
-  TRACE(TRC_CORE1_INIT);
+  trace(TRC_CORE1_INIT);
 #endif
 
   memset( message, 0, MESSAGE_LEN );
 
+  volatile int8_t dumping_trace = 0;
   while( 1 )
   {
+    sleep_ms(100);
+
+    if( dumping_trace )
+    {
+      const uint32_t NUM_PAGE_TRACE_ENTRIES = 2000;
+      TRACE_TYPE page[NUM_PAGE_TRACE_ENTRIES];
+      for( uint32_t page_index=0; page_index < ((sizeof(TRACE_TYPE)*trace_index)/NUM_PAGE_TRACE_ENTRIES)+1; page_index++ )
+      {
+	gpio_put( PICO_SPI_CSN_PIN, 0 );
+
+	uint32_t psram_offset = trace_table_start_offset + (sizeof(TRACE_TYPE)*(page_index*NUM_PAGE_TRACE_ENTRIES));
+
+	uint8_t read_cmd[] = { PRAM_CMD_READ,
+			       psram_offset >> 16, psram_offset >> 8, psram_offset };
+	spi_write_blocking(PICO_SPI, read_cmd, sizeof(read_cmd));
+
+	spi_read_blocking(PICO_SPI, 0, (uint8_t*)page, sizeof(TRACE_TYPE)*NUM_PAGE_TRACE_ENTRIES ); 
+      
+	/*
+	 * set dumping_trace=1
+	 *
+	 * (gdb) set print repeats 0
+	 * (gdb) set print elements unlimited
+	 * (gdb) set pagination off
+	 * (gdb) set max-value-size unlimited
+	 * (gdb) p page
+	 */
+
+	gpio_put( PICO_SPI_CSN_PIN, 1 );
+      }
+    }
+
 #if STDIO_ENABLED
     if( strchr( message, '\n' ) != NULL )
     {
