@@ -6,8 +6,8 @@
 
   (title_block
     (title "Pico Interface One")
-    (date "2023-04-15")
-    (rev "v1.3")
+    (date "2023-04-18")
+    (rev "v1.4WIP")
   )
 
   (lib_symbols

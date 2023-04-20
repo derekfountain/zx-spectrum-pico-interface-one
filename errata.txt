@@ -131,3 +131,8 @@ DIR_CHANGE from Pico2. I need to be able to see when Pico2 is changing the dbus 
 
 
 v1.3 Final is for fabrication as board #2
+
+
+v1.3
+====
+
