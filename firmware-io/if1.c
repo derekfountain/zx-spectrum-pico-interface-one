@@ -435,7 +435,7 @@ inline void __time_critical_func(port_ctr_out)( libspectrum_byte val )
   if( ((val & 0x02) == 0) && (if1_ula_comms_clk == 1) )
   {
     /* Falling edge of the clock on bit 0x02  ~~\__ */
-    trace(TRC_FALLING_EDGE, if1_ula_comms_clk);
+    // trace(TRC_FALLING_EDGE, if1_ula_comms_clk);
 
     /*
      * A falling edge has arrived on the clock bit 0x02. There will
@@ -473,6 +473,7 @@ inline void __time_critical_func(port_ctr_out)( libspectrum_byte val )
 
     gpio_put( LED_PIN, any_motor_on );
 
+#if 0
     trace(TRC_MOTORS_ON, (microdrive[7].motor_on << 7) |
 	                 (microdrive[6].motor_on << 6) |
 	                 (microdrive[5].motor_on << 5) |
@@ -481,6 +482,7 @@ inline void __time_critical_func(port_ctr_out)( libspectrum_byte val )
 	                 (microdrive[2].motor_on << 2) |
 	                 (microdrive[1].motor_on << 1) |
                          (microdrive[0].motor_on) );
+#endif
   }
 
   /* Note the level of the CLK line so we can see what it's done next time */
@@ -536,7 +538,18 @@ inline libspectrum_byte __time_critical_func(port_mdr_in)( void )
 			     psram_offset >> 16, psram_offset >> 8, psram_offset };
       spi_write_blocking(PICO_SPI, read_cmd, sizeof(read_cmd));
 
-      /* Read the byte at that address, that's the one the IF1 wants */
+      /*
+       * Read the byte at that address, that's the one the IF1 wants.
+       * This goes into the microdrive's "last" value. There's a corner case during
+       * FORMAT. The FORMAT code writes about 650 test bytes (0xFC), then reads
+       * them back. If it can't read them then it assumed it's at the tape splice
+       * point and marks the sector as unusable. But that 650 bytes is a weird
+       * number, it's outside the normal block range. The write code doesn't
+       * actually write it to tape beyond the normal block size, so here, where
+       * it's read back, it's not available to read from the tape. So under this
+       * odd circumstance we just return the last byte again in the "ret &=" line
+       * below (which is outside this max_bytes conditional block).
+       */
       spi_read_blocking(PICO_SPI, 0, (uint8_t*)&(microdrive[active_microdrive_index].last), 1 ); 
       
       gpio_put( PICO_SPI_CSN_PIN, 1 );

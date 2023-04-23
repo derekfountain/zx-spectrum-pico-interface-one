@@ -302,8 +302,8 @@ void __time_critical_func(core1_main)( void )
 
   trace(TRC_IMAGES_INIT, 0);
 
-  /* Turn tracing off, it get's turned back on by Z80 code */
-  trace_active=1;
+  /* Tracing off, I'll turn it back on if I get a bug where it's needed */
+  trace_active=0;
 
   while( 1 )
   {
@@ -357,7 +357,7 @@ void __time_critical_func(core1_main)( void )
                                        ((raw_pattern & 0x20) << 1) |        /* xbXx xxxx */
                                        ((raw_pattern & 0x40) >> 2);         /* xXxb xxxx */
     
-      trace(TRC_WRITE_EF_CONTROL, control_byte);
+      // trace(TRC_WRITE_EF_CONTROL, control_byte);
 
       /* Microdrive control, motor switch */
       port_ctr_out( control_byte );
@@ -387,7 +387,7 @@ void __time_critical_func(core1_main)( void )
       register uint32_t md_data = preconverted_data[port_mdr_in()];
       gpio_put_masked( DBUS_MASK, md_data );
 
-      trace(TRC_READ_E7_DATA, md_data);
+      // trace(TRC_READ_E7_DATA, md_data);
 
       /* Done waiting */
       gpio_set_dir(WAIT_GP, GPIO_IN);
@@ -424,7 +424,7 @@ void __time_critical_func(core1_main)( void )
       register uint32_t md_status = preconverted_data[port_ctr_in()];
       gpio_put_masked( DBUS_MASK, md_status );
 
-      trace(TRC_READ_EF_STATUS, md_status);
+      // trace(TRC_READ_EF_STATUS, md_status);
 
       /* Done waiting */
       gpio_set_dir(WAIT_GP, GPIO_IN);

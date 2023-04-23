@@ -45,8 +45,8 @@
 /* 1 instruction on the 150MHz microprocessor is 6.6ns */
 /* 1 instruction on the 200MHz microprocessor is 5.0ns */
 
-//#define OVERCLOCK 170000
-#define OVERCLOCK 270000
+#define OVERCLOCK 150000
+//#define OVERCLOCK 270000
 
 #include "roms.h"
 
@@ -373,14 +373,6 @@ void __time_critical_func(core1_main)( void )
   }
 }
 
-static int _1c05_visits = 0;
-static int _13e3_visits = 0;
-static int _1c0a_visits = 0;
-static int _1c16_visits = 0;
-static int _169d_visits = 0;
-static int _16a4_visits = 0;
-static int _16a5_visits = 0;
-static int _16ac_visits = 0;
 int main()
 {
   bi_decl(bi_program_description("ZX Spectrum Pico IF1 board binary."));
@@ -486,35 +478,6 @@ int main()
 
     register uint8_t rom_value = *(rom_image_ptr+rom_address);
 
-//if( (rom_image_ptr == __ROMs_if1_rom) && ((rom_address == 0x16AA) || (rom_address == 0x16AB)) )
-//{
-//  rom_value = 0;
-//}
-//if( (rom_image_ptr == __ROMs_if1_rom) && (rom_address == 0x1693) )
-//{
-// This fixes the format problem for all microdrives except #1
-//  rom_value = 1;   // 1 byte is max, 2 fails
-//}
-
-#if 0
-if( (rom_image_ptr == __ROMs_if1_rom) && (rom_address == 0x16B6) )
-{
-  rom_value = 0xF2;   // LD      A,$E2 ;    OUT     ($EF),A         ; enable writing
-}
-if( (rom_image_ptr == __ROMs_if1_rom) && (rom_address == 0x16D2) )
-{
-  rom_value = 0xF6;   // LD      A,$E6 ;    OUT     ($EF),A
-}
-if( (rom_image_ptr == __ROMs_if1_rom) && (rom_address == 0x1B7A) )
-{
-  rom_value = 0x0E; // 15 secotrs
-}
-if( (rom_image_ptr == __ROMs_if1_rom) && (rom_address == 0x1693) )
-{
-  rom_value = 0x1; // Read one more FC, not 10015 secotrs
-}
-#endif
-
     /*
      * This Pico is about to put a value on the data bus. The "ROM read" logic
      * hardware signal goes to Pico2 (the IO handling Pico) as well as this one.
@@ -544,19 +507,6 @@ if( (rom_image_ptr == __ROMs_if1_rom) && (rom_address == 0x1693) )
      */
     if( (gpios_state & M1_INPUT_BIT_MASK) == 0 )
     {
-      if( rom_image_ptr == __ROMs_if1_rom )
-      {
-#if 0
-	if( rom_address == 0x1c05 ) _1c05_visits++;
-	if( rom_address == 0x13e3 ) _13e3_visits++;
-	if( rom_address == 0x1c0a ) _1c0a_visits++;
-	if( rom_address == 0x1c16 ) _1c16_visits++;
-	if( rom_address == 0x169d ) _169d_visits++;
-	if( rom_address == 0x16a4 ) _16a4_visits++;
-	if( rom_address == 0x16a5 ) _16a5_visits++;
-	if( rom_address == 0x16ac ) _16ac_visits++;
-#endif
-      }
       if( (rom_address == 0x0008) || (rom_address == 0x1708) )
       {
 	gpio_put(LED_PIN, 1);
