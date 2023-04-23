@@ -45,8 +45,8 @@
 /* 1 instruction on the 150MHz microprocessor is 6.6ns */
 /* 1 instruction on the 200MHz microprocessor is 5.0ns */
 
-#define OVERCLOCK 170000
-//#define OVERCLOCK 270000
+//#define OVERCLOCK 170000
+#define OVERCLOCK 270000
 
 #include "roms.h"
 
@@ -495,6 +495,26 @@ int main()
 // This fixes the format problem for all microdrives except #1
 //  rom_value = 1;   // 1 byte is max, 2 fails
 //}
+
+#if 0
+if( (rom_image_ptr == __ROMs_if1_rom) && (rom_address == 0x16B6) )
+{
+  rom_value = 0xF2;   // LD      A,$E2 ;    OUT     ($EF),A         ; enable writing
+}
+if( (rom_image_ptr == __ROMs_if1_rom) && (rom_address == 0x16D2) )
+{
+  rom_value = 0xF6;   // LD      A,$E6 ;    OUT     ($EF),A
+}
+if( (rom_image_ptr == __ROMs_if1_rom) && (rom_address == 0x1B7A) )
+{
+  rom_value = 0x0E; // 15 secotrs
+}
+if( (rom_image_ptr == __ROMs_if1_rom) && (rom_address == 0x1693) )
+{
+  rom_value = 0x1; // Read one more FC, not 10015 secotrs
+}
+#endif
+
     /*
      * This Pico is about to put a value on the data bus. The "ROM read" logic
      * hardware signal goes to Pico2 (the IO handling Pico) as well as this one.
@@ -526,6 +546,7 @@ int main()
     {
       if( rom_image_ptr == __ROMs_if1_rom )
       {
+#if 0
 	if( rom_address == 0x1c05 ) _1c05_visits++;
 	if( rom_address == 0x13e3 ) _13e3_visits++;
 	if( rom_address == 0x1c0a ) _1c0a_visits++;
@@ -534,6 +555,7 @@ int main()
 	if( rom_address == 0x16a4 ) _16a4_visits++;
 	if( rom_address == 0x16a5 ) _16a5_visits++;
 	if( rom_address == 0x16ac ) _16ac_visits++;
+#endif
       }
       if( (rom_address == 0x0008) || (rom_address == 0x1708) )
       {

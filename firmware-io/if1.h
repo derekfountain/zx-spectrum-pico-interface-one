@@ -41,11 +41,15 @@ typedef struct utils_file {
  * (gdb) set print elements unlimited
  * (gdb) set pagination off
  * (gdb) set max-value-size unlimited
- * (gdb) p trace
+ * (gdb) p trace_table
  */
 typedef enum
 {
   TRC_NONE = 0,
+
+  TRC_TRC_ON,
+  TRC_TRC_OFF,
+
   TRC_SPI_INIT,
   TRC_DATA_CONV,
   TRC_GPIOS_INIT,
@@ -78,14 +82,11 @@ typedef struct _trace_type
 }
 TRACE_TYPE;
 
-#define NUM_TRACE_ENTRIES   19000
+#define NUM_TRACE_ENTRIES   30000
 
-extern TRACE_TYPE trace[];
-extern uint32_t   trace_index;
-#define TRACE(c)        {trace[trace_index].i=trace_index;trace[trace_index].code=c;trace[trace_index].data=0;  \
-                         if( trace_index++ == NUM_TRACE_ENTRIES ) trace_index=0;}
-#define TRACE_DATA(c,d) {trace[trace_index].i=trace_index;trace[trace_index].code=c;trace[trace_index].data=(d);\
-                         if( trace_index++ == NUM_TRACE_ENTRIES ) trace_index=0;}
+void trace( TRACE_CODE code, uint8_t data );
+void trace_on( uint8_t data );
+void trace_off( uint8_t data );
 
 /* This is used in the preamble */
 enum
