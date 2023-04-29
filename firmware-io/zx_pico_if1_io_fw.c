@@ -53,7 +53,7 @@
 /* 1 instruction on the 150MHz microprocessor is 6.6ns */
 /* 1 instruction on the 200MHz microprocessor is 5.0ns */
 
-#define OVERCLOCK 150000
+//#define OVERCLOCK 150000
 //#define OVERCLOCK 270000
 
 const uint8_t LED_PIN = PICO_DEFAULT_LED_PIN;
@@ -64,20 +64,20 @@ const uint8_t LED_PIN = PICO_DEFAULT_LED_PIN;
  * on the lower address lines. The extra bit is A3 which this Pico
  * still needs to be able to see to differentiate them
  */
-const uint8_t  IF1_PORT_SIGNAL_GP         = 13;
-const uint8_t  A3_GP                      = 14;
+const uint8_t  IF1_PORT_SIGNAL_GP         = 8;
+const uint8_t  A3_GP                      = 9;
 
 const uint32_t IF1_PORT_SIGNAL_BIT_MASK = ((uint32_t)1 <<  IF1_PORT_SIGNAL_GP);
 const uint32_t A3_BIT_MASK              = ((uint32_t)1 <<  A3_GP);
 
-const uint8_t  D0_GP          = 0;
-const uint8_t  D1_GP          = 1;
-const uint8_t  D2_GP          = 2;
-const uint8_t  D3_GP          = 4; 
-const uint8_t  D4_GP          = 6;
-const uint8_t  D5_GP          = 3;
-const uint8_t  D6_GP          = 5;
-const uint8_t  D7_GP          = 7;
+const uint8_t  D0_GP        = 0;
+const uint8_t  D1_GP        = 1;
+const uint8_t  D2_GP        = 2;
+const uint8_t  D3_GP        = 3; 
+const uint8_t  D4_GP        = 4;
+const uint8_t  D5_GP        = 5;
+const uint8_t  D6_GP        = 6;
+const uint8_t  D7_GP        = 7;
 
 const uint32_t D0_BIT_MASK  = ((uint32_t)1 <<  D0_GP);
 const uint32_t D1_BIT_MASK  = ((uint32_t)1 <<  D1_GP);
@@ -88,23 +88,23 @@ const uint32_t D5_BIT_MASK  = ((uint32_t)1 <<  D5_GP);
 const uint32_t D6_BIT_MASK  = ((uint32_t)1 <<  D6_GP);
 const uint32_t D7_BIT_MASK  = ((uint32_t)1 <<  D7_GP);
 
-const uint32_t DBUS_MASK     = ((uint32_t)1 << D0_GP) |
-                               ((uint32_t)1 << D1_GP) |
-                               ((uint32_t)1 << D2_GP) |
-                               ((uint32_t)1 << D3_GP) |
-                               ((uint32_t)1 << D4_GP) |
-                               ((uint32_t)1 << D5_GP) |
-                               ((uint32_t)1 << D6_GP) |
-                               ((uint32_t)1 << D7_GP);
+const uint32_t DBUS_MASK    = ((uint32_t)1 << D0_GP) |
+                              ((uint32_t)1 << D1_GP) |
+                              ((uint32_t)1 << D2_GP) |
+                              ((uint32_t)1 << D3_GP) |
+                              ((uint32_t)1 << D4_GP) |
+                              ((uint32_t)1 << D5_GP) |
+                              ((uint32_t)1 << D6_GP) |
+                              ((uint32_t)1 << D7_GP);
 
 /* Input from Z80 indicating an I/O request is happening */
-const uint8_t  IORQ_GP                  = 8;
+const uint8_t  IORQ_GP                  = 20;
 const uint32_t IORQ_BIT_MASK            = ((uint32_t)1 << IORQ_GP);
 
-const uint8_t  RD_GP                    = 9;
+const uint8_t  RD_GP                    = 21;
 const uint32_t RD_BIT_MASK              = ((uint32_t)1 << RD_GP);
 
-const uint8_t  WR_GP                    = 10;
+const uint8_t  WR_GP                    = 22;
 const uint32_t WR_BIT_MASK              = ((uint32_t)1 << WR_GP);
 
 /*
@@ -146,7 +146,7 @@ const uint32_t PORT_EF_WRITE = ((uint32_t)0 << IORQ_GP) |
  * This is configured as input from the PIO code which is where it's
  * used. It's not used in this C.
  */
-const uint8_t  ROM_READ_GP              = 15;
+const uint8_t  ROM_READ_GP              = 17;
 const uint32_t ROM_READ_BIT_MASK        = ((uint32_t)1 << ROM_READ_GP);
 
 /*
@@ -164,40 +164,7 @@ const uint8_t  DIR_OUTPUT_GP            = 28;
 const uint8_t  WAIT_GP                  = 27;
 
 /* Test pin */
-// Ensure this is suitable for output on test board, 11 is the old A0 and isn't!
-//const uint8_t  TEST_OUTPUT_GP           = 11;
-
-/*
- * The 8 address bus bits arrive on the GPIOs in a weird pattern which is
- * defined by the edge connector layout and the board design. See the
- * ROM code for the description of this.
- *
- * Here it's an 8 bit IO address, so a smaller table than in the ROM code.
- */
-uint16_t address_indirection_table[ 256 ];
-
-/*
- * Instead of shuffling the bits of an output value around at the point
- * they need to be sent back to the Z80, preconvert them and put them
- * in a table. The table is indexed 0-255, and each entry holds the
- * index value shuffled to match the GPIOs of the data bus.
- */
-uint8_t preconverted_data[256];
-void preconvert_data( void )
-{
-  uint16_t conv_index;
-  for( conv_index=0; conv_index < 256; conv_index++ )
-  {
-    /* Convert the number to the pattern the GPIOs show when that number is on them */
-    preconverted_data[conv_index] = 
-                                   (conv_index & 0x87)       |        /* bxxx xbbb */
-                                  ((conv_index & 0x08) << 1) |        /* xxxb xxxx */
-                                  ((conv_index & 0x10) << 2) |        /* xbxx xxxx */
-                                  ((conv_index & 0x20) >> 2) |        /* xxxx bxxx */
-                                  ((conv_index & 0x40) >> 1);         /* xxbx xxxx */
-  }
-}
-
+const uint8_t  TEST_OUTPUT_GP           = 10;
 
 /*
  * Rudimentary trace table for whole program
@@ -313,19 +280,12 @@ void __time_critical_func(core1_main)( void )
     {
       /* Z80 write (OUT instruction) to port 0xE7 (231), microdrive data */
 
-      /* Pick up the pattern of bits from the jumbled data bus GPIOs */
-      register uint32_t raw_pattern = (gpios_state & DBUS_MASK);
+      /* Pick up the pattern of bits from the data bus GPIOs */
+      register uint32_t z80_written_byte = (gpios_state & DBUS_MASK);
 
       /* Set Z80 waiting */
       gpio_set_dir(WAIT_GP, GPIO_OUT);
       gpio_put(WAIT_GP, 0);
-
-      /* Sort those bits out into the value which the Z80 originally wrote */
-      register uint32_t z80_written_byte =  (raw_pattern & 0x87)       |        /* bxxx xbbb */
-                                           ((raw_pattern & 0x08) << 2) |        /* xxbx Xxxx */
-                                           ((raw_pattern & 0x10) >> 1) |        /* xxxX bxxx */
-                                           ((raw_pattern & 0x20) << 1) |        /* xbXx xxxx */
-                                           ((raw_pattern & 0x40) >> 2);         /* xXxb xxxx */
 
       /* Write the byte out */
       // trace(TRC_WRITE_E7_DATA, z80_written_byte);
@@ -343,20 +303,13 @@ void __time_critical_func(core1_main)( void )
       /* Z80 write (OUT instruction) to port 0xEF (239), microdrive control */
       /* This turns on the motor */
 
-      /* Pick up the pattern of bits from the jumbled data bus GPIOs */
-      register uint32_t raw_pattern = (gpios_state & DBUS_MASK);
-
+      /* Pick up the pattern of bits from the data bus GPIOs */
+      register uint32_t control_byte = (gpios_state & DBUS_MASK);
+    
       /* Set Z80 waiting */
       gpio_set_dir(WAIT_GP, GPIO_OUT);
       gpio_put(WAIT_GP, 0);
 
-      /* Sort those bits out into the value which the Z80 originally wrote */
-      register uint32_t control_byte =  (raw_pattern & 0x87)       |        /* bxxx xbbb */
-                                       ((raw_pattern & 0x08) << 2) |        /* xxbx Xxxx */
-                                       ((raw_pattern & 0x10) >> 1) |        /* xxxX bxxx */
-                                       ((raw_pattern & 0x20) << 1) |        /* xbXx xxxx */
-                                       ((raw_pattern & 0x40) >> 2);         /* xXxb xxxx */
-    
       // trace(TRC_WRITE_EF_CONTROL, control_byte);
 
       /* Microdrive control, motor switch */
@@ -383,8 +336,8 @@ void __time_critical_func(core1_main)( void )
       /* Make data bus GPIOs outputs, pointed at the ZX */
       gpio_set_dir_out_masked( DBUS_MASK );
 
-      /* Port handling function returns the data */
-      register uint32_t md_data = preconverted_data[port_mdr_in()];
+      /* Port handling function returns the data from the microdrive */
+      register uint32_t md_data = port_mdr_in();
       gpio_put_masked( DBUS_MASK, md_data );
 
       // trace(TRC_READ_E7_DATA, md_data);
@@ -421,7 +374,7 @@ void __time_critical_func(core1_main)( void )
       gpio_set_dir_out_masked( DBUS_MASK );
 
       /* Port handling function returns the status */
-      register uint32_t md_status = preconverted_data[port_ctr_in()];
+      register uint32_t md_status = port_ctr_in();
       gpio_put_masked( DBUS_MASK, md_status );
 
       // trace(TRC_READ_EF_STATUS, md_status);
@@ -466,9 +419,6 @@ int __time_critical_func(main)( void )
 #ifdef OVERCLOCK
   set_sys_clock_khz( OVERCLOCK, 1 );
 #endif
-
-  /* Build the preconverted data table */
-  preconvert_data();
 
   trace(TRC_DATA_CONV,0 );
 
@@ -560,14 +510,14 @@ int __time_critical_func(main)( void )
       gpio_put(LED_PIN, 1);
       busy_wait_us_32(1000000);
       gpio_put(LED_PIN, 0);
-      busy_wait_us_32(500000);
+      busy_wait_us_32(100000);
     }
   }
 
   trace(TRC_SPI_INIT, 0);
 
-//  gpio_init(TEST_OUTPUT_GP); gpio_set_dir(TEST_OUTPUT_GP, GPIO_OUT);
-//  gpio_put(TEST_OUTPUT_GP, 0);
+  gpio_init(TEST_OUTPUT_GP); gpio_set_dir(TEST_OUTPUT_GP, GPIO_OUT);
+  gpio_put(TEST_OUTPUT_GP, 0);
 
 #if CORE1_IN_USE
   /*

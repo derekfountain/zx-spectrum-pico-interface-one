@@ -26,7 +26,7 @@
 #define PICO_SPI_RX_PIN        16
 #define PICO_SPI_TX_PIN        19
 #define PICO_SPI_SCK_PIN       18
-#define PICO_SPI_CSN_PIN       17
+#define PICO_SPI_CSN_PIN       26
 
 /* Commands for the memory chip I'm using */
 #define PRAM_CMD_WRITE         0x02

@@ -133,6 +133,21 @@ DIR_CHANGE from Pico2. I need to be able to see when Pico2 is changing the dbus 
 v1.3 Final is for fabrication as board #2
 
 
-v1.3
+v1.3 This version was made into board#2
 ====
+
+Stagger the rows of data bus resistors. Offset each from the ones either side of
+it so I can get the larger tweezers in. Or space them out a bit more.
+
+First attempt NOPOPed the extra level shifter and added a series 100R resistor
+into the ROM_READ signal. Need to confirm this worked. Its function is to protect
+the Pico's ADC GPIO which I'm putting 5V into. I can't really tell if it works
+unless and until the Pico fails, but I can at least confirm 100R is correct for
+timing.
+: It didn't work, the signal from the 3V3 side of the resistor was OK, but the
+  level was wrong. It went from 2.5V to about 1.5V. I didn't investigate, I
+  just took the R100 off and added the level shifter.
+:: Remove the resistor footprint and NOPOP silkscreen
+
+PSRAM footprint is missing the pin-1 dot on the silkscreen.
 

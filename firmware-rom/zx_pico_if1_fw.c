@@ -45,7 +45,7 @@
 /* 1 instruction on the 150MHz microprocessor is 6.6ns */
 /* 1 instruction on the 200MHz microprocessor is 5.0ns */
 
-#define OVERCLOCK 150000
+//#define OVERCLOCK 150000
 //#define OVERCLOCK 270000
 
 #include "roms.h"
@@ -56,65 +56,29 @@ const uint8_t LED_PIN = PICO_DEFAULT_LED_PIN;
  * These pin values are the GPxx ones in green background on the pinout diagram.
  * See schematic for how the signals are fed into the Pico's GPIOs
  */
-const uint8_t A0_GP          = 11;
-const uint8_t A1_GP          = 12;
-const uint8_t A2_GP          = 13;
-const uint8_t A3_GP          = 14;
-const uint8_t A4_GP          = 20;
-const uint8_t A5_GP          = 21;
-const uint8_t A6_GP          = 22;
-const uint8_t A7_GP          = 26;
-const uint8_t A8_GP          = 19;
-const uint8_t A9_GP          = 18;
-const uint8_t A10_GP         = 17;
-const uint8_t A11_GP         = 16;
-const uint8_t A12_GP         = 10;
-const uint8_t A13_GP         = 9;
+const uint8_t A0_GP          = 8;
+const uint8_t A1_GP          = 9;
+const uint8_t A2_GP          = 10;
+const uint8_t A3_GP          = 11;
+const uint8_t A4_GP          = 12;
+const uint8_t A5_GP          = 13;
+const uint8_t A6_GP          = 14;
+const uint8_t A7_GP          = 15;
+const uint8_t A8_GP          = 16;
+const uint8_t A9_GP          = 17;
+const uint8_t A10_GP         = 18;
+const uint8_t A11_GP         = 19;
+const uint8_t A12_GP         = 20;
+const uint8_t A13_GP         = 21;
 
-/*
- * Given the GPIOs with an address bus value on them, this packs the
- * 14 address bits down into the least significant 14 bits
- */
-inline uint16_t pack_address_gpios( uint32_t gpios )
-{
-  /*     Bits 0,1,2,3,4,5       Bits 6,7,8,9,10,11,12     Bit 13                   */
-  return ((gpios>>9) & 0x03F) | ((gpios>>10) & 0x1FC0) | ((gpios & 0x4000000) >> 13);
-}
-
-/*
- * Given value i, this calculates the pattern of the GPIOs if
- * value i were to appear on the Z80 address bus.
- */
-uint32_t create_gpios_for_address( uint32_t i )
-{
-  uint32_t gpio_pattern = 
-    ( ((i & 0x0001) >>  0) <<  A0_GP ) |
-    ( ((i & 0x0002) >>  1) <<  A1_GP ) |
-    ( ((i & 0x0004) >>  2) <<  A2_GP ) |
-    ( ((i & 0x0008) >>  3) <<  A3_GP ) |
-    ( ((i & 0x0010) >>  4) <<  A4_GP ) |
-    ( ((i & 0x0020) >>  5) <<  A5_GP ) |
-    ( ((i & 0x0040) >>  6) <<  A6_GP ) |
-    ( ((i & 0x0080) >>  7) <<  A7_GP ) |
-    ( ((i & 0x0100) >>  8) <<  A8_GP ) |
-    ( ((i & 0x0200) >>  9) <<  A9_GP ) |
-    ( ((i & 0x0400) >> 10) << A10_GP ) |
-    ( ((i & 0x0800) >> 11) << A11_GP ) |
-    ( ((i & 0x1000) >> 12) << A12_GP ) |
-    ( ((i & 0x2000) >> 13) << A13_GP );
-
-  return gpio_pattern;
-}
-
-
-const uint8_t  D0_GP          = 0;
-const uint8_t  D1_GP          = 1;
-const uint8_t  D2_GP          = 2;
-const uint8_t  D3_GP          = 4; 
-const uint8_t  D4_GP          = 6;
-const uint8_t  D5_GP          = 3;
-const uint8_t  D6_GP          = 5;
-const uint8_t  D7_GP          = 7;
+const uint8_t  D0_GP         = 0;
+const uint8_t  D1_GP         = 1;
+const uint8_t  D2_GP         = 2;
+const uint8_t  D3_GP         = 3; 
+const uint8_t  D4_GP         = 4;
+const uint8_t  D5_GP         = 5;
+const uint8_t  D6_GP         = 6;
+const uint8_t  D7_GP         = 7;
 
 const uint32_t  D0_BIT_MASK  = ((uint32_t)1 <<  D0_GP);
 const uint32_t  D1_BIT_MASK  = ((uint32_t)1 <<  D1_GP);
@@ -126,13 +90,17 @@ const uint32_t  D6_BIT_MASK  = ((uint32_t)1 <<  D6_GP);
 const uint32_t  D7_BIT_MASK  = ((uint32_t)1 <<  D7_GP);
 
 /* Input from the logic which merges A14, A15 and MREQ, goes active on a ROM read */
-const uint8_t  ROM_READ_GP              = 8;
+const uint8_t  ROM_READ_GP              = 26;
 const uint32_t ROM_READ_BIT_MASK        = ((uint32_t)1 << ROM_READ_GP);
 
 /* Z80's M1 signal, needs to be merged into the IF1 paging logic */
-const uint8_t  M1_GP                    = 15;
+const uint8_t  M1_GP                    = 22;
 const uint32_t M1_INPUT_BIT_MASK        = ((uint32_t)1 << M1_GP);
 
+/*
+ * Output signal, goes to Pico2 (IO Pico) to tell it that one of the
+ * IO ports it's interested in is on the address bus
+ */
 const uint8_t  IF1_PORT_ACTIVE_OUTPUT_GP = 27;
 
 /* This pin triggers a transistor which shorts the Z80's /RESET to ground */
@@ -147,97 +115,7 @@ const uint32_t DBUS_MASK     = ((uint32_t)1 << D0_GP) |
                                ((uint32_t)1 << D6_GP) |
                                ((uint32_t)1 << D7_GP);
 
-/*
- * The 14 address bus bits arrive on the GPIOs in a weird pattern which is
- * defined by the edge connector layout and the board design. Shifting all
- * 14 bits into place works, but it's slow, it needs all 14 masks and shifts
- * done each byte read from ROM. The Pico needs a significant overclock to
- * manage that.
- *
- * This is an optimisation. Take the 14 address bus bits, which are scattered
- * in the 32bit GPIO value, and shift them down into the lowest 14 bits of
- * a 16 bit word. They're not in order A0 to A13, they're in some weird order.
- * So this is a conversion table. The index into this is the weird 14 bit
- * value, the value at that offset into this table is the actual address bus
- * value the weird value represents.
- *
- * e.g. you might read the GPIOs, shuffle the 14 bits down and end with,
- * say, 0x032A. Look up entry 0x032A in this table and find, say, 0x0001.
- * That means when 0x32A appears on the mixed up address bus, the actual
- * address bus value the Z80 has passed in is 0x0001. It wants that byte
- * from the ROM.
- *
- * This table is filled in at the start; a lookup is done here for each
- * ROM byte read.
- */
-uint16_t address_indirection_table[ 16384 ];
-
-
-/*
- * The bits of the bytes in the ROM need shuffling around to match the
- * ordering of the D0-D7 bits on the output GPIOs. See the schematic.
- * Do this now so the pre-converted bytes can be put straight onto
- * the GPIOs at runtime.
- */
-void preconvert_rom( uint8_t *image_ptr, uint32_t length )
-{
-  uint16_t conv_index;
-  for( conv_index=0; conv_index < length; conv_index++ )
-  {
-    uint8_t rom_byte = *(image_ptr+conv_index);
-    *(image_ptr+conv_index) =  (rom_byte & 0x87)       |        /* bxxx xbbb */
-                              ((rom_byte & 0x08) << 1) |        /* xxxb xxxx */
-                              ((rom_byte & 0x10) << 2) |        /* xbxx xxxx */
-                              ((rom_byte & 0x20) >> 2) |        /* xxxx bxxx */
-                              ((rom_byte & 0x40) >> 1);         /* xxbx xxxx */
-  }
-}
-
-void preconvert_rom_image( uint8_t rom_index )
-{
-  preconvert_rom( cycle_roms[rom_index].rom_data, cycle_roms[rom_index].rom_size ); 
-}
-
-/*
- * Loop over all the ROM images in the header file and convert their bit
- * patterns to match the order of bits of the data bus. It's quicker to
- * preconvert these at the start than to fiddle the bits each read cycle.
- */
-void preconvert_roms( void )
-{
-  uint8_t rom_index;
-  for( rom_index = 0; rom_index < num_cycle_roms; rom_index++ )
-  {
-    preconvert_rom_image( rom_index );
-  }  
-}
-
-/*
- * Populate the address bus indirection table.
- */
-void create_indirection_table( void )
-{
-  uint32_t i;
-
-  /*
-   * Loop over all 16384 address the Z80 might ask for. For each one calculate
-   * the pattern of the GPIOs when that value is on the address bus. Then pack
-   * that pattern down into the lowest 14 bits. That's the value which is
-   * found for each read byte, so the value at that offset into the table is
-   * the original value which will match what the Z80's after.
-   */
-  for( i=0; i<16384; i++ )
-  {
-    uint32_t raw_bit_pattern = create_gpios_for_address( i );
-
-    uint32_t packed_bit_pattern = pack_address_gpios( raw_bit_pattern );
-
-    address_indirection_table[packed_bit_pattern] = i;
-  }
-
-  return;
-}
-
+/* Start with the 1982 Sinclair Research ROM */
 uint8_t *rom_image_ptr = __ROMs_48_original_rom;
 
 /*
@@ -265,31 +143,9 @@ int64_t start_z80_alarm_func( alarm_id_t id, void *user_data )
   return 0;
 }
 
-/* Crank up the overclock to 270MHz if this is turned on */
+/* You'll need to crank up the overclock to 270MHz if this is turned on */
 #define RECORDING 0
 #if RECORDING
-
-uint8_t unconverted_byte[ 256 ];
-
-/*
- * ROM bytes are stored converted into data bus GPIO order. To log
- * the byte being returned I need to convert it back to the value
- * in the ROM. This is fast path for the ROM emulation so it needs
- * to be quick. So store this table of pre-unconverted 8 bit bytes.
- */
-void create_unconvert_table( void )
-{
-  uint32_t i;
-  
-  for( i=0; i<256; i++ )
-  {
-    unconverted_byte[i] = (i & 0x87)       |        /* bxxx xbbb */
-                         ((i & 0x08) << 2) |        /* xxbx xxxx */
-                         ((i & 0x10) >> 1) |        /* xxxx bxxx */
-                         ((i & 0x20) << 1) |        /* xbxx xxxx */
-                         ((i & 0x40) >> 2);         /* xxxb xxxx */
-  }
-}
 
 typedef struct _recorder
 {
@@ -316,6 +172,14 @@ RECORDER address_recorder[ RECORDER_SIZE ];
 
 #endif
 
+
+/*
+ * Second core code, spins, watching the address bus. If one of the port values
+ * which the IF1 is interested in appears on the lower address lines, set the
+ * flag GPIO which tells the IO Pico it needs to pay attention.
+ *
+ * This can probably be moved to PIO if I need the core.
+ */
 void __time_critical_func(core1_main)( void )
 {
   const uint32_t ABUS_MASK     =
@@ -359,7 +223,6 @@ void __time_critical_func(core1_main)( void )
       continue;
     }
 
-
     if( (gpios_state & ABUS_MASK) == IF1_PORT )
     {
       /* It's one of ours, signal to the other Pico */
@@ -392,12 +255,6 @@ int main()
   /* All interrupts off except the timers */
   irq_set_mask_enabled( 0xFFFFFFFF, 0 );
   irq_set_mask_enabled( 0x0000000F, 1 );
-
-  /* Create address indirection table, this is the address bus optimisation  */
-  create_indirection_table();
-
-  /* Switch the bits in the ROM bytes around, this is the data bus optimisation */
-  preconvert_roms();
 
 #if RECORDING
   create_unconvert_table();
@@ -472,9 +329,11 @@ int main()
      */
     while( (gpios_state=gpio_get_all()) & ROM_READ_BIT_MASK );
 
-    register uint16_t raw_bit_pattern = pack_address_gpios( gpios_state );
-
-    register uint16_t rom_address = address_indirection_table[raw_bit_pattern];
+    /*
+     * Assume the address bus GPIOs are in sequence, so just shift
+     * down and mask everything except the lowest 14 bits
+     */
+    register uint16_t rom_address = (gpios_state>>A0_GP) & 0x3FFF;
 
     register uint8_t rom_value = *(rom_image_ptr+rom_address);
 
