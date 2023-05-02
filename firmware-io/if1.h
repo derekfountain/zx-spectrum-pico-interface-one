@@ -82,7 +82,7 @@ typedef struct _trace_type
 }
 TRACE_TYPE;
 
-#define NUM_TRACE_ENTRIES   1000
+#define NUM_TRACE_ENTRIES   100
 
 void trace( TRACE_CODE code, uint8_t data );
 void trace_on( uint8_t data );

@@ -55,17 +55,14 @@ typedef enum libspectrum_error {
 } libspectrum_error;
 
 
-/* Pico doesn't have enough RAM to hold a 254 block cartridge image. */
-/* #define LIBSPECTRUM_MICRODRIVE_BLOCK_MAX 254 */
-
-#define LIBSPECTRUM_MICRODRIVE_BLOCK_MAX 180
+#define LIBSPECTRUM_MICRODRIVE_BLOCK_MAX 254
 #define LIBSPECTRUM_MICRODRIVE_HEAD_LEN 15
 #define LIBSPECTRUM_MICRODRIVE_DATA_LEN 512
 #define LIBSPECTRUM_MICRODRIVE_BLOCK_LEN ( LIBSPECTRUM_MICRODRIVE_HEAD_LEN + \
                                            LIBSPECTRUM_MICRODRIVE_HEAD_LEN +  \
                                            LIBSPECTRUM_MICRODRIVE_DATA_LEN + 1 )   /* 543 */
 #define LIBSPECTRUM_MICRODRIVE_CARTRIDGE_LENGTH \
-        ( LIBSPECTRUM_MICRODRIVE_BLOCK_MAX * LIBSPECTRUM_MICRODRIVE_BLOCK_LEN )    /* 97740 for 180 block cartridge */
+        ( LIBSPECTRUM_MICRODRIVE_BLOCK_MAX * LIBSPECTRUM_MICRODRIVE_BLOCK_LEN )    /* 97740 for 180 block cartridge 137922 for 254 blocks */
 
 
 #endif

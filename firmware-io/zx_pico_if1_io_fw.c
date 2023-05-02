@@ -53,7 +53,7 @@
 /* 1 instruction on the 150MHz microprocessor is 6.6ns */
 /* 1 instruction on the 200MHz microprocessor is 5.0ns */
 
-//#define OVERCLOCK 150000
+#define OVERCLOCK 150000
 //#define OVERCLOCK 270000
 
 const uint8_t LED_PIN = PICO_DEFAULT_LED_PIN;
