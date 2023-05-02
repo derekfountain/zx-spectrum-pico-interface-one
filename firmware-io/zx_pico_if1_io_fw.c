@@ -215,18 +215,10 @@ void trace_off( uint8_t data )
 PIO pio;
 uint sm_mreq;
 
+
 /*
- * The software doesn't work with interrupts on. stdio doesn't work
- * with interrupts off. This is only of occasional use.
+ * I/O port handling runs in the second core.
  */
-#define STDIO_ENABLED 0
-
-#define CORE1_IN_USE 1
-#if CORE1_IN_USE
-
-#define MESSAGE_LEN   32
-uint8_t message[MESSAGE_LEN];
-
 void __time_critical_func(core1_main)( void )
 {
   /* All interrupts off in this core, the IO emulation won't work with interrupts enabled */
@@ -287,8 +279,9 @@ void __time_critical_func(core1_main)( void )
       gpio_set_dir(WAIT_GP, GPIO_OUT);
       gpio_put(WAIT_GP, 0);
 
-      /* Write the byte out */
       // trace(TRC_WRITE_E7_DATA, z80_written_byte);
+
+      /* Write the byte out */
       port_mdr_out( z80_written_byte );
 
       /* Done waiting */
@@ -363,10 +356,6 @@ void __time_critical_func(core1_main)( void )
       gpio_set_dir(WAIT_GP, GPIO_OUT);
       gpio_put(WAIT_GP, 0);
 
-#if 0
-      strcpy( message, "PORT_EF_READ running\n" );
-#endif
-
       /* Direction needs to be Pico->ZX */
       pio_sm_put( pio, sm_mreq, 1 );
 
@@ -390,15 +379,9 @@ void __time_critical_func(core1_main)( void )
 	  
       /* Put level shifter direction back to ZX->Pico */
       pio_sm_put( pio, sm_mreq, 0 );
-
-
-#if 0
-      strcpy( message, "PORT_EF_READ complete\n\n" );
-#endif
     }
   } 
 }
-#endif
 
 
 int __time_critical_func(main)( void )
@@ -408,13 +391,8 @@ int __time_critical_func(main)( void )
   /* Clean out the trace table */
   memset( trace_table, 0, sizeof(trace_table) );
 
-#if STDIO_ENABLED
-  stdio_init_all();
-  printf("ZX Spectrum Pico IF1 board binary."); fflush(stdout);
-#else  
   /* All interrupts off */
   irq_set_mask_enabled( 0xFFFFFFFF, 0 );  
-#endif  
 
 #ifdef OVERCLOCK
   set_sys_clock_khz( OVERCLOCK, 1 );
@@ -519,7 +497,6 @@ int __time_critical_func(main)( void )
   gpio_init(TEST_OUTPUT_GP); gpio_set_dir(TEST_OUTPUT_GP, GPIO_OUT);
   gpio_put(TEST_OUTPUT_GP, 0);
 
-#if CORE1_IN_USE
   /*
    * For some reason the second core code doesn't get started after SWD programming
    * unless I pause for a moment here
@@ -530,24 +507,11 @@ int __time_critical_func(main)( void )
   multicore_launch_core1( core1_main ); 
 
   trace(TRC_CORE1_INIT, 0);
-#endif
-
-  memset( message, 0, MESSAGE_LEN );
 
   while( 1 )
   {
     sleep_ms(100);
 
-#if STDIO_ENABLED
-    if( strchr( message, '\n' ) != NULL )
-    {
-      busy_wait_us_32(1000000);
-
-      printf(message); fflush(stdout);
-      while(1);
-      memset( message, 0, MESSAGE_LEN );
-    }
-#endif
   } /* Infinite loop */
 
 }
