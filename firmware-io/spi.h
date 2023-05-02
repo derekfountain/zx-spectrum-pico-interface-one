@@ -21,19 +21,36 @@
 #define __SPI_H
 
 /* Pseudo SRAM is on SPI0 */
-#define PICO_SPI               spi0
+#define PSRAM_SPI               spi0
 
-#define PICO_SPI_RX_PIN        16
-#define PICO_SPI_TX_PIN        19
-#define PICO_SPI_SCK_PIN       18
-#define PICO_SPI_CSN_PIN       26
+#define PSRAM_SPI_RX_PIN        16
+#define PSRAM_SPI_TX_PIN        19
+#define PSRAM_SPI_SCK_PIN       18
+#define PSRAM_SPI_CSN_PIN       26
 
 /* Commands for the memory chip I'm using */
-#define PRAM_CMD_WRITE         0x02
-#define PRAM_CMD_READ          0x03
-#define PRAM_CMD_FAST_READ     0x0B
-#define PRAM_CMD_RESET_ENABLE  0x66
-#define PRAM_CMD_RESET         0x99
-#define PRAM_CMD_READ_ID       0x9F
+#define PSRAM_CMD_WRITE         0x02
+#define PSRAM_CMD_READ          0x03
+#define PSRAM_CMD_FAST_READ     0x0B
+#define PSRAM_CMD_RESET_ENABLE  0x66
+#define PSRAM_CMD_RESET         0x99
+#define PSRAM_CMD_READ_ID       0x9F
+
+
+/* UI Pico is master to UI Pico on SPI1 */
+#define UI_TO_IO_SPI           spi1
+
+#define UI_TO_IO_SPI_RX_PIN    12
+#define UI_TO_IO_SPI_TX_PIN    15
+#define UI_TO_IO_SPI_SCK_PIN   14
+#define UI_TO_IO_SPI_CSN_PIN   13
+
+/* IO Pico is slave to UI Pico on SPI1 */
+#define IO_FROM_UI_SPI          spi1
+
+#define IO_FROM_UI_SPI_RX_PIN   12
+#define IO_FROM_UI_SPI_TX_PIN   15
+#define IO_FROM_UI_SPI_SCK_PIN  14
+#define IO_FROM_UI_SPI_CSN_PIN  13
 
 #endif

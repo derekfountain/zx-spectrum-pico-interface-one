@@ -41,6 +41,8 @@
 #include "hardware/timer.h"
 #include "hardware/spi.h"
 
+#include "spi.h"
+
 /* 1 instruction on the 133MHz microprocessor is 7.5ns */
 /* 1 instruction on the 140MHz microprocessor is 7.1ns */
 /* 1 instruction on the 150MHz microprocessor is 6.6ns */
@@ -60,16 +62,38 @@ int main( void )
   set_sys_clock_khz( OVERCLOCK, 1 );
 #endif
 
+  spi_init(UI_TO_IO_SPI, 1 * 1000 * 1000);
+  gpio_set_function(UI_TO_IO_SPI_RX_PIN, GPIO_FUNC_SPI);
+  gpio_set_function(UI_TO_IO_SPI_SCK_PIN, GPIO_FUNC_SPI);
+  gpio_set_function(UI_TO_IO_SPI_TX_PIN, GPIO_FUNC_SPI);
+
+  /* Output for chip select on slave, starts high (unselected) */
+  gpio_init(UI_TO_IO_SPI_CSN_PIN);
+  gpio_set_dir(UI_TO_IO_SPI_CSN_PIN, GPIO_OUT);
+  gpio_put(UI_TO_IO_SPI_CSN_PIN, 1);
+
   gpio_init(LED_PIN); gpio_set_dir(LED_PIN, GPIO_OUT);
   gpio_put( LED_PIN, 0 );
 
   while( 1 )
   {
-    sleep_ms(1000);
-    gpio_put( LED_PIN, 1 );
+    gpio_put( UI_TO_IO_SPI_CSN_PIN, 0 );
+    uint8_t write_cmd[] = { 1 };
+    spi_write_blocking(UI_TO_IO_SPI, write_cmd, 1);
+    gpio_put( UI_TO_IO_SPI_CSN_PIN, 1 );
 
-    sleep_ms(500);
+    gpio_put( LED_PIN, 1 );
+    sleep_ms(250);
+
+
+
+    gpio_put( UI_TO_IO_SPI_CSN_PIN, 0 );
+    write_cmd[0] = 0;
+    spi_write_blocking(UI_TO_IO_SPI, write_cmd, 1);
+    gpio_put( UI_TO_IO_SPI_CSN_PIN, 1 );
+
     gpio_put( LED_PIN, 0 );
+    sleep_ms(250);
 
   } /* Infinite loop */
 

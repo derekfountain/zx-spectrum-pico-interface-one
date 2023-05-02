@@ -447,39 +447,39 @@ int __time_critical_func(main)( void )
    * a frequency like this seems rather silly. You get what the hardware can give you.
    * Might as well ask for the theoretical maximum though.
    */
-  spi_init(PICO_SPI, 62 * 1000 * 1000);
-  gpio_set_function(PICO_SPI_RX_PIN, GPIO_FUNC_SPI);
-  gpio_set_function(PICO_SPI_SCK_PIN, GPIO_FUNC_SPI);
-  gpio_set_function(PICO_SPI_TX_PIN, GPIO_FUNC_SPI);
+  spi_init(PSRAM_SPI, 62 * 1000 * 1000);
+  gpio_set_function(PSRAM_SPI_RX_PIN, GPIO_FUNC_SPI);
+  gpio_set_function(PSRAM_SPI_SCK_PIN, GPIO_FUNC_SPI);
+  gpio_set_function(PSRAM_SPI_TX_PIN, GPIO_FUNC_SPI);
 
   /* Output for chip select on slave, starts high (unselected) */
-  gpio_init(PICO_SPI_CSN_PIN);
-  gpio_set_dir(PICO_SPI_CSN_PIN, GPIO_OUT);
-  gpio_put(PICO_SPI_CSN_PIN, 1);
+  gpio_init(PSRAM_SPI_CSN_PIN);
+  gpio_set_dir(PSRAM_SPI_CSN_PIN, GPIO_OUT);
+  gpio_put(PSRAM_SPI_CSN_PIN, 1);
 
   /* Datasheet says 150uS between power up and the reset command */
   busy_wait_us_32(200);
 
   /* All examples I've seen don't bother with this reset, might be optional */
-  uint8_t reset_cmd[] = { PRAM_CMD_RESET_ENABLE, 
-			  PRAM_CMD_RESET };
-  gpio_put(PICO_SPI_CSN_PIN, 0); 
-  spi_write_blocking(PICO_SPI, reset_cmd, 2);
-  gpio_put(PICO_SPI_CSN_PIN, 1);   
+  uint8_t reset_cmd[] = { PSRAM_CMD_RESET_ENABLE, 
+			  PSRAM_CMD_RESET };
+  gpio_put(PSRAM_SPI_CSN_PIN, 0); 
+  spi_write_blocking(PSRAM_SPI, reset_cmd, 2);
+  gpio_put(PSRAM_SPI_CSN_PIN, 1);   
 
   /* Test SPI RAM is present */
-  gpio_put(PICO_SPI_CSN_PIN, 0);
+  gpio_put(PSRAM_SPI_CSN_PIN, 0);
 
   /* Read ID, on the chip I'm using takes 0x9F as the command followed by 3 "don't care"s */
-  uint8_t read_cmd[] = { PRAM_CMD_READ_ID,
+  uint8_t read_cmd[] = { PSRAM_CMD_READ_ID,
 			 0, 0, 0 };
-  spi_write_blocking(PICO_SPI, read_cmd, sizeof(read_cmd)); 
+  spi_write_blocking(PSRAM_SPI, read_cmd, sizeof(read_cmd)); 
 			
   /* Chip I'm using returns 0x0D, 0x5D according to the datasheet */
   uint8_t id1, id2;
-  spi_read_blocking(PICO_SPI, 0, &id1, 1 ); 
-  spi_read_blocking(PICO_SPI, 0, &id2, 1 ); 
-  gpio_put(PICO_SPI_CSN_PIN, 1);
+  spi_read_blocking(PSRAM_SPI, 0, &id1, 1 ); 
+  spi_read_blocking(PSRAM_SPI, 0, &id2, 1 ); 
+  gpio_put(PSRAM_SPI_CSN_PIN, 1);
 
   if( (id1 != 0x0D) || (id2 != 0x5D) )
   {
@@ -493,6 +493,14 @@ int __time_critical_func(main)( void )
   }
 
   trace(TRC_SPI_INIT, 0);
+
+  /* Enable SPI1 as slave from the UI Pico */
+  spi_init(IO_FROM_UI_SPI, 1 * 1000 * 1000);
+  spi_set_slave(IO_FROM_UI_SPI, true);
+  gpio_set_function(IO_FROM_UI_SPI_RX_PIN, GPIO_FUNC_SPI);
+  gpio_set_function(IO_FROM_UI_SPI_SCK_PIN, GPIO_FUNC_SPI);
+  gpio_set_function(IO_FROM_UI_SPI_TX_PIN, GPIO_FUNC_SPI);
+  gpio_set_function(IO_FROM_UI_SPI_CSN_PIN, GPIO_FUNC_SPI);
 
   gpio_init(TEST_OUTPUT_GP); gpio_set_dir(TEST_OUTPUT_GP, GPIO_OUT);
   gpio_put(TEST_OUTPUT_GP, 0);
@@ -510,7 +518,18 @@ int __time_critical_func(main)( void )
 
   while( 1 )
   {
-    sleep_ms(100);
+    if( spi_is_readable( IO_FROM_UI_SPI ) )
+    {
+      uint8_t in_buf[1];
+
+      // Write the output buffer to MOSI, and at the same time read from MISO.
+      spi_read_blocking( IO_FROM_UI_SPI, 0, in_buf, 1 );
+
+      if( in_buf[0] == 0 )
+	gpio_put(LED_PIN, 0);
+      else
+	gpio_put(LED_PIN, 1);
+    }
 
   } /* Infinite loop */
 

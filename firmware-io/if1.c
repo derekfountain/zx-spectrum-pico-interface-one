@@ -189,7 +189,7 @@ static int32_t load_flash_tape_image( flash_mdr_image_index_t which )
   dma_channel_unclaim( chan );
 
   /* OK, cartridge data is DMA'ed from flash in onboard RAM, step 2 is to copy from RAM into PSRAM */
-  gpio_put( PICO_SPI_CSN_PIN, 0 );
+  gpio_put( PSRAM_SPI_CSN_PIN, 0 );
 
   /*
    * Write cartridge data bytes into SPI PSRAM. Don't worry about exact size, there's
@@ -198,13 +198,13 @@ static int32_t load_flash_tape_image( flash_mdr_image_index_t which )
    */
   uint32_t psram_offset = which * LIBSPECTRUM_MICRODRIVE_CARTRIDGE_LENGTH;
 
-  uint8_t write_cmd[] = { PRAM_CMD_WRITE,
+  uint8_t write_cmd[] = { PSRAM_CMD_WRITE,
 			  psram_offset >> 16, psram_offset >> 8 , psram_offset
 			};
-  spi_write_blocking(PICO_SPI, write_cmd, sizeof(write_cmd));
-  spi_write_blocking(PICO_SPI, cartridge_data, LIBSPECTRUM_MICRODRIVE_CARTRIDGE_LENGTH);
+  spi_write_blocking(PSRAM_SPI, write_cmd, sizeof(write_cmd));
+  spi_write_blocking(PSRAM_SPI, cartridge_data, LIBSPECTRUM_MICRODRIVE_CARTRIDGE_LENGTH);
 
-  gpio_put( PICO_SPI_CSN_PIN, 1 );
+  gpio_put( PSRAM_SPI_CSN_PIN, 1 );
 
   /* Note where the cartridge image data has been put in the PSRAM */
   microdrive[which].cartridge_data_psram_offset = psram_offset;
@@ -527,16 +527,16 @@ inline libspectrum_byte __time_critical_func(port_mdr_in)( void )
     {
       /* Fetch the required byte from the PSRAM device on the SPI bus */
 
-      gpio_put( PICO_SPI_CSN_PIN, 0 );
+      gpio_put( PSRAM_SPI_CSN_PIN, 0 );
 
       /* Work out where the byte under the active microdrive's head is stored in the PSRAM */
       uint32_t psram_offset = microdrive[active_microdrive_index].cartridge_data_psram_offset
 	                      +
 	                      microdrive[active_microdrive_index].head_pos;
 
-      uint8_t read_cmd[] = { PRAM_CMD_READ,
+      uint8_t read_cmd[] = { PSRAM_CMD_READ,
 			     psram_offset >> 16, psram_offset >> 8, psram_offset };
-      spi_write_blocking(PICO_SPI, read_cmd, sizeof(read_cmd));
+      spi_write_blocking(PSRAM_SPI, read_cmd, sizeof(read_cmd));
 
       /*
        * Read the byte at that address, that's the one the IF1 wants.
@@ -550,9 +550,9 @@ inline libspectrum_byte __time_critical_func(port_mdr_in)( void )
        * odd circumstance we just return the last byte again in the "ret &=" line
        * below (which is outside this max_bytes conditional block).
        */
-      spi_read_blocking(PICO_SPI, 0, (uint8_t*)&(microdrive[active_microdrive_index].last), 1 ); 
+      spi_read_blocking(PSRAM_SPI, 0, (uint8_t*)&(microdrive[active_microdrive_index].last), 1 ); 
       
-      gpio_put( PICO_SPI_CSN_PIN, 1 );
+      gpio_put( PSRAM_SPI_CSN_PIN, 1 );
 
       /* Move tape on, with wrap */
       increment_head(active_microdrive_index);
@@ -643,20 +643,20 @@ inline void __time_critical_func(port_mdr_out)( libspectrum_byte val )
     {
       /* OK, write the byte to "tape" which is really the PSRAM on the SPI bus */
       
-      gpio_put( PICO_SPI_CSN_PIN, 0 );
+      gpio_put( PSRAM_SPI_CSN_PIN, 0 );
 
       /* Work out where the byte under the active microdrive's head is stored in the PSRAM */
       uint32_t psram_offset = microdrive[active_microdrive_index].cartridge_data_psram_offset
 	                      +
 	                      microdrive[active_microdrive_index].head_pos;
-      uint8_t write_cmd[] = { PRAM_CMD_WRITE,
+      uint8_t write_cmd[] = { PSRAM_CMD_WRITE,
 			      psram_offset >> 16, psram_offset >> 8, psram_offset,
                               val };
 
       /* Write the IF1's byte to that location in PSRAM */
-      spi_write_blocking(PICO_SPI, write_cmd, sizeof(write_cmd));
+      spi_write_blocking(PSRAM_SPI, write_cmd, sizeof(write_cmd));
 
-      gpio_put( PICO_SPI_CSN_PIN, 1 );
+      gpio_put( PSRAM_SPI_CSN_PIN, 1 );
 
       increment_head(active_microdrive_index);
 
