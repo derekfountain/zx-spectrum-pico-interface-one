@@ -471,7 +471,7 @@ inline void __time_critical_func(port_ctr_out)( libspectrum_byte val )
     microdrive[0].motor_on = (val & 0x01) ? 0 : 1;
     any_motor_on |= microdrive[0].motor_on;
 
-    gpio_put( LED_PIN, any_motor_on );
+//    gpio_put( LED_PIN, any_motor_on );
 
 #if 0
     trace(TRC_MOTORS_ON, (microdrive[7].motor_on << 7) |

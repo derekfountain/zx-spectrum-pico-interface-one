@@ -62,38 +62,48 @@ int main( void )
   set_sys_clock_khz( OVERCLOCK, 1 );
 #endif
 
-  spi_init(UI_TO_IO_SPI, 1 * 1000 * 1000);
+  /*
+   * With reference to this thread:
+   *  https://forums.raspberrypi.com//viewtopic.php?f=145&t=300589
+   * setting up the slave-select as controlled by SPI hardware means
+   * the line is pulsed after each byte. That's the way the Pico
+   * hardware does it. The slave side, which is the IO Pico in this
+   * case, needs to recognise that as the standard being used, which
+   * it does as long as the IO Pico code also sets up with the 
+   * slave-select line as SPI hardware controlled.
+   */
+  spi_init(UI_TO_IO_SPI, UI_TO_IO_SPI_SPEED);
   gpio_set_function(UI_TO_IO_SPI_RX_PIN, GPIO_FUNC_SPI);
   gpio_set_function(UI_TO_IO_SPI_SCK_PIN, GPIO_FUNC_SPI);
   gpio_set_function(UI_TO_IO_SPI_TX_PIN, GPIO_FUNC_SPI);
-
-  /* Output for chip select on slave, starts high (unselected) */
-  gpio_init(UI_TO_IO_SPI_CSN_PIN);
-  gpio_set_dir(UI_TO_IO_SPI_CSN_PIN, GPIO_OUT);
-  gpio_put(UI_TO_IO_SPI_CSN_PIN, 1);
+  gpio_set_function(UI_TO_IO_SPI_CSN_PIN, GPIO_FUNC_SPI);
 
   gpio_init(LED_PIN); gpio_set_dir(LED_PIN, GPIO_OUT);
   gpio_put( LED_PIN, 0 );
 
+  uint8_t test_data[] = { 0,1,2,3,4,5,6,7,8,9,
+			  10,11,12,13,14,15,16,17,18,19,
+			  20,21,22,23,24,25,26,27,28,29 };
   while( 1 )
   {
-    gpio_put( UI_TO_IO_SPI_CSN_PIN, 0 );
-    uint8_t write_cmd[] = { 1 };
-    spi_write_blocking(UI_TO_IO_SPI, write_cmd, 1);
-    gpio_put( UI_TO_IO_SPI_CSN_PIN, 1 );
+//    gpio_put( UI_TO_IO_SPI_CSN_PIN, 0 );
+    UI_TO_IO_CMD led_on = UI_TO_IO_TEST_LED_ON;
+    spi_write_blocking(UI_TO_IO_SPI, test_data, sizeof(test_data));
+///    spi_write_blocking(UI_TO_IO_SPI, &led_on, sizeof(UI_TO_IO_CMD));
+//    gpio_put( UI_TO_IO_SPI_CSN_PIN, 1 );
 
     gpio_put( LED_PIN, 1 );
-    sleep_ms(250);
+    sleep_ms(1000);
 
 
 
-    gpio_put( UI_TO_IO_SPI_CSN_PIN, 0 );
-    write_cmd[0] = 0;
-    spi_write_blocking(UI_TO_IO_SPI, write_cmd, 1);
-    gpio_put( UI_TO_IO_SPI_CSN_PIN, 1 );
+//    gpio_put( UI_TO_IO_SPI_CSN_PIN, 0 );
+//    UI_TO_IO_CMD led_off = UI_TO_IO_TEST_LED_OFF;
+//    spi_write_blocking(UI_TO_IO_SPI, &led_off, sizeof(UI_TO_IO_CMD));
+//    gpio_put( UI_TO_IO_SPI_CSN_PIN, 1 );
 
     gpio_put( LED_PIN, 0 );
-    sleep_ms(250);
+    sleep_ms(1000);
 
   } /* Infinite loop */
 

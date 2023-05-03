@@ -166,6 +166,20 @@ const uint8_t  WAIT_GP                  = 27;
 /* Test pin */
 const uint8_t  TEST_OUTPUT_GP           = 10;
 
+static void __time_critical_func(blip_test_pin)( void )
+{
+  gpio_put( TEST_OUTPUT_GP, 1 );
+  __asm volatile ("nop");
+  __asm volatile ("nop");
+  __asm volatile ("nop");
+  __asm volatile ("nop");
+  gpio_put( TEST_OUTPUT_GP, 0 );
+  __asm volatile ("nop");
+  __asm volatile ("nop");
+  __asm volatile ("nop");
+  __asm volatile ("nop");
+}
+
 /*
  * Rudimentary trace table for whole program
  *
@@ -428,8 +442,7 @@ int __time_critical_func(main)( void )
    */
   gpio_init( WAIT_GP ); gpio_set_dir( WAIT_GP, GPIO_IN );
 
-  gpio_init(LED_PIN);
-  gpio_set_dir(LED_PIN, GPIO_OUT);
+  gpio_init( LED_PIN ); gpio_set_dir( LED_PIN, GPIO_OUT );
 
   trace(TRC_GPIOS_INIT ,0);
 
@@ -452,7 +465,14 @@ int __time_critical_func(main)( void )
   gpio_set_function(PSRAM_SPI_SCK_PIN, GPIO_FUNC_SPI);
   gpio_set_function(PSRAM_SPI_TX_PIN, GPIO_FUNC_SPI);
 
-  /* Output for chip select on slave, starts high (unselected) */
+  /*
+   * With reference to this thread:
+   *  https://forums.raspberrypi.com//viewtopic.php?f=145&t=300589
+   * this PSRAM device likes its slave-select line low across the
+   * whole transaction (not high and low, byte to byte). It's
+   * therefore controlled with software (the SPI hardware doing
+   * things differently).
+   */
   gpio_init(PSRAM_SPI_CSN_PIN);
   gpio_set_dir(PSRAM_SPI_CSN_PIN, GPIO_OUT);
   gpio_put(PSRAM_SPI_CSN_PIN, 1);
@@ -495,7 +515,7 @@ int __time_critical_func(main)( void )
   trace(TRC_SPI_INIT, 0);
 
   /* Enable SPI1 as slave from the UI Pico */
-  spi_init(IO_FROM_UI_SPI, 1 * 1000 * 1000);
+  spi_init(IO_FROM_UI_SPI, UI_TO_IO_SPI_SPEED);
   spi_set_slave(IO_FROM_UI_SPI, true);
   gpio_set_function(IO_FROM_UI_SPI_RX_PIN, GPIO_FUNC_SPI);
   gpio_set_function(IO_FROM_UI_SPI_SCK_PIN, GPIO_FUNC_SPI);
@@ -516,19 +536,43 @@ int __time_critical_func(main)( void )
 
   trace(TRC_CORE1_INIT, 0);
 
+  /* This core responds to commands from the User Interface Pico */
   while( 1 )
   {
-    if( spi_is_readable( IO_FROM_UI_SPI ) )
+    /* Wait for IU Pico to say something */
+    while( !spi_is_readable( IO_FROM_UI_SPI ) );
+
+    UI_TO_IO_CMD cmd;
+
+    /* Read the command byte from the UI Pico */
+    spi_read_blocking( IO_FROM_UI_SPI, 0, &cmd, sizeof(UI_TO_IO_CMD) );
+
+    switch( cmd )
     {
-      uint8_t in_buf[1];
+    case 0:
+gpio_put( TEST_OUTPUT_GP, 1 );
+    /* Read the command byte from the UI Pico */
+uint8_t data[29];
+    spi_read_blocking( IO_FROM_UI_SPI, 0, data, 29 );
+gpio_put( TEST_OUTPUT_GP, 0 );
+for(int i=1; i<=29; i++ )
+{
+  if( data[i-1] != i )
+    gpio_put(LED_PIN, 1);
+  
+}
+      break;
 
-      // Write the output buffer to MOSI, and at the same time read from MISO.
-      spi_read_blocking( IO_FROM_UI_SPI, 0, in_buf, 1 );
+    case UI_TO_IO_TEST_LED_ON:
+      gpio_put(LED_PIN, 1);
+      break;
+	
+    case UI_TO_IO_TEST_LED_OFF:
+      gpio_put(LED_PIN, 0);
+      break;
 
-      if( in_buf[0] == 0 )
-	gpio_put(LED_PIN, 0);
-      else
-	gpio_put(LED_PIN, 1);
+    default:
+      break;
     }
 
   } /* Infinite loop */
