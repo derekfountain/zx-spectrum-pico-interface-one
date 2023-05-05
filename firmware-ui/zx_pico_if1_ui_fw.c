@@ -43,6 +43,16 @@
 
 #include "spi.h"
 
+#include "ssd1306.h"
+
+#define OLED_I2C    (i2c0)
+#define OLED_FREQ   400000
+#define OLED_WIDTH  128
+#define OLED_HEIGHT 64
+#define OLED_ADDR   0x3C
+#define OLED_SCK    4
+#define OLED_SDA    5
+
 /* 1 instruction on the 133MHz microprocessor is 7.5ns */
 /* 1 instruction on the 140MHz microprocessor is 7.1ns */
 /* 1 instruction on the 150MHz microprocessor is 6.6ns */
@@ -61,6 +71,22 @@ int main( void )
 #ifdef OVERCLOCK
   set_sys_clock_khz( OVERCLOCK, 1 );
 #endif
+
+  /*
+   * First, set up the screen. It's an I2C device.
+   */
+  i2c_init(OLED_I2C, OLED_FREQ);
+  gpio_set_function( OLED_SCK, GPIO_FUNC_I2C ); gpio_pull_up( OLED_SCK );
+  gpio_set_function( OLED_SDA, GPIO_FUNC_I2C ); gpio_pull_up( OLED_SDA );
+
+  ssd1306_t display;
+  display.external_vcc=false;
+
+  ssd1306_init( &display, OLED_WIDTH, OLED_HEIGHT, OLED_ADDR, OLED_I2C );
+  ssd1306_clear( &display );
+
+  ssd1306_draw_string(&display, 10, 10, 2, "ZX Pico");
+  ssd1306_show(&display);
 
   /*
    * With reference to this thread:

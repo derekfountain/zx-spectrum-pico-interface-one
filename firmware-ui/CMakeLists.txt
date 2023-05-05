@@ -12,9 +12,10 @@ if (TARGET tinyusb_device)
 
   add_executable(zx_pico_if1_ui_fw
     zx_pico_if1_ui_fw.c
+    ssd1306.c
   )
 
-  target_link_libraries(zx_pico_if1_ui_fw pico_stdlib pico_mem_ops pico_multicore hardware_spi hardware_flash hardware_dma)
+  target_link_libraries(zx_pico_if1_ui_fw pico_stdlib pico_mem_ops pico_multicore hardware_spi hardware_flash hardware_dma hardware_i2c)
 
   pico_enable_stdio_usb(zx_pico_if1_ui_fw 0)
   pico_enable_stdio_uart(zx_pico_if1_ui_fw 0)

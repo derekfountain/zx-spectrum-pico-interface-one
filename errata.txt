@@ -138,6 +138,8 @@ v1.3 This version was made into board#2
 
 Stagger the rows of data bus resistors. Offset each from the ones either side of
 it so I can get the larger tweezers in. Or space them out a bit more.
+: Needs doing
+
 
 First attempt NOPOPed the extra level shifter and added a series 100R resistor
 into the ROM_READ signal. Need to confirm this worked. Its function is to protect
@@ -148,6 +150,20 @@ timing.
   level was wrong. It went from 2.5V to about 1.5V. I didn't investigate, I
   just took the R100 off and added the level shifter.
 :: Remove the resistor footprint and NOPOP silkscreen
+: Needs doing
+
 
 PSRAM footprint is missing the pin-1 dot on the silkscreen.
+: Needs doing
+
+
+OLED CLK and SDA signals are transposed. I've labelled Pico3 GPIO4 as CLK and
+GPIO5 and SDA. Check the A4 pin out diagram: GPIO4 is SDA and GPIO5 is CLK.
+This is a hardware I2C bus so I can't switch them in software.
+: Needs doing
+
+
+OLED screen is currently mounted upside and out the back. Work out where the
+screen is going to be mounted and set the header correctly.
+: Needs doing
 
