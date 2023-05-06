@@ -167,3 +167,17 @@ OLED screen is currently mounted upside and out the back. Work out where the
 screen is going to be mounted and set the header correctly.
 : Needs doing
 
+
+Rotary encoder connection is reversed on the board, it needs to stick out the
+back for the pins to be connected up correctly. I think it needs flipping over
+to have the encorder out the front.
+: Needs doing
+:: I need to decide on the final layout before changing this
+
+
+Rotary encoder pins are in sequence SW, DT, CLK, the example code I had ready
+is CLK, DT, SW.
+: Fixed in code
+:: I need to decide whether to change this, it's probably OK as it is
+
+

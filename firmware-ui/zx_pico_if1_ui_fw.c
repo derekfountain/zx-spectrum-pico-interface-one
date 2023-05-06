@@ -41,6 +41,11 @@
 #include "hardware/timer.h"
 #include "hardware/spi.h"
 
+#include "f_util.h"
+#include "ff.h"
+#include "rtc.h"
+#include "hw_config.h"
+
 #include "spi.h"
 
 #include "ssd1306.h"
@@ -61,7 +66,7 @@
 //#define OVERCLOCK 150000
 //#define OVERCLOCK 270000
 
-const uint8_t LED_PIN = PICO_DEFAULT_LED_PIN;
+//const uint8_t LED_PIN = PICO_DEFAULT_LED_PIN;
 
 /* https://lastminuteengineers.com/rotary-encoder-arduino-tutorial/ is useful */
 
@@ -157,6 +162,25 @@ int main( void )
   gpio_set_irq_enabled_with_callback( ENC_SW, GPIO_IRQ_EDGE_FALL, true, &encoder_callback );
   gpio_set_irq_enabled( ENC_A, GPIO_IRQ_EDGE_FALL, true );
   gpio_set_irq_enabled( ENC_B, GPIO_IRQ_EDGE_FALL, true );
+
+    // See FatFs - Generic FAT Filesystem Module, "Application Interface",
+    // http://elm-chan.org/fsw/ff/00index_e.html
+    sd_card_t *pSD = sd_get_by_num(0);
+    FRESULT fr = f_mount(&pSD->fatfs, pSD->pcName, 1);
+    if (FR_OK != fr) panic("f_mount error: %s (%d)\n", FRESULT_str(fr), fr);
+    FIL fil;
+    const char* const filename = "filen_df.txt";
+    fr = f_open(&fil, filename, FA_OPEN_APPEND | FA_WRITE);
+    if (FR_OK != fr && FR_EXIST != fr)
+        panic("f_open(%s) error: %s (%d)\n", filename, FRESULT_str(fr), fr);
+    if (f_printf(&fil, "Hello, world!\n") < 0) {
+        printf("f_printf failed\n");
+    }
+    fr = f_close(&fil);
+    if (FR_OK != fr) {
+        printf("f_close error: %s (%d)\n", FRESULT_str(fr), fr);
+    }
+    f_unmount(pSD->pcName);
 
   /* Loop, not doing much for this example. Just update the display if value changes */
   while( true ) 
