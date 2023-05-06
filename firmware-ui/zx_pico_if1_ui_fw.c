@@ -63,6 +63,66 @@
 
 const uint8_t LED_PIN = PICO_DEFAULT_LED_PIN;
 
+/* https://lastminuteengineers.com/rotary-encoder-arduino-tutorial/ is useful */
+
+#define ENC_SW	 6     // Marked SW or Switch on some devices
+#define ENC_B	 7     // Marked DT on some devices
+#define ENC_A	 8     // Marked CLK on some devices
+
+/* Something to show on the screen */
+uint8_t previous_value = 255;
+uint8_t value          = 0;
+
+void encoder_callback( uint gpio, uint32_t events ) 
+{
+  uint32_t gpio_state = (gpio_get_all() >> ENC_B) & 0x0003;
+  uint8_t  enc_value  = (gpio_state & 0x03);
+	
+  static bool counterclockwise_fall = 0;
+  static bool clockwise_fall        = 0;
+	
+  if( gpio == ENC_A ) 
+  {
+    if( (!clockwise_fall) && (enc_value == 0x01) )
+      clockwise_fall = 1; 
+
+    if( (counterclockwise_fall) && (enc_value == 0x00) )
+    {
+      /* Counter clockwise event */
+      clockwise_fall        = 0;
+      counterclockwise_fall = 0;
+
+      /* Do application action here */
+      value--;
+      gpio_put( LED_PIN, 1 );
+    }
+  }	
+  else if( gpio == ENC_B )
+  {
+    if( (!counterclockwise_fall) && (enc_value == 0x02) )
+      counterclockwise_fall = 1;
+
+    if( (clockwise_fall) && (enc_value == 0x00) )
+    {
+      /* Clockwise event */
+      clockwise_fall        = 0;
+      counterclockwise_fall = 0;
+
+      /* Do application action here */
+      value++;
+      gpio_put( LED_PIN, 0 );
+    }    
+  }
+  else if( gpio == ENC_SW )
+  {
+    /*
+     * Switch event, set to interrupt on falling edge, so this is a click down.
+     * Debounce is left as an exercise for the reader :)
+     */
+    value = 0;
+  }
+}
+
 
 int main( void )
 {
@@ -87,6 +147,33 @@ int main( void )
 
   ssd1306_draw_string(&display, 10, 10, 2, "ZX Pico");
   ssd1306_show(&display);
+
+  /* Rotary encoder, 3 GPIOs */
+  gpio_init( ENC_SW ); gpio_set_dir( ENC_SW, GPIO_IN ); // gpio_disable_pulls(ENC_SW);
+  gpio_init( ENC_A );  gpio_set_dir( ENC_A, GPIO_IN );  // gpio_disable_pulls(ENC_A);
+  gpio_init( ENC_B );  gpio_set_dir( ENC_B, GPIO_IN );  // gpio_disable_pulls(ENC_B);
+
+  /* Set the handler for all 3 GPIOs */
+  gpio_set_irq_enabled_with_callback( ENC_SW, GPIO_IRQ_EDGE_FALL, true, &encoder_callback );
+  gpio_set_irq_enabled( ENC_A, GPIO_IRQ_EDGE_FALL, true );
+  gpio_set_irq_enabled( ENC_B, GPIO_IRQ_EDGE_FALL, true );
+
+  /* Loop, not doing much for this example. Just update the display if value changes */
+  while( true ) 
+  {
+    if( value != previous_value )
+    {
+      uint8_t value_str[4];
+      snprintf( value_str, 4, "%d", value );
+
+      ssd1306_clear(&display);
+      ssd1306_draw_string(&display, 10, 10, 2, value_str);
+      ssd1306_show(&display);
+
+      previous_value = value;
+    }
+    sleep_ms(5);
+  }
 
   /*
    * With reference to this thread:
