@@ -71,6 +71,8 @@ typedef enum
   UI_TO_IO_EJECT_MDR_REQUEST,                // Tell IO Pico to eject the given MD
   UI_TO_IO_REQUEST_STATUS,                   // Request the IO Pico returns status
   UI_TO_IO_REQUEST_MDR_TO_SAVE,              // Request the IO Pico returns data from MD to save to SD card
+
+  UI_TO_IO_ACK,
 }
 UI_TO_IO_CMD;
 

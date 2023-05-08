@@ -30,7 +30,14 @@ if (TARGET tinyusb_device)
 
   pico_generate_pio_header(zx_pico_if1_io_fw ${CMAKE_CURRENT_LIST_DIR}/mreq_dir.pio)
 
-  target_link_libraries(zx_pico_if1_io_fw pico_stdlib pico_mem_ops pico_multicore hardware_pio hardware_spi hardware_flash hardware_dma)
+  target_link_libraries(zx_pico_if1_io_fw pico_stdlib
+                                          pico_mem_ops
+                                          pico_multicore
+                                          hardware_pio
+                                          hardware_spi
+                                          hardware_flash
+                                          hardware_dma
+					  hardware_uart)
 
   pico_enable_stdio_usb(zx_pico_if1_io_fw 0)
   pico_enable_stdio_uart(zx_pico_if1_io_fw 0)

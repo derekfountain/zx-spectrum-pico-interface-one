@@ -536,39 +536,44 @@ int __time_critical_func(main)( void )
 
   trace(TRC_CORE1_INIT, 0);
 
+#define UART_TX_PIN 12
+#define UART_RX_PIN 13
+#define UART_ID uart0
+#define BAUD_RATE 2400
+#define DATA_BITS 8
+#define STOP_BITS 1
+#define PARITY    UART_PARITY_NONE
+
+  // Set up our UART with a basic baud rate.
+  uart_init(UART_ID, BAUD_RATE);
+
+  // Set the TX and RX pins by using the function select on the GPIO
+  // Set datasheet for more information on function select
+  gpio_set_function(UART_TX_PIN, GPIO_FUNC_UART);
+  gpio_set_function(UART_RX_PIN, GPIO_FUNC_UART);
+
+  // Set UART flow control CTS/RTS, we don't want these, so turn them off for now
+  uart_set_hw_flow(UART_ID, false, false);
+
+  // Set our data format, 8N1
+  uart_set_format(UART_ID, DATA_BITS, STOP_BITS, PARITY);
+
   /* This core responds to commands from the User Interface Pico */
   while( 1 )
   {
     /* Wait for IU Pico to say something */
-    while( !spi_is_readable( IO_FROM_UI_SPI ) );
-
-    UI_TO_IO_CMD cmd;
-
-    /* Read the command byte from the UI Pico */
-    spi_read_blocking( IO_FROM_UI_SPI, 0, &cmd, sizeof(UI_TO_IO_CMD) );
+    UI_TO_IO_CMD cmd = uart_getc(UART_ID);
 
     switch( cmd )
     {
-    case 0:
-gpio_put( TEST_OUTPUT_GP, 1 );
-    /* Read the command byte from the UI Pico */
-uint8_t data[29];
-    spi_read_blocking( IO_FROM_UI_SPI, 0, data, 29 );
-gpio_put( TEST_OUTPUT_GP, 0 );
-for(int i=1; i<=29; i++ )
-{
-  if( data[i-1] != i )
-    gpio_put(LED_PIN, 1);
-  
-}
-      break;
-
     case UI_TO_IO_TEST_LED_ON:
       gpio_put(LED_PIN, 1);
+      uart_putc_raw(UART_ID, UI_TO_IO_ACK);
       break;
 	
     case UI_TO_IO_TEST_LED_OFF:
       gpio_put(LED_PIN, 0);
+      uart_putc_raw(UART_ID, UI_TO_IO_ACK);
       break;
 
     default:

@@ -40,6 +40,7 @@
 #include "pico/platform.h"
 #include "hardware/timer.h"
 #include "hardware/spi.h"
+#include "hardware/uart.h"
 
 #include "f_util.h"
 #include "ff.h"
@@ -182,9 +183,68 @@ int main( void )
     }
     f_unmount(pSD->pcName);
 
-  /* Loop, not doing much for this example. Just update the display if value changes */
-  while( true ) 
+
+  gpio_init(LED_PIN); gpio_set_dir(LED_PIN, GPIO_OUT);
+  gpio_put( LED_PIN, 0 );
+
+  /*
+   * I've soldered this Pico's UART0 to the IO Pico. The link was
+   * originally SPI, so the IO Pico's UART pins are connected to
+   * this Pico's SPI device pins. I'll cut the tracks when I've
+   * finally decided what to do, but for now set this Pico's SPI
+   * pins to inputs so they don't interfere with the UART link.
+   */
+  gpio_init(12); gpio_set_dir(12, GPIO_IN);
+  gpio_init(13); gpio_set_dir(13, GPIO_IN);
+  gpio_init(14); gpio_set_dir(14, GPIO_IN);
+  gpio_init(15); gpio_set_dir(15, GPIO_IN);
+  
+#define UART_TX_PIN 0
+#define UART_RX_PIN 1
+#define UART_ID uart0
+#define BAUD_RATE 2400
+#define DATA_BITS 8
+#define STOP_BITS 1
+#define PARITY    UART_PARITY_NONE
+
+  // Set up our UART with a basic baud rate.
+  uart_init(UART_ID, BAUD_RATE);
+
+  // Set the TX and RX pins by using the function select on the GPIO
+  // Set datasheet for more information on function select
+  gpio_set_function(UART_TX_PIN, GPIO_FUNC_UART);
+  gpio_set_function(UART_RX_PIN, GPIO_FUNC_UART);
+
+  // Set UART flow control CTS/RTS, we don't want these, so turn them off for now
+  uart_set_hw_flow(UART_ID, false, false);
+
+  // Set our data format, 8N1
+  uart_set_format(UART_ID, DATA_BITS, STOP_BITS, PARITY);
+
+  while( 1 )
   {
+    uart_putc_raw(UART_ID, UI_TO_IO_TEST_LED_ON);
+    gpio_put( LED_PIN, 1 );
+
+    UI_TO_IO_CMD ack = uart_getc(UART_ID);
+    if( ack != UI_TO_IO_ACK )
+      gpio_put( LED_PIN, 0 );   // Just break the pattern so I can see it's wrong
+      
+    sleep_ms(1000);
+
+    uart_putc_raw(UART_ID, UI_TO_IO_TEST_LED_OFF);
+    gpio_put( LED_PIN, 0 );
+
+    ack = uart_getc(UART_ID);
+    if( ack != UI_TO_IO_ACK )
+      gpio_put( LED_PIN, 1 );   // Just break the pattern so I can see it's wrong
+
+    sleep_ms(1000);
+
+#if 0
+    gpio_put( LED_PIN, 0 );
+    sleep_ms(1000);
+
     if( value != previous_value )
     {
       uint8_t value_str[4];
@@ -196,53 +256,11 @@ int main( void )
 
       previous_value = value;
     }
-    sleep_ms(5);
-  }
 
-  /*
-   * With reference to this thread:
-   *  https://forums.raspberrypi.com//viewtopic.php?f=145&t=300589
-   * setting up the slave-select as controlled by SPI hardware means
-   * the line is pulsed after each byte. That's the way the Pico
-   * hardware does it. The slave side, which is the IO Pico in this
-   * case, needs to recognise that as the standard being used, which
-   * it does as long as the IO Pico code also sets up with the 
-   * slave-select line as SPI hardware controlled.
-   */
-  spi_init(UI_TO_IO_SPI, UI_TO_IO_SPI_SPEED);
-  gpio_set_function(UI_TO_IO_SPI_RX_PIN, GPIO_FUNC_SPI);
-  gpio_set_function(UI_TO_IO_SPI_SCK_PIN, GPIO_FUNC_SPI);
-  gpio_set_function(UI_TO_IO_SPI_TX_PIN, GPIO_FUNC_SPI);
-  gpio_set_function(UI_TO_IO_SPI_CSN_PIN, GPIO_FUNC_SPI);
-
-  gpio_init(LED_PIN); gpio_set_dir(LED_PIN, GPIO_OUT);
-  gpio_put( LED_PIN, 0 );
-
-  uint8_t test_data[] = { 0,1,2,3,4,5,6,7,8,9,
-			  10,11,12,13,14,15,16,17,18,19,
-			  20,21,22,23,24,25,26,27,28,29 };
-  while( 1 )
-  {
-//    gpio_put( UI_TO_IO_SPI_CSN_PIN, 0 );
-    UI_TO_IO_CMD led_on = UI_TO_IO_TEST_LED_ON;
-    spi_write_blocking(UI_TO_IO_SPI, test_data, sizeof(test_data));
-///    spi_write_blocking(UI_TO_IO_SPI, &led_on, sizeof(UI_TO_IO_CMD));
-//    gpio_put( UI_TO_IO_SPI_CSN_PIN, 1 );
-
-    gpio_put( LED_PIN, 1 );
-    sleep_ms(1000);
-
-
-
-//    gpio_put( UI_TO_IO_SPI_CSN_PIN, 0 );
-//    UI_TO_IO_CMD led_off = UI_TO_IO_TEST_LED_OFF;
-//    spi_write_blocking(UI_TO_IO_SPI, &led_off, sizeof(UI_TO_IO_CMD));
-//    gpio_put( UI_TO_IO_SPI_CSN_PIN, 1 );
-
-    gpio_put( LED_PIN, 0 );
-    sleep_ms(1000);
+#endif
 
   } /* Infinite loop */
+
 
 }
 
