@@ -32,36 +32,7 @@
 #include "if1.h"
 #include "spi.h"
 
-/* This file is generated from test data, don't change what's in it manually */
-#include "flash_images.h"
-
 #define NO_ACTIVE_MICRODRIVE  ((microdrive_index_t)(-1))
-
-/*
- * These are the test images in flash. They can be memcpy'ed from flash memory,
- * but writing them back is more elaborate.
- *
- * Examine, for example, 98304 bytes of flash memory with:
- *
- * (gdb) x/98304xb flash_mdr_image[0].flash_address
- *
- * Remove any cruft from the bottom of the output (left side is OK) then convert
- * to binary with
- *
- * > perl -ne 'while( m/ (0x..)/g) {print chr(hex($1))}' < ram.txt > ram.bin
- */
-static flash_mdr_image_t flash_mdr_image[NUM_MICRODRIVES] =
-{
-  { tape1_image, tape1_image_len },
-  { tape2_image, tape2_image_len },
-  { tape3_image, tape3_image_len },
-  { tape4_image, tape4_image_len },
-  { tape5_image, tape5_image_len },
-  { tape6_image, tape6_image_len },
-  { tape7_image, tape7_image_len },
-  { tape8_image, tape8_image_len },
-};
-
 
 /*
  * These are the microdrives, typically 8 of them. This structure
@@ -132,6 +103,7 @@ int32_t if1_init( void )
 /* Lopping this lot off the stack will cause a problem if the program grows. Keep static. Might need to page */
 static tape_byte_t  __attribute__((aligned(4))) cartridge_data[LIBSPECTRUM_MICRODRIVE_CARTRIDGE_LENGTH];
 
+#if 0
 static int32_t load_flash_tape_image( flash_mdr_image_index_t which )
 {
   /* Check requested image exists */
@@ -203,16 +175,19 @@ static int32_t load_flash_tape_image( flash_mdr_image_index_t which )
 
   return which;
 }
+#endif
 
-
-int32_t if1_mdr_insert( const microdrive_index_t which )
+int32_t if1_mdr_insert( const microdrive_index_t which, uint32_t psram_offset, uint32_t length_in_bytes )
 {
   /*
    * This loads the test cartridge data from flash. It'll come via
    * the UI Pico at some point
    */
-  if( load_flash_tape_image( which ) == -1 )
-    return -1;
+//  if( load_flash_tape_image( which ) == -1 )
+//    return -1;
+
+  microdrive[which].cartridge_data_psram_offset = psram_offset;
+  microdrive[which].cartridge_len_in_blocks     = (length_in_bytes / LIBSPECTRUM_MICRODRIVE_BLOCK_LEN);
 
   microdrive[which].inserted = 1;
   microdrive[which].modified = 0;

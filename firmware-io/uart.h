@@ -61,14 +61,21 @@ typedef enum
 }
 UI_TO_IO_CMD;
 
+/* Not sure where this is going yet */
+typedef struct _io_status_t
+{
+  uint8_t error;
+}
+io_status_t;
 
+/* Data structure for MDR insert command */
 typedef struct _ui_to_io_insert_mdr_t
 {
-  uint32_t microdrive_index;
-  uint32_t is_write_protected;
-  uint32_t data_size;
-  uint32_t page_size;
-  uint32_t checksum;
+  uint32_t microdrive_index;                 // Which microdrive
+  uint32_t is_write_protected;               // Whether th cartridge is write protected
+  uint32_t data_size;                        // Size of cartridge data in bytes
+  uint32_t page_size;                        // A page size suitable for sending the data across to the IO Pico
+  uint32_t checksum;                         // Checksum, not usre if this is needed
 }
 ui_to_io_insert_mdr_t;
 

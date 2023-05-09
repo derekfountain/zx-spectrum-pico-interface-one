@@ -166,19 +166,8 @@ typedef uint32_t psram_offset_t;
 #define LAST_MICRODRIVE_INDEX (NUM_MICRODRIVES-1)
 
 int32_t if1_init( void );
-int32_t if1_mdr_insert( const microdrive_index_t which );
+int32_t if1_mdr_insert( const microdrive_index_t which, uint32_t psram_offset, uint32_t length_in_bytes );
 
-/*
- * Details of an MDR image in flash. At the moment the address points to
- * the tape bytes. This will eventually be the complete MDR image sent
- * from SD card
- */
-typedef struct _flash_mdr_image
-{
-  void     *flash_address;
-  uint32_t  length;
-}
-flash_mdr_image_t;
 
 
 libspectrum_byte port_ctr_in( void );

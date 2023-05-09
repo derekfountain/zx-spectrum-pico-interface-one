@@ -207,32 +207,6 @@ void trace( TRACE_CODE code, uint8_t data )
   }
 }
 
-/* Not sure these are much use */
-void trace_on( uint8_t data )
-{
-  trace_active = 1;
-  trace(TRC_TRC_ON, data);
-}
-void trace_off( uint8_t data )
-{
-  trace(TRC_TRC_OFF, data);
-  trace_active = 0;
-}
-
-/* Table of where to find each tape image in the external RAM device */
-static psram_offset_t tape_image_psram_offset[NUM_MICRODRIVES] = 
-{
-  LIBSPECTRUM_MICRODRIVE_CARTRIDGE_LENGTH * 0,
-  LIBSPECTRUM_MICRODRIVE_CARTRIDGE_LENGTH * 1,
-  LIBSPECTRUM_MICRODRIVE_CARTRIDGE_LENGTH * 2,
-  LIBSPECTRUM_MICRODRIVE_CARTRIDGE_LENGTH * 3,
-  LIBSPECTRUM_MICRODRIVE_CARTRIDGE_LENGTH * 4,
-  LIBSPECTRUM_MICRODRIVE_CARTRIDGE_LENGTH * 5,
-  LIBSPECTRUM_MICRODRIVE_CARTRIDGE_LENGTH * 6,
-  LIBSPECTRUM_MICRODRIVE_CARTRIDGE_LENGTH * 7
-};
-
-
 /*
  * This PIO state machine is used to change the data bus level
  * shifter direction when either the ROM handling Pico says it
@@ -242,6 +216,8 @@ static psram_offset_t tape_image_psram_offset[NUM_MICRODRIVES] =
 PIO pio;
 uint sm_mreq;
 
+/* Status of this Pico, reported to UI Pico for action/user feedback */
+io_status_t status;
 
 /*
  * I/O port handling runs in the second core.
@@ -268,30 +244,10 @@ void __time_critical_func(core1_main)( void )
 
   trace(TRC_IF1_INIT, 0);
 
-  /* Insert the test images into the Microdrives */
-  if( (if1_mdr_insert( 0 ) != LIBSPECTRUM_ERROR_NONE) ||
-      (if1_mdr_insert( 1 ) != LIBSPECTRUM_ERROR_NONE) ||
-      (if1_mdr_insert( 2 ) != LIBSPECTRUM_ERROR_NONE) ||
-      (if1_mdr_insert( 3 ) != LIBSPECTRUM_ERROR_NONE) ||
-      (if1_mdr_insert( 4 ) != LIBSPECTRUM_ERROR_NONE) ||
-      (if1_mdr_insert( 5 ) != LIBSPECTRUM_ERROR_NONE) ||
-      (if1_mdr_insert( 6 ) != LIBSPECTRUM_ERROR_NONE) ||
-      (if1_mdr_insert( 7 ) != LIBSPECTRUM_ERROR_NONE) )
-  {
-    while(1)
-    {
-      gpio_put(LED_PIN, 1);
-      busy_wait_us_32(25000);
-      gpio_put(LED_PIN, 0);
-      busy_wait_us_32(25000);
-    }
-  }
-
-  trace(TRC_IMAGES_INIT, 0);
-
   /* Tracing off, I'll turn it back on if I get a bug where it's needed */
   trace_active=0;
 
+  /* Signal to other core we're up and running */
   core1_running = 1;
   while( 1 )
   {
@@ -538,7 +494,7 @@ int __time_critical_func(main)( void )
   gpio_set_function(IO_PICO_UART_TX_PIN, GPIO_FUNC_UART);
   gpio_set_function(IO_PICO_UART_RX_PIN, GPIO_FUNC_UART);
 
-  /* Set UART flow control CTS/RTS, we don't want these, so turn them off for now */
+  /* Set UART flow control CTS/RTS */
   uart_set_hw_flow(IO_PICO_UART_ID, true, true);
 
   /* Set our data format, 8N1 */
@@ -585,32 +541,37 @@ int __time_critical_func(main)( void )
 
     case UI_TO_IO_INSERT_MDR:
     {
-      /* ACK */
+      /* ACK the command */
       UI_TO_IO_CMD ack = UI_TO_IO_ACK;
       uart_putc_raw(IO_PICO_UART_ID, UI_TO_IO_ACK);
 
       ui_to_io_insert_mdr_t cmd_struct;
 
+      /* UI will respond with a structure describing the incoming MDR data */
       uart_read_blocking(IO_PICO_UART_ID, (uint8_t*)&cmd_struct, sizeof(cmd_struct) );
       uart_putc_raw(IO_PICO_UART_ID, UI_TO_IO_ACK);
 
       trace(TRC_RCV_INSERT_MDR_STRUCT, cmd_struct.microdrive_index);
 
 gpio_put( TEST_OUTPUT_GP, 1 );
+      /*
+       * There isn't enough room to store the whole 137KB image, so receive it in pages.
+       * (Keep whole size be divisible by page size or I'm in trouble.)
+       */
       uint32_t pages = cmd_struct.data_size / cmd_struct.page_size;
-      uint32_t data_index=0;
       for( uint32_t page=0; page < pages; page++ )
       {
+	/* Load a page from the UI Pico into a local buffer */
 	uint8_t page_buffer[ cmd_struct.page_size ];
 	uart_read_blocking(IO_PICO_UART_ID, page_buffer, sizeof(page_buffer) );
 
-	/* Need code to place byte in the external RAM */
+	/* Now write that page into the local external RAM */
 	gpio_put( PSRAM_SPI_CSN_PIN, 0 );
 
-	/* Work out where to store this page in the PSRAM */
-	uint32_t psram_offset = tape_image_psram_offset[cmd_struct.microdrive_index]
+	/* Work out where to store this page in the PSRAM and write it in */
+	uint32_t psram_offset = (LIBSPECTRUM_MICRODRIVE_CARTRIDGE_LENGTH * cmd_struct.microdrive_index)
 	                         +
-                                data_index;
+	                        (page*cmd_struct.page_size);
 
 	uint8_t write_cmd[] = { PSRAM_CMD_WRITE,
 				psram_offset >> 16, psram_offset >> 8, psram_offset 
@@ -620,9 +581,16 @@ gpio_put( TEST_OUTPUT_GP, 1 );
 	spi_write_blocking(PSRAM_SPI, page_buffer, sizeof(page_buffer));
 
 	gpio_put( PSRAM_SPI_CSN_PIN, 1 );
-
-	data_index += cmd_struct.page_size;
       }
+
+      /* Insert MDR so the IF1 code can start using it */
+      if( if1_mdr_insert( cmd_struct.microdrive_index,
+			  LIBSPECTRUM_MICRODRIVE_CARTRIDGE_LENGTH * cmd_struct.microdrive_index,
+			  cmd_struct.data_size ) )
+      {
+	status.error = true;
+      }
+      
 gpio_put( TEST_OUTPUT_GP, 0 );
 
     }

@@ -52,7 +52,52 @@
 #include "spi.h"
 #include "uart.h"
 
+/* This file is generated from test data, don't change what's in it manually */
+#include "flash_images.h"
+
+/*
+ * These are the test images in flash. They can be memcpy'ed from flash memory,
+ * but writing them back is more elaborate.
+ *
+ * Examine, for example, 98304 bytes of flash memory with:
+ *
+ * (gdb) x/98304xb flash_mdr_image[0].flash_address
+ *
+ * Remove any cruft from the bottom of the output (left side is OK) then convert
+ * to binary with
+ *
+ * > perl -ne 'while( m/ (0x..)/g) {print chr(hex($1))}' < ram.txt > ram.bin
+ */
+
+/*
+ * Details of an MDR image in flash. At the moment the address points to
+ * the tape bytes. This will eventually be the complete MDR image sent
+ * from SD card
+ */
+typedef struct _flash_mdr_image
+{
+  void     *flash_address;
+  uint32_t  length;
+}
+flash_mdr_image_t;
+
+#define NUM_MICRODRIVES       (8)
+
+static flash_mdr_image_t flash_mdr_image[NUM_MICRODRIVES] =
+{
+  { tape1_image, tape1_image_len },
+  { tape2_image, tape2_image_len },
+  { tape3_image, tape3_image_len },
+  { tape4_image, tape4_image_len },
+  { tape5_image, tape5_image_len },
+  { tape6_image, tape6_image_len },
+  { tape7_image, tape7_image_len },
+  { tape8_image, tape8_image_len },
+};
+
 #include "ssd1306.h"
+
+ssd1306_t display;
 
 #define OLED_I2C    (i2c0)
 #define OLED_FREQ   400000
@@ -133,6 +178,62 @@ void encoder_callback( uint gpio, uint32_t events )
 }
 
 
+/*
+ * This implementation loads the MDR image out of flash, where the test
+ * images are compiled in. It'll have to work with the SD card in due course.
+ */
+void insert_mdr_image( uint8_t which, uint8_t *src )
+{
+  ssd1306_clear(&display);
+  ssd1306_draw_string(&display, 10, 10, 1, "Send cmd");
+  ssd1306_show(&display);
+
+  uart_putc_raw(UI_PICO_UART_ID, UI_TO_IO_INSERT_MDR);
+  UI_TO_IO_CMD ack = uart_getc(UI_PICO_UART_ID);
+  if( ack != UI_TO_IO_ACK )
+    gpio_put( LED_PIN, 0 );   // Just break the pattern so I can see it's wrong
+
+  /* Write the data which describes the command */
+  ui_to_io_insert_mdr_t cmd_struct =
+    {
+      .microdrive_index   = which,
+      .is_write_protected = 0,
+      .data_size          = LIBSPECTRUM_MICRODRIVE_CARTRIDGE_LENGTH,
+      .page_size          = LIBSPECTRUM_MICRODRIVE_CARTRIDGE_PAGE_SIZE,
+      .checksum           = 0
+    };
+  uart_write_blocking(UI_PICO_UART_ID, (uint8_t*)&cmd_struct, sizeof(cmd_struct)); 	
+  ack = uart_getc(UI_PICO_UART_ID);
+  if( ack != UI_TO_IO_ACK )
+    gpio_put( LED_PIN, 1 );   // Just break the pattern so I can see it's wrong
+
+  ssd1306_clear(&display);
+  ssd1306_draw_string(&display, 10, 10, 1, "Sending data");
+  ssd1306_show(&display);
+
+  for( uint32_t i=0; i < LIBSPECTRUM_MICRODRIVE_CARTRIDGE_LENGTH; i++ )
+  {
+    /* Feedback on screen, probably redundant when I get a proper GUI */
+    if( (i % 16384) == 0 )
+    {
+      uint8_t msg[32];
+      snprintf( msg, 16, "Drive %d, %d", which, i );
+      ssd1306_clear(&display);
+      ssd1306_draw_string(&display, 0, 0, 1, msg);
+      ssd1306_show(&display);
+    }
+
+    uart_putc_raw(UI_PICO_UART_ID, *(src+i));
+  }
+
+  ssd1306_clear(&display);
+  ssd1306_draw_string(&display, 0, 0, 1, "Done");
+  ssd1306_show(&display);
+
+  return;
+}
+
+
 int main( void )
 {
   bi_decl(bi_program_description("ZX Spectrum Pico IF1 board binary."));
@@ -151,7 +252,6 @@ int main( void )
   gpio_set_function( OLED_SCK, GPIO_FUNC_I2C ); gpio_pull_up( OLED_SCK );
   gpio_set_function( OLED_SDA, GPIO_FUNC_I2C ); gpio_pull_up( OLED_SDA );
 
-  ssd1306_t display;
   display.external_vcc=false;
 
   ssd1306_init( &display, OLED_WIDTH, OLED_HEIGHT, OLED_ADDR, OLED_I2C );
@@ -220,6 +320,12 @@ int main( void )
   uart_set_format(UI_PICO_UART_ID, PICOS_DATA_BITS, PICOS_STOP_BITS, PICOS_PARITY);
   uart_set_translate_crlf(UI_PICO_UART_ID, false);
 
+  /* Send flash images over to the IO Pico */
+  for( uint8_t microdrive_index=0; microdrive_index < 8; microdrive_index++ )
+  {
+    insert_mdr_image( microdrive_index, flash_mdr_image[microdrive_index].flash_address );
+  }
+
   while( 1 )
   {
     uart_putc_raw(UI_PICO_UART_ID, UI_TO_IO_TEST_LED_ON);
@@ -232,43 +338,6 @@ int main( void )
     sleep_ms(1000);
 
 
-    ssd1306_clear(&display);
-    ssd1306_draw_string(&display, 10, 10, 2, "Send cmd");
-    ssd1306_show(&display);
-
-    uart_putc_raw(UI_PICO_UART_ID, UI_TO_IO_INSERT_MDR);
-    ack = uart_getc(UI_PICO_UART_ID);
-    if( ack != UI_TO_IO_ACK )
-      gpio_put( LED_PIN, 0 );   // Just break the pattern so I can see it's wrong
-
-    /* Write the data which describes the command */
-    ui_to_io_insert_mdr_t cmd_struct =
-      {
-	.microdrive_index   = 7,
-	.is_write_protected = 0,
-	.data_size          = LIBSPECTRUM_MICRODRIVE_CARTRIDGE_LENGTH,
-	.page_size          = LIBSPECTRUM_MICRODRIVE_CARTRIDGE_PAGE_SIZE,
-	.checksum           = 0
-    };
-    uart_write_blocking(UI_PICO_UART_ID,
-			(uint8_t*)&cmd_struct,
-			sizeof(cmd_struct)); 	
-    ack = uart_getc(UI_PICO_UART_ID);
-    if( ack != UI_TO_IO_ACK )
-      gpio_put( LED_PIN, 1 );   // Just break the pattern so I can see it's wrong
-
-    ssd1306_clear(&display);
-    ssd1306_draw_string(&display, 10, 10, 2, "Send 0xDF");
-    ssd1306_show(&display);
-
-    for( uint32_t i=0; i < LIBSPECTRUM_MICRODRIVE_CARTRIDGE_LENGTH; i++ )
-      uart_putc_raw(UI_PICO_UART_ID, 0xDF);
-
-    ssd1306_clear(&display);
-    ssd1306_draw_string(&display, 10, 10, 2, "Done");
-    ssd1306_show(&display);
-
-    sleep_ms(1000);
 
 
     uart_putc_raw(UI_PICO_UART_ID, UI_TO_IO_TEST_LED_OFF);
