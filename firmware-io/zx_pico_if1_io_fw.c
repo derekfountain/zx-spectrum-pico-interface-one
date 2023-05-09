@@ -43,6 +43,7 @@
 
 #include "if1.h"
 #include "spi.h"
+#include "uart.h"
 
 #include "hardware/pio.h"
 #include "hardware/clocks.h"
@@ -218,6 +219,18 @@ void trace_off( uint8_t data )
   trace_active = 0;
 }
 
+/* Table of where to find each tape image in the external RAM device */
+static psram_offset_t tape_image_psram_offset[NUM_MICRODRIVES] = 
+{
+  LIBSPECTRUM_MICRODRIVE_CARTRIDGE_LENGTH * 0,
+  LIBSPECTRUM_MICRODRIVE_CARTRIDGE_LENGTH * 1,
+  LIBSPECTRUM_MICRODRIVE_CARTRIDGE_LENGTH * 2,
+  LIBSPECTRUM_MICRODRIVE_CARTRIDGE_LENGTH * 3,
+  LIBSPECTRUM_MICRODRIVE_CARTRIDGE_LENGTH * 4,
+  LIBSPECTRUM_MICRODRIVE_CARTRIDGE_LENGTH * 5,
+  LIBSPECTRUM_MICRODRIVE_CARTRIDGE_LENGTH * 6,
+  LIBSPECTRUM_MICRODRIVE_CARTRIDGE_LENGTH * 7
+};
 
 
 /*
@@ -233,6 +246,7 @@ uint sm_mreq;
 /*
  * I/O port handling runs in the second core.
  */
+static uint8_t core1_running = 0;
 void __time_critical_func(core1_main)( void )
 {
   /* All interrupts off in this core, the IO emulation won't work with interrupts enabled */
@@ -278,6 +292,7 @@ void __time_critical_func(core1_main)( void )
   /* Tracing off, I'll turn it back on if I get a bug where it's needed */
   trace_active=0;
 
+  core1_running = 1;
   while( 1 )
   {
     register uint32_t gpios_state = gpio_get_all();
@@ -456,6 +471,8 @@ int __time_critical_func(main)( void )
   trace(TRC_PIOS_INIT, 0);
 
   /*
+   * Psuedo SRAM device, on SPI
+   *
    * Enable SPI 0 at <n> MHz and connect to GPIOs. Second param is a baudrate, giving it
    * a frequency like this seems rather silly. You get what the hardware can give you.
    * Might as well ask for the theoretical maximum though.
@@ -514,14 +531,23 @@ int __time_critical_func(main)( void )
 
   trace(TRC_SPI_INIT, 0);
 
-  /* Enable SPI1 as slave from the UI Pico */
-  spi_init(IO_FROM_UI_SPI, UI_TO_IO_SPI_SPEED);
-  spi_set_slave(IO_FROM_UI_SPI, true);
-  gpio_set_function(IO_FROM_UI_SPI_RX_PIN, GPIO_FUNC_SPI);
-  gpio_set_function(IO_FROM_UI_SPI_SCK_PIN, GPIO_FUNC_SPI);
-  gpio_set_function(IO_FROM_UI_SPI_TX_PIN, GPIO_FUNC_SPI);
-  gpio_set_function(IO_FROM_UI_SPI_CSN_PIN, GPIO_FUNC_SPI);
+  /*
+   * Set up our UART to talk to the UI Pico
+   */
+  uart_init(IO_PICO_UART_ID, PICOS_BAUD_RATE);
+  gpio_set_function(IO_PICO_UART_TX_PIN, GPIO_FUNC_UART);
+  gpio_set_function(IO_PICO_UART_RX_PIN, GPIO_FUNC_UART);
 
+  /* Set UART flow control CTS/RTS, we don't want these, so turn them off for now */
+  uart_set_hw_flow(IO_PICO_UART_ID, true, true);
+
+  /* Set our data format, 8N1 */
+  uart_set_format(IO_PICO_UART_ID, PICOS_DATA_BITS, PICOS_STOP_BITS, PICOS_PARITY);
+  uart_set_translate_crlf(IO_PICO_UART_ID, false);
+
+  trace(TRC_UART_INIT, 0);
+
+  /* Test pin, blips the scope */
   gpio_init(TEST_OUTPUT_GP); gpio_set_dir(TEST_OUTPUT_GP, GPIO_OUT);
   gpio_put(TEST_OUTPUT_GP, 0);
 
@@ -536,45 +562,71 @@ int __time_critical_func(main)( void )
 
   trace(TRC_CORE1_INIT, 0);
 
-#define UART_TX_PIN 12
-#define UART_RX_PIN 13
-#define UART_ID uart0
-#define BAUD_RATE 2400
-#define DATA_BITS 8
-#define STOP_BITS 1
-#define PARITY    UART_PARITY_NONE
-
-  // Set up our UART with a basic baud rate.
-  uart_init(UART_ID, BAUD_RATE);
-
-  // Set the TX and RX pins by using the function select on the GPIO
-  // Set datasheet for more information on function select
-  gpio_set_function(UART_TX_PIN, GPIO_FUNC_UART);
-  gpio_set_function(UART_RX_PIN, GPIO_FUNC_UART);
-
-  // Set UART flow control CTS/RTS, we don't want these, so turn them off for now
-  uart_set_hw_flow(UART_ID, false, false);
-
-  // Set our data format, 8N1
-  uart_set_format(UART_ID, DATA_BITS, STOP_BITS, PARITY);
+  /* Wait for the other core to initialise */
+  while( core1_running == 0 );
 
   /* This core responds to commands from the User Interface Pico */
   while( 1 )
   {
     /* Wait for IU Pico to say something */
-    UI_TO_IO_CMD cmd = uart_getc(UART_ID);
+    UI_TO_IO_CMD cmd = uart_getc(IO_PICO_UART_ID);
 
     switch( cmd )
     {
     case UI_TO_IO_TEST_LED_ON:
       gpio_put(LED_PIN, 1);
-      uart_putc_raw(UART_ID, UI_TO_IO_ACK);
+      uart_putc_raw(IO_PICO_UART_ID, UI_TO_IO_ACK);
       break;
 	
     case UI_TO_IO_TEST_LED_OFF:
       gpio_put(LED_PIN, 0);
-      uart_putc_raw(UART_ID, UI_TO_IO_ACK);
+      uart_putc_raw(IO_PICO_UART_ID, UI_TO_IO_ACK);
       break;
+
+    case UI_TO_IO_INSERT_MDR:
+    {
+      /* ACK */
+      UI_TO_IO_CMD ack = UI_TO_IO_ACK;
+      uart_putc_raw(IO_PICO_UART_ID, UI_TO_IO_ACK);
+
+      ui_to_io_insert_mdr_t cmd_struct;
+
+      uart_read_blocking(IO_PICO_UART_ID, (uint8_t*)&cmd_struct, sizeof(cmd_struct) );
+      uart_putc_raw(IO_PICO_UART_ID, UI_TO_IO_ACK);
+
+      trace(TRC_RCV_INSERT_MDR_STRUCT, cmd_struct.microdrive_index);
+
+gpio_put( TEST_OUTPUT_GP, 1 );
+      uint32_t pages = cmd_struct.data_size / cmd_struct.page_size;
+      uint32_t data_index=0;
+      for( uint32_t page=0; page < pages; page++ )
+      {
+	uint8_t page_buffer[ cmd_struct.page_size ];
+	uart_read_blocking(IO_PICO_UART_ID, page_buffer, sizeof(page_buffer) );
+
+	/* Need code to place byte in the external RAM */
+	gpio_put( PSRAM_SPI_CSN_PIN, 0 );
+
+	/* Work out where to store this page in the PSRAM */
+	uint32_t psram_offset = tape_image_psram_offset[cmd_struct.microdrive_index]
+	                         +
+                                data_index;
+
+	uint8_t write_cmd[] = { PSRAM_CMD_WRITE,
+				psram_offset >> 16, psram_offset >> 8, psram_offset 
+	                      };
+
+	spi_write_blocking(PSRAM_SPI, write_cmd,   sizeof(write_cmd));
+	spi_write_blocking(PSRAM_SPI, page_buffer, sizeof(page_buffer));
+
+	gpio_put( PSRAM_SPI_CSN_PIN, 1 );
+
+	data_index += cmd_struct.page_size;
+      }
+gpio_put( TEST_OUTPUT_GP, 0 );
+
+    }
+    break;
 
     default:
       break;

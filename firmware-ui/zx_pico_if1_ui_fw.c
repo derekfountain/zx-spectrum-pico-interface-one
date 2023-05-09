@@ -42,12 +42,15 @@
 #include "hardware/spi.h"
 #include "hardware/uart.h"
 
+/* These are the FAT filesystem library headers */
 #include "f_util.h"
 #include "ff.h"
 #include "rtc.h"
 #include "hw_config.h"
 
+#include "libspectrum.h"
 #include "spi.h"
+#include "uart.h"
 
 #include "ssd1306.h"
 
@@ -138,6 +141,9 @@ int main( void )
   set_sys_clock_khz( OVERCLOCK, 1 );
 #endif
 
+  gpio_init(LED_PIN); gpio_set_dir(LED_PIN, GPIO_OUT);
+  gpio_put( LED_PIN, 0 );
+
   /*
    * First, set up the screen. It's an I2C device.
    */
@@ -154,7 +160,9 @@ int main( void )
   ssd1306_draw_string(&display, 10, 10, 2, "ZX Pico");
   ssd1306_show(&display);
 
-  /* Rotary encoder, 3 GPIOs */
+  /*
+   * Rotary encoder, 3 GPIOs
+   */
   gpio_init( ENC_SW ); gpio_set_dir( ENC_SW, GPIO_IN ); // gpio_disable_pulls(ENC_SW);
   gpio_init( ENC_A );  gpio_set_dir( ENC_A, GPIO_IN );  // gpio_disable_pulls(ENC_A);
   gpio_init( ENC_B );  gpio_set_dir( ENC_B, GPIO_IN );  // gpio_disable_pulls(ENC_B);
@@ -164,6 +172,7 @@ int main( void )
   gpio_set_irq_enabled( ENC_A, GPIO_IRQ_EDGE_FALL, true );
   gpio_set_irq_enabled( ENC_B, GPIO_IRQ_EDGE_FALL, true );
 
+  /* hw_config, i think? */
     // See FatFs - Generic FAT Filesystem Module, "Application Interface",
     // http://elm-chan.org/fsw/ff/00index_e.html
     sd_card_t *pSD = sd_get_by_num(0);
@@ -184,13 +193,14 @@ int main( void )
     f_unmount(pSD->pcName);
 
 
-  gpio_init(LED_PIN); gpio_set_dir(LED_PIN, GPIO_OUT);
-  gpio_put( LED_PIN, 0 );
+  /*
+   * Set up our UART to talk to the IO Pico
+   */
 
   /*
    * I've soldered this Pico's UART0 to the IO Pico. The link was
    * originally SPI, so the IO Pico's UART pins are connected to
-   * this Pico's SPI device pins. I'll cut the tracks when I've
+   * this Pico's SPI1 device pins. I'll cut the tracks when I've
    * finally decided what to do, but for now set this Pico's SPI
    * pins to inputs so they don't interfere with the UART link.
    */
@@ -199,43 +209,72 @@ int main( void )
   gpio_init(14); gpio_set_dir(14, GPIO_IN);
   gpio_init(15); gpio_set_dir(15, GPIO_IN);
   
-#define UART_TX_PIN 0
-#define UART_RX_PIN 1
-#define UART_ID uart0
-#define BAUD_RATE 2400
-#define DATA_BITS 8
-#define STOP_BITS 1
-#define PARITY    UART_PARITY_NONE
+  uart_init(UI_PICO_UART_ID, PICOS_BAUD_RATE);
+  gpio_set_function(UI_PICO_UART_TX_PIN, GPIO_FUNC_UART);
+  gpio_set_function(UI_PICO_UART_RX_PIN, GPIO_FUNC_UART);
 
-  // Set up our UART with a basic baud rate.
-  uart_init(UART_ID, BAUD_RATE);
+  /* Set UART flow control CTS/RTS, we don't want these, so turn them off for now */
+  uart_set_hw_flow(UI_PICO_UART_ID, true, true);
 
-  // Set the TX and RX pins by using the function select on the GPIO
-  // Set datasheet for more information on function select
-  gpio_set_function(UART_TX_PIN, GPIO_FUNC_UART);
-  gpio_set_function(UART_RX_PIN, GPIO_FUNC_UART);
-
-  // Set UART flow control CTS/RTS, we don't want these, so turn them off for now
-  uart_set_hw_flow(UART_ID, false, false);
-
-  // Set our data format, 8N1
-  uart_set_format(UART_ID, DATA_BITS, STOP_BITS, PARITY);
+  /* Set our data format, 8N1 */
+  uart_set_format(UI_PICO_UART_ID, PICOS_DATA_BITS, PICOS_STOP_BITS, PICOS_PARITY);
+  uart_set_translate_crlf(UI_PICO_UART_ID, false);
 
   while( 1 )
   {
-    uart_putc_raw(UART_ID, UI_TO_IO_TEST_LED_ON);
+    uart_putc_raw(UI_PICO_UART_ID, UI_TO_IO_TEST_LED_ON);
     gpio_put( LED_PIN, 1 );
 
-    UI_TO_IO_CMD ack = uart_getc(UART_ID);
+    UI_TO_IO_CMD ack = uart_getc(UI_PICO_UART_ID);
     if( ack != UI_TO_IO_ACK )
       gpio_put( LED_PIN, 0 );   // Just break the pattern so I can see it's wrong
       
     sleep_ms(1000);
 
-    uart_putc_raw(UART_ID, UI_TO_IO_TEST_LED_OFF);
+
+    ssd1306_clear(&display);
+    ssd1306_draw_string(&display, 10, 10, 2, "Send cmd");
+    ssd1306_show(&display);
+
+    uart_putc_raw(UI_PICO_UART_ID, UI_TO_IO_INSERT_MDR);
+    ack = uart_getc(UI_PICO_UART_ID);
+    if( ack != UI_TO_IO_ACK )
+      gpio_put( LED_PIN, 0 );   // Just break the pattern so I can see it's wrong
+
+    /* Write the data which describes the command */
+    ui_to_io_insert_mdr_t cmd_struct =
+      {
+	.microdrive_index   = 7,
+	.is_write_protected = 0,
+	.data_size          = LIBSPECTRUM_MICRODRIVE_CARTRIDGE_LENGTH,
+	.page_size          = LIBSPECTRUM_MICRODRIVE_CARTRIDGE_PAGE_SIZE,
+	.checksum           = 0
+    };
+    uart_write_blocking(UI_PICO_UART_ID,
+			(uint8_t*)&cmd_struct,
+			sizeof(cmd_struct)); 	
+    ack = uart_getc(UI_PICO_UART_ID);
+    if( ack != UI_TO_IO_ACK )
+      gpio_put( LED_PIN, 1 );   // Just break the pattern so I can see it's wrong
+
+    ssd1306_clear(&display);
+    ssd1306_draw_string(&display, 10, 10, 2, "Send 0xDF");
+    ssd1306_show(&display);
+
+    for( uint32_t i=0; i < LIBSPECTRUM_MICRODRIVE_CARTRIDGE_LENGTH; i++ )
+      uart_putc_raw(UI_PICO_UART_ID, 0xDF);
+
+    ssd1306_clear(&display);
+    ssd1306_draw_string(&display, 10, 10, 2, "Done");
+    ssd1306_show(&display);
+
+    sleep_ms(1000);
+
+
+    uart_putc_raw(UI_PICO_UART_ID, UI_TO_IO_TEST_LED_OFF);
     gpio_put( LED_PIN, 0 );
 
-    ack = uart_getc(UART_ID);
+    ack = uart_getc(UI_PICO_UART_ID);
     if( ack != UI_TO_IO_ACK )
       gpio_put( LED_PIN, 1 );   // Just break the pattern so I can see it's wrong
 

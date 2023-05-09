@@ -36,20 +36,6 @@
 #include "flash_images.h"
 
 #define NO_ACTIVE_MICRODRIVE  ((microdrive_index_t)(-1))
-#define NUM_MICRODRIVES       ((microdrive_index_t)(8))
-#define LAST_MICRODRIVE_INDEX (NUM_MICRODRIVES-1)
-
-/*
- * Details of an MDR image in flash. At the moment the address points to
- * the tape bytes. This will eventually be the complete MDR image sent
- * from SD card
- */
-typedef struct _flash_mdr_image
-{
-  void     *flash_address;
-  uint32_t  length;
-}
-flash_mdr_image_t;
 
 /*
  * These are the test images in flash. They can be memcpy'ed from flash memory,

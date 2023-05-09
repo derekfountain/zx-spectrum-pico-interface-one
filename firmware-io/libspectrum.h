@@ -64,5 +64,10 @@ typedef enum libspectrum_error {
 #define LIBSPECTRUM_MICRODRIVE_CARTRIDGE_LENGTH \
         ( LIBSPECTRUM_MICRODRIVE_BLOCK_MAX * LIBSPECTRUM_MICRODRIVE_BLOCK_LEN )    /* 97740 for 180 block cartridge 137922 for 254 blocks */
 
+/*
+ * This is the page size for inter-Pico transfers. 137922 divides into 181 762 byte pages. This will need
+ * revisiting if the max cartridge length changes
+ */
+#define LIBSPECTRUM_MICRODRIVE_CARTRIDGE_PAGE_SIZE (LIBSPECTRUM_MICRODRIVE_CARTRIDGE_LENGTH/181)
 
 #endif

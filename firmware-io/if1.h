@@ -51,6 +51,7 @@ typedef enum
   TRC_TRC_OFF,
 
   TRC_SPI_INIT,
+  TRC_UART_INIT,
   TRC_DATA_CONV,
   TRC_GPIOS_INIT,
   TRC_PIOS_INIT,
@@ -61,6 +62,10 @@ typedef enum
   TRC_IMAGES_INIT,
   TRC_LOAD_IMAGE,
   TRC_UNLOAD_IMAGE,
+
+  TRC_RCV_CMD,
+
+  TRC_RCV_INSERT_MDR_STRUCT,
 
   TRC_READ_EF_STATUS,
   TRC_READ_E7_DATA,
@@ -78,11 +83,11 @@ typedef struct _trace_type
 {
   uint32_t   i;
   TRACE_CODE code;
-  uint8_t    data;
+  uint32_t   data;
 }
 TRACE_TYPE;
 
-#define NUM_TRACE_ENTRIES   100
+#define NUM_TRACE_ENTRIES   1000
 
 void trace( TRACE_CODE code, uint8_t data );
 void trace_on( uint8_t data );
@@ -154,9 +159,27 @@ typedef uint8_t tape_byte_t;
 /* Index of MDR image into flash array */
 typedef int32_t flash_mdr_image_index_t;
 
+/* Offset into external RAM device to find something */
+typedef uint32_t psram_offset_t;
+
+#define NUM_MICRODRIVES       ((microdrive_index_t)(8))
+#define LAST_MICRODRIVE_INDEX (NUM_MICRODRIVES-1)
 
 int32_t if1_init( void );
 int32_t if1_mdr_insert( const microdrive_index_t which );
+
+/*
+ * Details of an MDR image in flash. At the moment the address points to
+ * the tape bytes. This will eventually be the complete MDR image sent
+ * from SD card
+ */
+typedef struct _flash_mdr_image
+{
+  void     *flash_address;
+  uint32_t  length;
+}
+flash_mdr_image_t;
+
 
 libspectrum_byte port_ctr_in( void );
 void port_ctr_out( libspectrum_byte val );
