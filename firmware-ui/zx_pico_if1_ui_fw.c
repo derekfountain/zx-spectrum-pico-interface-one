@@ -48,9 +48,9 @@
 #include "rtc.h"
 #include "hw_config.h"
 
-#include "libspectrum.h"
-#include "spi.h"
 #include "uart.h"
+#include "microdrive.h"
+#include "ui_io_comms.h"
 
 /* This file is generated from test data, don't change what's in it manually */
 #include "flash_images.h"
@@ -80,8 +80,6 @@ typedef struct _flash_mdr_image
   uint32_t  length;
 }
 flash_mdr_image_t;
-
-#define NUM_MICRODRIVES       (8)
 
 static flash_mdr_image_t flash_mdr_image[NUM_MICRODRIVES] =
 {
@@ -198,8 +196,8 @@ void insert_mdr_image( uint8_t which, uint8_t *src )
     {
       .microdrive_index   = which,
       .is_write_protected = 0,
-      .data_size          = LIBSPECTRUM_MICRODRIVE_CARTRIDGE_LENGTH,
-      .page_size          = LIBSPECTRUM_MICRODRIVE_CARTRIDGE_PAGE_SIZE,
+      .data_size          = MICRODRIVE_CARTRIDGE_LENGTH,
+      .page_size          = MICRODRIVE_CARTRIDGE_PAGE_SIZE,
       .checksum           = 0
     };
   uart_write_blocking(UI_PICO_UART_ID, (uint8_t*)&cmd_struct, sizeof(cmd_struct)); 	
@@ -211,7 +209,7 @@ void insert_mdr_image( uint8_t which, uint8_t *src )
   ssd1306_draw_string(&display, 10, 10, 1, "Sending data");
   ssd1306_show(&display);
 
-  for( uint32_t i=0; i < LIBSPECTRUM_MICRODRIVE_CARTRIDGE_LENGTH; i++ )
+  for( uint32_t i=0; i < MICRODRIVE_CARTRIDGE_LENGTH; i++ )
   {
     /* Feedback on screen, probably redundant when I get a proper GUI */
     if( (i % 16384) == 0 )
@@ -251,7 +249,6 @@ int main( void )
   i2c_init(OLED_I2C, OLED_FREQ);
   gpio_set_function( OLED_SCK, GPIO_FUNC_I2C ); gpio_pull_up( OLED_SCK );
   gpio_set_function( OLED_SDA, GPIO_FUNC_I2C ); gpio_pull_up( OLED_SDA );
-
   display.external_vcc=false;
 
   ssd1306_init( &display, OLED_WIDTH, OLED_HEIGHT, OLED_ADDR, OLED_I2C );
@@ -313,15 +310,15 @@ int main( void )
   gpio_set_function(UI_PICO_UART_TX_PIN, GPIO_FUNC_UART);
   gpio_set_function(UI_PICO_UART_RX_PIN, GPIO_FUNC_UART);
 
-  /* Set UART flow control CTS/RTS, we don't want these, so turn them off for now */
+  /* Set UART flow control CTS/RTS */
   uart_set_hw_flow(UI_PICO_UART_ID, true, true);
 
   /* Set our data format, 8N1 */
   uart_set_format(UI_PICO_UART_ID, PICOS_DATA_BITS, PICOS_STOP_BITS, PICOS_PARITY);
   uart_set_translate_crlf(UI_PICO_UART_ID, false);
 
-  /* Send flash images over to the IO Pico */
-  for( uint8_t microdrive_index=0; microdrive_index < 8; microdrive_index++ )
+  /* Send test flash images over to the IO Pico */
+  for( microdrive_index_t microdrive_index=0; microdrive_index < NUM_MICRODRIVES; microdrive_index++ )
   {
     insert_mdr_image( microdrive_index, flash_mdr_image[microdrive_index].flash_address );
   }

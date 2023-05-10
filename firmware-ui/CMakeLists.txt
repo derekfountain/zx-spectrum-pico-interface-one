@@ -16,6 +16,8 @@ if (TARGET tinyusb_device)
     hw_config.c
   )
 
+  target_include_directories(zx_pico_if1_ui_fw PRIVATE ../firmware-common)
+
   add_subdirectory(no-OS-FatFS-SD-SPI-RPi-Pico/FatFs_SPI)
 
   target_link_libraries(zx_pico_if1_ui_fw pico_stdlib

@@ -24,6 +24,8 @@ if (TARGET tinyusb_device)
     if1.c
   )
 
+  target_include_directories(zx_pico_if1_io_fw PRIVATE ../firmware-common)
+
   # I prefer to catch my own OOM conditions
   # 
   target_compile_definitions(zx_pico_if1_io_fw PUBLIC -D PICO_MALLOC_PANIC=0)

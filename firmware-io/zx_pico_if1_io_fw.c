@@ -44,6 +44,8 @@
 #include "if1.h"
 #include "spi.h"
 #include "uart.h"
+#include "ui_io_comms.h"
+#include "cartridge.h"
 
 #include "hardware/pio.h"
 #include "hardware/clocks.h"
@@ -194,7 +196,7 @@ TRACE_TYPE trace_table[NUM_TRACE_ENTRIES];
 uint8_t  trace_active=1;
 uint32_t trace_index=0;
 
-void trace( TRACE_CODE code, uint8_t data )
+void trace( TRACE_CODE code, uint32_t data )
 {
   if( trace_active )
   {
@@ -569,7 +571,7 @@ gpio_put( TEST_OUTPUT_GP, 1 );
 	gpio_put( PSRAM_SPI_CSN_PIN, 0 );
 
 	/* Work out where to store this page in the PSRAM and write it in */
-	uint32_t psram_offset = (LIBSPECTRUM_MICRODRIVE_CARTRIDGE_LENGTH * cmd_struct.microdrive_index)
+	uint32_t psram_offset = (MICRODRIVE_CARTRIDGE_LENGTH * cmd_struct.microdrive_index)
 	                         +
 	                        (page*cmd_struct.page_size);
 
@@ -585,7 +587,7 @@ gpio_put( TEST_OUTPUT_GP, 1 );
 
       /* Insert MDR so the IF1 code can start using it */
       if( if1_mdr_insert( cmd_struct.microdrive_index,
-			  LIBSPECTRUM_MICRODRIVE_CARTRIDGE_LENGTH * cmd_struct.microdrive_index,
+			  MICRODRIVE_CARTRIDGE_LENGTH * cmd_struct.microdrive_index,
 			  cmd_struct.data_size ) )
       {
 	status.error = true;

@@ -28,11 +28,19 @@
 #include "hardware/dma.h"
 #include "hardware/spi.h"
 
-#include "libspectrum.h"
+#include "cartridge.h"
+#include "microdrive.h"
 #include "if1.h"
 #include "spi.h"
 
 #define NO_ACTIVE_MICRODRIVE  ((microdrive_index_t)(-1))
+
+/* This is used in the preamble */
+enum
+{
+  SYNC_NO = 0,
+  SYNC_OK = 0xff
+};
 
 /*
  * These are the microdrives, typically 8 of them. This structure
@@ -101,7 +109,7 @@ int32_t if1_init( void )
  * know how
  */
 /* Lopping this lot off the stack will cause a problem if the program grows. Keep static. Might need to page */
-static tape_byte_t  __attribute__((aligned(4))) cartridge_data[LIBSPECTRUM_MICRODRIVE_CARTRIDGE_LENGTH];
+static tape_byte_t  __attribute__((aligned(4))) cartridge_data[MICRODRIVE_CARTRIDGE_LENGTH];
 
 #if 0
 static int32_t load_flash_tape_image( flash_mdr_image_index_t which )
@@ -111,7 +119,7 @@ static int32_t load_flash_tape_image( flash_mdr_image_index_t which )
     return -1;
 
   /* Check requested image will fit in buffer */
-  if( flash_mdr_image[which].length > LIBSPECTRUM_MICRODRIVE_CARTRIDGE_LENGTH )
+  if( flash_mdr_image[which].length > MICRODRIVE_CARTRIDGE_LENGTH )
     return -1;
 
   /*
@@ -154,13 +162,13 @@ static int32_t load_flash_tape_image( flash_mdr_image_index_t which )
    * plenty of room in the PSRAM. Each cartridge takes up the maximum possible number
    * of bytes
    */
-  uint32_t psram_offset = which * LIBSPECTRUM_MICRODRIVE_CARTRIDGE_LENGTH;
+  uint32_t psram_offset = which * MICRODRIVE_CARTRIDGE_LENGTH;
 
   uint8_t write_cmd[] = { PSRAM_CMD_WRITE,
 			  psram_offset >> 16, psram_offset >> 8 , psram_offset
 			};
   spi_write_blocking(PSRAM_SPI, write_cmd, sizeof(write_cmd));
-  spi_write_blocking(PSRAM_SPI, cartridge_data, LIBSPECTRUM_MICRODRIVE_CARTRIDGE_LENGTH);
+  spi_write_blocking(PSRAM_SPI, cartridge_data, MICRODRIVE_CARTRIDGE_LENGTH);
 
   gpio_put( PSRAM_SPI_CSN_PIN, 1 );
 
@@ -168,8 +176,8 @@ static int32_t load_flash_tape_image( flash_mdr_image_index_t which )
   microdrive[which].cartridge_data_psram_offset = psram_offset;
 
   /* Note how many blocks it is */
-  size_t length_in_bytes = flash_mdr_image[which].length - ( flash_mdr_image[which].length % LIBSPECTRUM_MICRODRIVE_BLOCK_LEN );
-  microdrive[which].cartridge_len_in_blocks = (length_in_bytes / LIBSPECTRUM_MICRODRIVE_BLOCK_LEN);
+  size_t length_in_bytes = flash_mdr_image[which].length - ( flash_mdr_image[which].length % MICRODRIVE_BLOCK_LEN );
+  microdrive[which].cartridge_len_in_blocks = (length_in_bytes / MICRODRIVE_BLOCK_LEN);
  
   trace(TRC_LOAD_IMAGE, which);
 
@@ -187,7 +195,7 @@ int32_t if1_mdr_insert( const microdrive_index_t which, uint32_t psram_offset, u
 //    return -1;
 
   microdrive[which].cartridge_data_psram_offset = psram_offset;
-  microdrive[which].cartridge_len_in_blocks     = (length_in_bytes / LIBSPECTRUM_MICRODRIVE_BLOCK_LEN);
+  microdrive[which].cartridge_len_in_blocks     = (length_in_bytes / MICRODRIVE_BLOCK_LEN);
 
   microdrive[which].inserted = 1;
   microdrive[which].modified = 0;
@@ -220,7 +228,7 @@ int32_t if1_mdr_insert( const microdrive_index_t which, uint32_t psram_offset, u
 static inline void __time_critical_func(increment_head)( microdrive_index_t which )
 {
   microdrive[which].head_pos++;
-  if( microdrive[which].head_pos >= (microdrive[which].cartridge_len_in_blocks * LIBSPECTRUM_MICRODRIVE_BLOCK_LEN) )
+  if( microdrive[which].head_pos >= (microdrive[which].cartridge_len_in_blocks * MICRODRIVE_BLOCK_LEN) )
   {
     microdrive[which].head_pos = 0;
   }
@@ -255,21 +263,21 @@ static void __time_critical_func(microdrives_restart)( void )
 {
   for( microdrive_index_t m=0; m<NUM_MICRODRIVES; m++ )
   {
-    while( ( microdrive[m].head_pos % LIBSPECTRUM_MICRODRIVE_BLOCK_LEN ) != 0  &&
-	   ( microdrive[m].head_pos % LIBSPECTRUM_MICRODRIVE_BLOCK_LEN ) != LIBSPECTRUM_MICRODRIVE_HEAD_LEN )
+    while( ( microdrive[m].head_pos % MICRODRIVE_BLOCK_LEN ) != 0  &&
+	   ( microdrive[m].head_pos % MICRODRIVE_BLOCK_LEN ) != MICRODRIVE_HEAD_LEN )
     {
       increment_head(m); /* put head in the start of a block */
     }
 	
     microdrive[m].transfered = 0; /* reset current number of bytes written */
 
-    if( ( microdrive[m].head_pos % LIBSPECTRUM_MICRODRIVE_BLOCK_LEN ) == 0 )
+    if( ( microdrive[m].head_pos % MICRODRIVE_BLOCK_LEN ) == 0 )
     {
-      microdrive[m].max_bytes = LIBSPECTRUM_MICRODRIVE_HEAD_LEN; /* up to 15 bytes for header blocks */
+      microdrive[m].max_bytes = MICRODRIVE_HEAD_LEN; /* up to 15 bytes for header blocks */
     }
     else
     {
-      microdrive[m].max_bytes = LIBSPECTRUM_MICRODRIVE_HEAD_LEN + LIBSPECTRUM_MICRODRIVE_DATA_LEN + 1; /* up to 528 bytes for data blocks */
+      microdrive[m].max_bytes = MICRODRIVE_HEAD_LEN + MICRODRIVE_DATA_LEN + 1; /* up to 528 bytes for data blocks */
     }
   }
 
@@ -279,9 +287,9 @@ static void __time_critical_func(microdrives_restart)( void )
 /*
  * Control port in - Z80 is reading IF1/microdrives status
  */
-inline libspectrum_byte __time_critical_func(port_ctr_in)( void )
+inline uint8_t __time_critical_func(port_ctr_in)( void )
 {
-  libspectrum_byte ret = 0xff;
+  uint8_t ret = 0xff;
 
   microdrive_index_t active_microdrive_index;
   if( (active_microdrive_index=query_active_microdrive()) == NO_ACTIVE_MICRODRIVE )
@@ -390,7 +398,7 @@ inline libspectrum_byte __time_critical_func(port_ctr_in)( void )
  * If the CLK line is going low set microdrive0 (the only one, now)
  * to motor status as per bit0 (COMMS DATA).
  */
-inline void __time_critical_func(port_ctr_out)( libspectrum_byte val )
+inline void __time_critical_func(port_ctr_out)( uint8_t val )
 {
   /* Look for a falling edge on the CLK line */
   if( ((val & 0x02) == 0) && (if1_ula_comms_clk == 1) )
@@ -432,9 +440,8 @@ inline void __time_critical_func(port_ctr_out)( libspectrum_byte val )
     microdrive[0].motor_on = (val & 0x01) ? 0 : 1;
     any_motor_on |= microdrive[0].motor_on;
 
-//    gpio_put( LED_PIN, any_motor_on );
-
 #if 0
+    gpio_put( LED_PIN, any_motor_on );
     trace(TRC_MOTORS_ON, (microdrive[7].motor_on << 7) |
 	                 (microdrive[6].motor_on << 6) |
 	                 (microdrive[5].motor_on << 5) |
@@ -466,9 +473,9 @@ inline void __time_critical_func(port_ctr_out)( libspectrum_byte val )
  * Byte is taken from the data block of the running microdrive
  * cartridge
  */
-inline libspectrum_byte __time_critical_func(port_mdr_in)( void )
+inline uint8_t __time_critical_func(port_mdr_in)( void )
 {
-  libspectrum_byte ret = 0xff;
+  uint8_t ret = 0xff;
 
   microdrive_index_t active_microdrive_index;
   if( (active_microdrive_index=query_active_microdrive()) == NO_ACTIVE_MICRODRIVE )
@@ -548,7 +555,7 @@ inline libspectrum_byte __time_critical_func(port_mdr_in)( void )
  * the preamble. Once that arrives the SYNC_OK flag is set.
  *
  */
-inline void __time_critical_func(port_mdr_out)( libspectrum_byte val )
+inline void __time_critical_func(port_mdr_out)( uint8_t val )
 {
   microdrive_index_t active_microdrive_index;
   if( (active_microdrive_index=query_active_microdrive()) == NO_ACTIVE_MICRODRIVE )

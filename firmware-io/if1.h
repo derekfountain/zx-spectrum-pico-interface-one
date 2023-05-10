@@ -23,7 +23,7 @@
 #ifndef __IF1_H
 #define __IF1_H
 
-#include "libspectrum.h"
+#include "microdrive.h"
 
 /* Probably won't need this in the long term */
 typedef struct utils_file {
@@ -89,16 +89,7 @@ TRACE_TYPE;
 
 #define NUM_TRACE_ENTRIES   1000
 
-void trace( TRACE_CODE code, uint8_t data );
-void trace_on( uint8_t data );
-void trace_off( uint8_t data );
-
-/* This is used in the preamble */
-enum
-{
-  SYNC_NO = 0,
-  SYNC_OK = 0xff
-};
+void trace( TRACE_CODE code, uint32_t data );
 
 /*
  * Microdrive structure, represents the drive ifself.
@@ -113,10 +104,10 @@ typedef struct _microdrive_t
   int head_pos;
   int transfered;
   int max_bytes;
-  libspectrum_byte pream[512];	/* preamble/sync area written. 256 header blocks and 256 data blocks */
-  libspectrum_byte last;
-  libspectrum_byte gap;
-  libspectrum_byte sync;
+  uint8_t pream[512];	/* preamble/sync area written. 256 header blocks and 256 data blocks */
+  uint8_t last;
+  uint8_t gap;
+  uint8_t sync;
 
   /*
    * Offset in PSRAM to the byte array representing the tape, approx 97KB for a 180 sector
@@ -141,20 +132,14 @@ typedef struct _microdrive_t
    * MDR file.
    *
    */
-  uint32_t         cartridge_data_psram_offset;
+  uint32_t  cartridge_data_psram_offset;
 
-  uint8_t          cartridge_data_modified;
-  libspectrum_byte cartridge_write_protect;
-  libspectrum_byte cartridge_len_in_blocks;
+  uint8_t   cartridge_data_modified;
+  uint8_t   cartridge_write_protect;
+  uint8_t   cartridge_len_in_blocks;
 
 } microdrive_t;
 
-
-/* Index into microdrives array, etc. 0 to 7, maybe -1 */
-typedef int32_t microdrive_index_t;
-
-/* A byte on tape, the cartridge has an array of these */
-typedef uint8_t tape_byte_t;
 
 /* Index of MDR image into flash array */
 typedef int32_t flash_mdr_image_index_t;
@@ -162,19 +147,16 @@ typedef int32_t flash_mdr_image_index_t;
 /* Offset into external RAM device to find something */
 typedef uint32_t psram_offset_t;
 
-#define NUM_MICRODRIVES       ((microdrive_index_t)(8))
-#define LAST_MICRODRIVE_INDEX (NUM_MICRODRIVES-1)
-
 int32_t if1_init( void );
 int32_t if1_mdr_insert( const microdrive_index_t which, uint32_t psram_offset, uint32_t length_in_bytes );
 
 
 
-libspectrum_byte port_ctr_in( void );
-void port_ctr_out( libspectrum_byte val );
+uint8_t port_ctr_in( void );
+void port_ctr_out( uint8_t val );
 
-libspectrum_byte port_mdr_in( void );
-void port_mdr_out( libspectrum_byte val );
+uint8_t port_mdr_in( void );
+void port_mdr_out( uint8_t val );
 
 
 #endif
