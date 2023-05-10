@@ -57,9 +57,8 @@ io_status_t;
 typedef struct _ui_to_io_insert_mdr_t
 {
   microdrive_index_t microdrive_index;                 // Which microdrive
-  uint8_t            is_write_protected;               // Whether the cartridge is write protected
+  write_protect_t    write_protected;                  // Whether the cartridge is write protected
   uint32_t           data_size;                        // Size of cartridge data in bytes
-  uint32_t           page_size;                        // A page size suitable for sending the data across to the IO Pico
   uint32_t           checksum;                         // Checksum, not sure if this is needed
 }
 ui_to_io_insert_mdr_t;

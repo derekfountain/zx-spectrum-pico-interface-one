@@ -23,6 +23,17 @@
 /* A byte on tape, the cartridge has an array of these */
 typedef uint8_t tape_byte_t;
 
+/*
+ * Enum just to make the code more readable. "Non zero if write protected" is defined in the MDR
+ * fornmat so it's a binary flag
+ */
+typedef enum
+{
+  WRITE_PROTECT_OFF = 0,
+  WRITE_PROTECT_ON  = 1
+}
+write_protect_t;
+
 #define MICRODRIVE_BLOCK_MAX 254
 #define MICRODRIVE_HEAD_LEN 15
 #define MICRODRIVE_DATA_LEN 512

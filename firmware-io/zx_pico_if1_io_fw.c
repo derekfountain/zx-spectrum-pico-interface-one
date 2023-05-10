@@ -371,6 +371,23 @@ void __time_critical_func(core1_main)( void )
 }
 
 
+static void write_psram_block( uint32_t psram_offset, uint8_t *block_buffer, uint32_t length )
+{
+  gpio_put( PSRAM_SPI_CSN_PIN, 0 );
+
+  uint8_t write_cmd[] = { PSRAM_CMD_WRITE,
+	                  psram_offset >> 16, psram_offset >> 8, psram_offset 
+	                };
+
+  spi_write_blocking(PSRAM_SPI, write_cmd,    sizeof(write_cmd));
+  spi_write_blocking(PSRAM_SPI, block_buffer, length);
+
+  gpio_put( PSRAM_SPI_CSN_PIN, 1 );
+
+  return;
+}
+
+
 int __time_critical_func(main)( void )
 {
   bi_decl(bi_program_description("ZX Spectrum Pico IF1 board binary."));
@@ -555,45 +572,46 @@ int __time_critical_func(main)( void )
 
       trace(TRC_RCV_INSERT_MDR_STRUCT, cmd_struct.microdrive_index);
 
-gpio_put( TEST_OUTPUT_GP, 1 );
       /*
-       * There isn't enough room to store the whole 137KB image, so receive it in pages.
-       * (Keep whole size be divisible by page size or I'm in trouble.)
+       * There isn't enough room to store the whole 137KB image, so receive it in 256 byte pages.
        */
-      uint32_t pages = cmd_struct.data_size / cmd_struct.page_size;
+      uint32_t pages = cmd_struct.data_size / 256;
+      uint32_t final_page_size = cmd_struct.data_size - (pages * 256);
       for( uint32_t page=0; page < pages; page++ )
       {
 	/* Load a page from the UI Pico into a local buffer */
-	uint8_t page_buffer[ cmd_struct.page_size ];
+	uint8_t page_buffer[ 256 ];
 	uart_read_blocking(IO_PICO_UART_ID, page_buffer, sizeof(page_buffer) );
-
-	/* Now write that page into the local external RAM */
-	gpio_put( PSRAM_SPI_CSN_PIN, 0 );
 
 	/* Work out where to store this page in the PSRAM and write it in */
 	uint32_t psram_offset = (MICRODRIVE_CARTRIDGE_LENGTH * cmd_struct.microdrive_index)
 	                         +
-	                        (page*cmd_struct.page_size);
+	                        (page*256);
 
-	uint8_t write_cmd[] = { PSRAM_CMD_WRITE,
-				psram_offset >> 16, psram_offset >> 8, psram_offset 
-	                      };
+	write_psram_block( psram_offset, page_buffer, sizeof(page_buffer) );
+      }
 
-	spi_write_blocking(PSRAM_SPI, write_cmd,   sizeof(write_cmd));
-	spi_write_blocking(PSRAM_SPI, page_buffer, sizeof(page_buffer));
+      /* Do the last bit */
+      if( final_page_size != 0 )
+      {
+	uint8_t page_buffer[ final_page_size ];
+	uart_read_blocking(IO_PICO_UART_ID, page_buffer, sizeof(page_buffer) );
 
-	gpio_put( PSRAM_SPI_CSN_PIN, 1 );
+	uint32_t psram_offset = (MICRODRIVE_CARTRIDGE_LENGTH * cmd_struct.microdrive_index)
+	                         +
+	                        (pages*256);
+
+	write_psram_block( psram_offset, page_buffer, final_page_size );
       }
 
       /* Insert MDR so the IF1 code can start using it */
       if( if1_mdr_insert( cmd_struct.microdrive_index,
 			  MICRODRIVE_CARTRIDGE_LENGTH * cmd_struct.microdrive_index,
-			  cmd_struct.data_size ) )
+			  cmd_struct.data_size,
+	                  cmd_struct.write_protected ) )
       {
 	status.error = true;
       }
-      
-gpio_put( TEST_OUTPUT_GP, 0 );
 
     }
     break;

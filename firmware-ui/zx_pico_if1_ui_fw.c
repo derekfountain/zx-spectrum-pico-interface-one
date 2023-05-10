@@ -195,9 +195,8 @@ void insert_mdr_image( uint8_t which, uint8_t *src )
   ui_to_io_insert_mdr_t cmd_struct =
     {
       .microdrive_index   = which,
-      .is_write_protected = 0,
       .data_size          = MICRODRIVE_CARTRIDGE_LENGTH,
-      .page_size          = MICRODRIVE_CARTRIDGE_PAGE_SIZE,
+      .write_protected    = WRITE_PROTECT_OFF,    // Needs to come from final byte of the MDR file
       .checksum           = 0
     };
   uart_write_blocking(UI_PICO_UART_ID, (uint8_t*)&cmd_struct, sizeof(cmd_struct)); 	

@@ -185,7 +185,8 @@ static int32_t load_flash_tape_image( flash_mdr_image_index_t which )
 }
 #endif
 
-int32_t if1_mdr_insert( const microdrive_index_t which, uint32_t psram_offset, uint32_t length_in_bytes )
+int32_t if1_mdr_insert( const microdrive_index_t which, uint32_t psram_offset, uint32_t length_in_bytes,
+			write_protect_t write_protected )
 {
   /*
    * This loads the test cartridge data from flash. It'll come via
@@ -196,9 +197,9 @@ int32_t if1_mdr_insert( const microdrive_index_t which, uint32_t psram_offset, u
 
   microdrive[which].cartridge_data_psram_offset = psram_offset;
   microdrive[which].cartridge_len_in_blocks     = (length_in_bytes / MICRODRIVE_BLOCK_LEN);
-
-  microdrive[which].inserted = 1;
-  microdrive[which].modified = 0;
+  microdrive[which].cartridge_write_protect     = write_protected;
+  microdrive[which].inserted                    = 1;
+  microdrive[which].modified                    = 0;
 
   /*
    * pream is 512 bytes in the microdrive_t structure.
