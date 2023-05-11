@@ -232,17 +232,8 @@ void __time_critical_func(core1_main)( void )
 
   trace(TRC_INTS_OFF, 0);
 
-  if( if1_init() == -1 )
-  {
-    /* Slow blink means not enough memory for the in-RAM microdrive image */
-    while(1)
-    {
-      gpio_put(LED_PIN, 1);
-      busy_wait_us_32(250000);
-      gpio_put(LED_PIN, 0);
-      busy_wait_us_32(250000);
-    }
-  }
+  /* Set up the IF1 structures */
+  if1_init();
 
   trace(TRC_IF1_INIT, 0);
 
@@ -330,7 +321,7 @@ void __time_critical_func(core1_main)( void )
 
       /* Make the GPIOs inputs again */
       gpio_set_dir_in_masked( DBUS_MASK );
-	  
+          
       /* Put level shifter direction back to ZX->Pico */
       pio_sm_put( pio, sm_mreq, 0 );
     }
@@ -363,7 +354,7 @@ void __time_critical_func(core1_main)( void )
 
       /* Make the GPIOs inputs again */
       gpio_set_dir_in_masked( DBUS_MASK );
-	  
+          
       /* Put level shifter direction back to ZX->Pico */
       pio_sm_put( pio, sm_mreq, 0 );
     }
@@ -371,13 +362,16 @@ void __time_critical_func(core1_main)( void )
 }
 
 
+/*
+ * Write a block of data into the pseudo RAM device at a given location.
+ */
 static void write_psram_block( uint32_t psram_offset, uint8_t *block_buffer, uint32_t length )
 {
   gpio_put( PSRAM_SPI_CSN_PIN, 0 );
 
   uint8_t write_cmd[] = { PSRAM_CMD_WRITE,
-	                  psram_offset >> 16, psram_offset >> 8, psram_offset 
-	                };
+                          psram_offset >> 16, psram_offset >> 8, psram_offset 
+                        };
 
   spi_write_blocking(PSRAM_SPI, write_cmd,    sizeof(write_cmd));
   spi_write_blocking(PSRAM_SPI, block_buffer, length);
@@ -448,9 +442,7 @@ int __time_critical_func(main)( void )
   /*
    * Psuedo SRAM device, on SPI
    *
-   * Enable SPI 0 at <n> MHz and connect to GPIOs. Second param is a baudrate, giving it
-   * a frequency like this seems rather silly. You get what the hardware can give you.
-   * Might as well ask for the theoretical maximum though.
+   * Enable SPI 0 at <n> MHz and connect to GPIOs. Might as well ask for the theoretical maximum.
    */
   spi_init(PSRAM_SPI, 62 * 1000 * 1000);
   gpio_set_function(PSRAM_SPI_RX_PIN, GPIO_FUNC_SPI);
@@ -462,8 +454,7 @@ int __time_critical_func(main)( void )
    *  https://forums.raspberrypi.com//viewtopic.php?f=145&t=300589
    * this PSRAM device likes its slave-select line low across the
    * whole transaction (not high and low, byte to byte). It's
-   * therefore controlled with software (the SPI hardware doing
-   * things differently).
+   * therefore controlled with software.
    */
   gpio_init(PSRAM_SPI_CSN_PIN);
   gpio_set_dir(PSRAM_SPI_CSN_PIN, GPIO_OUT);
@@ -474,7 +465,7 @@ int __time_critical_func(main)( void )
 
   /* All examples I've seen don't bother with this reset, might be optional */
   uint8_t reset_cmd[] = { PSRAM_CMD_RESET_ENABLE, 
-			  PSRAM_CMD_RESET };
+                          PSRAM_CMD_RESET };
   gpio_put(PSRAM_SPI_CSN_PIN, 0); 
   spi_write_blocking(PSRAM_SPI, reset_cmd, 2);
   gpio_put(PSRAM_SPI_CSN_PIN, 1);   
@@ -484,9 +475,9 @@ int __time_critical_func(main)( void )
 
   /* Read ID, on the chip I'm using takes 0x9F as the command followed by 3 "don't care"s */
   uint8_t read_cmd[] = { PSRAM_CMD_READ_ID,
-			 0, 0, 0 };
+                         0, 0, 0 };
   spi_write_blocking(PSRAM_SPI, read_cmd, sizeof(read_cmd)); 
-			
+                        
   /* Chip I'm using returns 0x0D, 0x5D according to the datasheet */
   uint8_t id1, id2;
   spi_read_blocking(PSRAM_SPI, 0, &id1, 1 ); 
@@ -540,7 +531,12 @@ int __time_critical_func(main)( void )
   /* Wait for the other core to initialise */
   while( core1_running == 0 );
 
-  /* This core responds to commands from the User Interface Pico */
+  /*
+   * This core responds to commands from the User Interface Pico. In theory it's
+   * tightly controlled and "can't go wrong." In practise bytes might get lost
+   * and the Picos get out of step during programming development. So at least
+   * try to keep the communications in lockstep.
+   */
   while( 1 )
   {
     /* Wait for IU Pico to say something */
@@ -552,7 +548,7 @@ int __time_critical_func(main)( void )
       gpio_put(LED_PIN, 1);
       uart_putc_raw(IO_PICO_UART_ID, UI_TO_IO_ACK);
       break;
-	
+        
     case UI_TO_IO_TEST_LED_OFF:
       gpio_put(LED_PIN, 0);
       uart_putc_raw(IO_PICO_UART_ID, UI_TO_IO_ACK);
@@ -579,36 +575,36 @@ int __time_critical_func(main)( void )
       uint32_t final_page_size = cmd_struct.data_size - (pages * 256);
       for( uint32_t page=0; page < pages; page++ )
       {
-	/* Load a page from the UI Pico into a local buffer */
-	uint8_t page_buffer[ 256 ];
-	uart_read_blocking(IO_PICO_UART_ID, page_buffer, sizeof(page_buffer) );
+        /* Load a page from the UI Pico into a local buffer */
+        uint8_t page_buffer[ 256 ];
+        uart_read_blocking(IO_PICO_UART_ID, page_buffer, sizeof(page_buffer) );
 
-	/* Work out where to store this page in the PSRAM and write it in */
-	uint32_t psram_offset = (MICRODRIVE_CARTRIDGE_LENGTH * cmd_struct.microdrive_index)
-	                         +
-	                        (page*256);
+        /* Work out where to store this page in the PSRAM and write it in */
+        uint32_t psram_offset = (MICRODRIVE_CARTRIDGE_LENGTH * cmd_struct.microdrive_index)
+                                 +
+                                (page*256);
 
-	write_psram_block( psram_offset, page_buffer, sizeof(page_buffer) );
+        write_psram_block( psram_offset, page_buffer, sizeof(page_buffer) );
       }
 
       /* Do the last bit */
       if( final_page_size != 0 )
       {
-	uint8_t page_buffer[ final_page_size ];
-	uart_read_blocking(IO_PICO_UART_ID, page_buffer, sizeof(page_buffer) );
+        uint8_t page_buffer[ final_page_size ];
+        uart_read_blocking(IO_PICO_UART_ID, page_buffer, sizeof(page_buffer) );
 
-	uint32_t psram_offset = (MICRODRIVE_CARTRIDGE_LENGTH * cmd_struct.microdrive_index)
-	                         +
-	                        (pages*256);
+        uint32_t psram_offset = (MICRODRIVE_CARTRIDGE_LENGTH * cmd_struct.microdrive_index)
+                                 +
+                                (pages*256);
 
-	write_psram_block( psram_offset, page_buffer, final_page_size );
+        write_psram_block( psram_offset, page_buffer, final_page_size );
       }
 
       /* Insert MDR so the IF1 code can start using it */
       if1_mdr_insert( cmd_struct.microdrive_index,
-		      MICRODRIVE_CARTRIDGE_LENGTH * cmd_struct.microdrive_index,
-		      cmd_struct.data_size,
-		      cmd_struct.write_protected );
+                      MICRODRIVE_CARTRIDGE_LENGTH * cmd_struct.microdrive_index,
+                      cmd_struct.data_size,
+                      cmd_struct.write_protected );
 
     }
     break;

@@ -74,7 +74,7 @@ static void __time_critical_func(blip_test_pin)( void )
  * Initialise Interface One structure. Create the 8 microdrive images.
  * All start off with no cartridge inserted.
  */
-int32_t if1_init( void )
+void if1_init( void )
 {
   if1_ula_comms_clk = 0;
 
@@ -94,7 +94,7 @@ int32_t if1_init( void )
     microdrive[m].cartridge_len_in_blocks     = 0;
   }
 
-  return 0;
+  return;
 }
 
 
@@ -178,11 +178,11 @@ static void __time_critical_func(microdrives_restart)( void )
   {
     /* Move the to the start of a block */
     while( ( microdrive[m].head_pos % MICRODRIVE_BLOCK_LEN ) != 0  &&
-	   ( microdrive[m].head_pos % MICRODRIVE_BLOCK_LEN ) != MICRODRIVE_HEAD_LEN )
+           ( microdrive[m].head_pos % MICRODRIVE_BLOCK_LEN ) != MICRODRIVE_HEAD_LEN )
     {
       increment_head(m);
     }
-	
+        
     /* Reset current number of bytes written */
     microdrive[m].transfered = 0;
 
@@ -224,62 +224,62 @@ inline uint8_t __time_critical_func(port_ctr_in)( void )
 
       /* pream might be an array of flags, one for each block, indicating something... */
       /* Original comment suggests formatted? Of the block? */
-      if( microdrive[active_microdrive_index].pream[block] == SYNC_OK )  	/* if formatted */
+      if( microdrive[active_microdrive_index].pream[block] == SYNC_OK )         /* if formatted */
       {
-	/* This is the only place the gap is used. It counts down from 15 to 0.
-	 * While it's non-zero the GAP bit is set in the status byte returned
-	 * to the IF1. When it gets to zero the sync value is counted down.
-	 * That's treated in the exact same way, counting down from 15. When
-	 * that gets to 0 both gap and sync are reset to 15.
-	 * The effect is output of
-	 *
-	 *  GAP=1, SYNC=1 15 times
-	 *  GAP=0, SYNC=0 15 times
-	 *
-	 * Gap is looked for in the FORMAT command, and the TURN-ON routine
-	 * which establishes if a formatted cartridge is in the drive. Also
-	 * GET-M-BUF which is the microdrive block read routine. These bits
-	 * of code look for a non-gap followed by a gap. In the receive-block
-	 * code https://www.tablix.org/~avian/spectrum/rom/if1_2.htm#L15EB
-	 * it looks for 8 non-gap statuses, followed by 6 gap statuses
-	 * followed by one SYNC status. (Setting .gap to 8 and .sync to 6
-	 * works here, but I'll keep with the original code's 15s.)
-	 *
-	 * If the gap isn't found the IF1 ROM code drops out at NOPRES:
-	 * https://www.tablix.org/~avian/spectrum/rom/if1_2.htm#L153D
-	 * If the sync isn't found then it goes back to looking for
-	 * non-gap followed by gap. When looking for a data block it
-	 * loops 500 times before giving up; when looking for a header
-	 * block it loops 65535 times before giving up.
-	 */
-	if( microdrive[active_microdrive_index].gap )
-	{
-	  /* Send back a "no-gap status", the IF1 looks for 8 consecutive of these */
-	  microdrive[active_microdrive_index].gap--;
-	}
-	else
-	{
-	  /*
-	   * Now start sending back "gap status", the IF1 looks for 6 consecutive of these
-	   * followed by one "sync status"
-	   */
-	  ret &= 0xf9; /* GAP and SYNC low (both are active low) */
+        /* This is the only place the gap is used. It counts down from 15 to 0.
+         * While it's non-zero the GAP bit is set in the status byte returned
+         * to the IF1. When it gets to zero the sync value is counted down.
+         * That's treated in the exact same way, counting down from 15. When
+         * that gets to 0 both gap and sync are reset to 15.
+         * The effect is output of
+         *
+         *  GAP=1, SYNC=1 15 times
+         *  GAP=0, SYNC=0 15 times
+         *
+         * Gap is looked for in the FORMAT command, and the TURN-ON routine
+         * which establishes if a formatted cartridge is in the drive. Also
+         * GET-M-BUF which is the microdrive block read routine. These bits
+         * of code look for a non-gap followed by a gap. In the receive-block
+         * code https://www.tablix.org/~avian/spectrum/rom/if1_2.htm#L15EB
+         * it looks for 8 non-gap statuses, followed by 6 gap statuses
+         * followed by one SYNC status. (Setting .gap to 8 and .sync to 6
+         * works here, but I'll keep with the original code's 15s.)
+         *
+         * If the gap isn't found the IF1 ROM code drops out at NOPRES:
+         * https://www.tablix.org/~avian/spectrum/rom/if1_2.htm#L153D
+         * If the sync isn't found then it goes back to looking for
+         * non-gap followed by gap. When looking for a data block it
+         * loops 500 times before giving up; when looking for a header
+         * block it loops 65535 times before giving up.
+         */
+        if( microdrive[active_microdrive_index].gap )
+        {
+          /* Send back a "no-gap status", the IF1 looks for 8 consecutive of these */
+          microdrive[active_microdrive_index].gap--;
+        }
+        else
+        {
+          /*
+           * Now start sending back "gap status", the IF1 looks for 6 consecutive of these
+           * followed by one "sync status"
+           */
+          ret &= 0xf9; /* GAP and SYNC low (both are active low) */
 
-	  if( microdrive[active_microdrive_index].sync )
-	  {
-	    microdrive[active_microdrive_index].sync--;
-	  }
-	  else
-	  {
-	    /* 15 is overkill to keep the IF1 ROM code happy, but that's the original FUSE code */
-	    microdrive[active_microdrive_index].gap  = 15;
-	    microdrive[active_microdrive_index].sync = 15;
-	  }
-	}
+          if( microdrive[active_microdrive_index].sync )
+          {
+            microdrive[active_microdrive_index].sync--;
+          }
+          else
+          {
+            /* 15 is overkill to keep the IF1 ROM code happy, but that's the original FUSE code */
+            microdrive[active_microdrive_index].gap  = 15;
+            microdrive[active_microdrive_index].sync = 15;
+          }
+        }
       }
       else
       {
-	/* pream[block] is not SYNC_OK, we'll return GAP=1 and SYNC=1 indefinitely */
+        /* pream[block] is not SYNC_OK, we'll return GAP=1 and SYNC=1 indefinitely */
       }
     
       /*
@@ -289,8 +289,8 @@ inline uint8_t __time_critical_func(port_ctr_in)( void )
        */
       if( microdrive[active_microdrive_index].cartridge_write_protect )
       {
-	/* If write protected flag is true, pull the bit in the status byte low */
-	ret &= 0xfe;
+        /* If write protected flag is true, pull the bit in the status byte low */
+        ret &= 0xfe;
       }
     }
     else
@@ -362,12 +362,12 @@ inline void __time_critical_func(port_ctr_out)( uint8_t val )
     extern const uint8_t LED_PIN;
     gpio_put( LED_PIN, any_motor_on );
     trace(TRC_MOTORS_ON, (microdrive[7].motor_on << 7) |
-	                 (microdrive[6].motor_on << 6) |
-	                 (microdrive[5].motor_on << 5) |
-	                 (microdrive[4].motor_on << 4) |
+                         (microdrive[6].motor_on << 6) |
+                         (microdrive[5].motor_on << 5) |
+                         (microdrive[4].motor_on << 4) |
                          (microdrive[3].motor_on << 3) |
-	                 (microdrive[2].motor_on << 2) |
-	                 (microdrive[1].motor_on << 1) |
+                         (microdrive[2].motor_on << 2) |
+                         (microdrive[1].motor_on << 1) |
                          (microdrive[0].motor_on) );
 #endif
   }
@@ -418,11 +418,11 @@ inline uint8_t __time_critical_func(port_mdr_in)( void )
 
       /* Work out where the byte under the active microdrive's head is stored in the PSRAM */
       uint32_t psram_offset = microdrive[active_microdrive_index].cartridge_data_psram_offset
-	                      +
-	                      microdrive[active_microdrive_index].head_pos;
+                              +
+                              microdrive[active_microdrive_index].head_pos;
 
       uint8_t read_cmd[] = { PSRAM_CMD_READ,
-			     psram_offset >> 16, psram_offset >> 8, psram_offset };
+                             psram_offset >> 16, psram_offset >> 8, psram_offset };
       spi_write_blocking(PSRAM_SPI, read_cmd, sizeof(read_cmd));
 
       /*
@@ -525,8 +525,8 @@ inline void __time_critical_func(port_mdr_out)( uint8_t val )
      * outside that range
      */
     if( (microdrive[active_microdrive_index].transfered > 11)
-	&&
-	(microdrive[active_microdrive_index].transfered < (microdrive[active_microdrive_index].max_bytes + 12)) )
+        &&
+        (microdrive[active_microdrive_index].transfered < (microdrive[active_microdrive_index].max_bytes + 12)) )
     {
       /* OK, write the byte to "tape" which is really the PSRAM on the SPI bus */
       
@@ -534,10 +534,10 @@ inline void __time_critical_func(port_mdr_out)( uint8_t val )
 
       /* Work out where the byte under the active microdrive's head is stored in the PSRAM */
       uint32_t psram_offset = microdrive[active_microdrive_index].cartridge_data_psram_offset
-	                      +
-	                      microdrive[active_microdrive_index].head_pos;
+                              +
+                              microdrive[active_microdrive_index].head_pos;
       uint8_t write_cmd[] = { PSRAM_CMD_WRITE,
-			      psram_offset >> 16, psram_offset >> 8, psram_offset,
+                              psram_offset >> 16, psram_offset >> 8, psram_offset,
                               val };
 
       /* Write the IF1's byte to that location in PSRAM */

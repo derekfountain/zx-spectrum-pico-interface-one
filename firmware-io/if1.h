@@ -98,14 +98,14 @@ void trace( TRACE_CODE code, uint32_t data );
 typedef struct _microdrive_t
 {
   utils_file file;
-  char *filename;		/* old filename */
+  char *filename;               /* old filename */
   int inserted;
   int modified;  // This isn't used, but might be needed for the save code
   int motor_on;
   int head_pos;
   int transfered;
   int max_bytes;
-  uint8_t pream[512];	/* preamble/sync area written. 256 header blocks and 256 data blocks */
+  uint8_t pream[512];   /* preamble/sync area written. 256 header blocks and 256 data blocks */
   uint8_t last;
   uint8_t gap;
   uint8_t sync;
@@ -148,9 +148,9 @@ typedef int32_t flash_mdr_image_index_t;
 /* Offset into external RAM device to find something */
 typedef uint32_t psram_offset_t;
 
-int32_t if1_init( void );
-void    if1_mdr_insert( const microdrive_index_t which, const uint32_t psram_offset, const uint32_t length_in_bytes,
-			const write_protect_t write_protected );
+void if1_init( void );
+void if1_mdr_insert( const microdrive_index_t which, const uint32_t psram_offset, const uint32_t length_in_bytes,
+                     const write_protect_t write_protected );
 
 uint8_t port_ctr_in( void );
 void port_ctr_out( uint8_t val );
