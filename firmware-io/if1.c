@@ -24,8 +24,6 @@
 
 #include "hardware/gpio.h"
 #include "pico/platform.h"
-#include "hardware/flash.h"
-#include "hardware/dma.h"
 #include "hardware/spi.h"
 
 #include "cartridge.h"
@@ -52,14 +50,12 @@ static microdrive_t microdrive[NUM_MICRODRIVES];
 /* Clock bit in the ULA */
 static uint8_t if1_ula_comms_clk;
 
-extern const uint8_t LED_PIN;
-
 static void __time_critical_func(microdrives_restart)( void );
 
+
+/* This can be used to blip a pin on the scope, sometimes gives a clue what's happening */
 static void __time_critical_func(blip_test_pin)( void )
 {
-// No GPIOs left
-#if 0
   extern const uint8_t TEST_OUTPUT_GP;
   gpio_put( TEST_OUTPUT_GP, 1 );
   __asm volatile ("nop");
@@ -71,7 +67,6 @@ static void __time_critical_func(blip_test_pin)( void )
   __asm volatile ("nop");
   __asm volatile ("nop");
   __asm volatile ("nop");
-#endif
 }
 
 
@@ -104,97 +99,12 @@ int32_t if1_init( void )
 
 
 /*
- * Load one of the tape images from flash into the PSRAM buffer.
- * The UI Pico will do this job at some point but I don't yet
- * know how
+ * "Insert" one of the tape images into the PSRAM buffer. The PSRAM buffer
+ * is where the image will be read from and written to.
  */
-/* Lopping this lot off the stack will cause a problem if the program grows. Keep static. Might need to page */
-static tape_byte_t  __attribute__((aligned(4))) cartridge_data[MICRODRIVE_CARTRIDGE_LENGTH];
-
-#if 0
-static int32_t load_flash_tape_image( flash_mdr_image_index_t which )
+void if1_mdr_insert( const microdrive_index_t which, const uint32_t psram_offset, const uint32_t length_in_bytes,
+                     const write_protect_t write_protected )
 {
-  /* Check requested image exists */
-  if( (which < 0) || (which > LAST_MICRODRIVE_INDEX) )
-    return -1;
-
-  /* Check requested image will fit in buffer */
-  if( flash_mdr_image[which].length > MICRODRIVE_CARTRIDGE_LENGTH )
-    return -1;
-
-  /*
-   * Copy cartridge image data from flash into the SPI PSRAM which is where it's
-   * normally used from. I can't DMA (or memcpy()) into the SPI device, so this
-   * goes in 2 steps: flash into onboard RAM, onboard RAM into PSRAM
-   */
-
-  /*
-   * Step 1, pull from flash into onboard RAM
-   *
-   * memcpy( cartridge_data, (tape_byte_t*)flash_mdr_image[which].flash_address, flash_mdr_image[which].length );
-   *
-   * Using DMA, but in practise this is only about 1ms faster than the memcpy()
-   * It still takes about 8ms.
-   */
-  int chan             = dma_claim_unused_channel( true );
-  dma_channel_config c = dma_channel_get_default_config( chan );
-  channel_config_set_transfer_data_size( &c, DMA_SIZE_32 );
-  channel_config_set_read_increment( &c, true );
-  channel_config_set_write_increment( &c, true );
-
-  dma_channel_configure(
-    chan,                                  // Channel to be configured
-    &c,                                    // The configuration we just created
-    cartridge_data,                        // The initial write address
-    flash_mdr_image[which].flash_address,  // The initial read address
-    flash_mdr_image[which].length/4,       // Number of transfers; in this case each is 4 bytes.
-    true                                   // Start immediately.
-  );
-
-  dma_channel_wait_for_finish_blocking( chan );
-  dma_channel_unclaim( chan );
-
-  /* OK, cartridge data is DMA'ed from flash in onboard RAM, step 2 is to copy from RAM into PSRAM */
-  gpio_put( PSRAM_SPI_CSN_PIN, 0 );
-
-  /*
-   * Write cartridge data bytes into SPI PSRAM. Don't worry about exact size, there's
-   * plenty of room in the PSRAM. Each cartridge takes up the maximum possible number
-   * of bytes
-   */
-  uint32_t psram_offset = which * MICRODRIVE_CARTRIDGE_LENGTH;
-
-  uint8_t write_cmd[] = { PSRAM_CMD_WRITE,
-			  psram_offset >> 16, psram_offset >> 8 , psram_offset
-			};
-  spi_write_blocking(PSRAM_SPI, write_cmd, sizeof(write_cmd));
-  spi_write_blocking(PSRAM_SPI, cartridge_data, MICRODRIVE_CARTRIDGE_LENGTH);
-
-  gpio_put( PSRAM_SPI_CSN_PIN, 1 );
-
-  /* Note where the cartridge image data has been put in the PSRAM */
-  microdrive[which].cartridge_data_psram_offset = psram_offset;
-
-  /* Note how many blocks it is */
-  size_t length_in_bytes = flash_mdr_image[which].length - ( flash_mdr_image[which].length % MICRODRIVE_BLOCK_LEN );
-  microdrive[which].cartridge_len_in_blocks = (length_in_bytes / MICRODRIVE_BLOCK_LEN);
- 
-  trace(TRC_LOAD_IMAGE, which);
-
-  return which;
-}
-#endif
-
-int32_t if1_mdr_insert( const microdrive_index_t which, uint32_t psram_offset, uint32_t length_in_bytes,
-			write_protect_t write_protected )
-{
-  /*
-   * This loads the test cartridge data from flash. It'll come via
-   * the UI Pico at some point
-   */
-//  if( load_flash_tape_image( which ) == -1 )
-//    return -1;
-
   microdrive[which].cartridge_data_psram_offset = psram_offset;
   microdrive[which].cartridge_len_in_blocks     = (length_in_bytes / MICRODRIVE_BLOCK_LEN);
   microdrive[which].cartridge_write_protect     = write_protected;
@@ -202,10 +112,12 @@ int32_t if1_mdr_insert( const microdrive_index_t which, uint32_t psram_offset, u
   microdrive[which].modified                    = 0;
 
   /*
-   * pream is 512 bytes in the microdrive_t structure.
-   * This is filling 2 areas of the microdrive area's premable with SYNC_OK.
-   * The loop is over the number of blocks on the cartridge.
-   * Not quite sure what it's doing, maybe marking some sort of sector map?
+   * pream is 512 bytes in the microdrive_t structure. It's actually 2 256 byte
+   * buffers, one to indicate the 256 header blocks are formatted, the other
+   * to indicate the 256 data blocks are formatted.
+   *
+   * This is filling the 2 areas of the microdrive area's premable with SYNC_OK.
+   * (We assume formatted a cartridge.)
    */
   for( size_t i = microdrive[which].cartridge_len_in_blocks; i > 0; i-- )
     microdrive[which].pream[255 + i] = microdrive[which].pream[i-1] = SYNC_OK;
@@ -218,7 +130,7 @@ int32_t if1_mdr_insert( const microdrive_index_t which, uint32_t psram_offset, u
 
   trace(TRC_IMAGE_INIT, which);
 
-  return 0;
+  return;
 }
 
 
@@ -254,31 +166,36 @@ static microdrive_index_t __time_critical_func(query_active_microdrive)( void )
 
 
 /*
- * I think the idea here is that whenever the Z80 asks for the microdrive
- * status that can be seen as an indication that the IF1 is going to want
- * to read the tape. On the real device this action will be a poll, "is
- * the data ready? is the data ready? is the data ready?..." For this
- * emulation we can immediately make it ready and respond "yes, ready".
+ * Whenever the Z80 asks for the microdrive status that can be seen as
+ * an indication that the IF1 is going to want to read the tape. On the
+ * real device this action will be a poll, "is the data ready? is the
+ * data ready? is the data ready?..." For this emulation we can immediately
+ * make it ready and respond "yes, ready".
  */
 static void __time_critical_func(microdrives_restart)( void )
 {
   for( microdrive_index_t m=0; m<NUM_MICRODRIVES; m++ )
   {
+    /* Move the to the start of a block */
     while( ( microdrive[m].head_pos % MICRODRIVE_BLOCK_LEN ) != 0  &&
 	   ( microdrive[m].head_pos % MICRODRIVE_BLOCK_LEN ) != MICRODRIVE_HEAD_LEN )
     {
-      increment_head(m); /* put head in the start of a block */
+      increment_head(m);
     }
 	
-    microdrive[m].transfered = 0; /* reset current number of bytes written */
+    /* Reset current number of bytes written */
+    microdrive[m].transfered = 0;
 
+    /* Set max byte for the block we're now at */
     if( ( microdrive[m].head_pos % MICRODRIVE_BLOCK_LEN ) == 0 )
     {
-      microdrive[m].max_bytes = MICRODRIVE_HEAD_LEN; /* up to 15 bytes for header blocks */
+      /* up to 15 bytes for header blocks */
+      microdrive[m].max_bytes = MICRODRIVE_HEAD_LEN;
     }
     else
     {
-      microdrive[m].max_bytes = MICRODRIVE_HEAD_LEN + MICRODRIVE_DATA_LEN + 1; /* up to 528 bytes for data blocks */
+      /* up to 528 bytes for data blocks */
+      microdrive[m].max_bytes = MICRODRIVE_HEAD_LEN + MICRODRIVE_DATA_LEN + 1;
     }
   }
 
@@ -442,6 +359,7 @@ inline void __time_critical_func(port_ctr_out)( uint8_t val )
     any_motor_on |= microdrive[0].motor_on;
 
 #if 0
+    extern const uint8_t LED_PIN;
     gpio_put( LED_PIN, any_motor_on );
     trace(TRC_MOTORS_ON, (microdrive[7].motor_on << 7) |
 	                 (microdrive[6].motor_on << 6) |
@@ -561,7 +479,7 @@ inline void __time_critical_func(port_mdr_out)( uint8_t val )
   microdrive_index_t active_microdrive_index;
   if( (active_microdrive_index=query_active_microdrive()) == NO_ACTIVE_MICRODRIVE )
   {
-    blip_test_pin(); blip_test_pin(); blip_test_pin(); blip_test_pin();
+    blip_test_pin(); blip_test_pin(); blip_test_pin();
     return;  /* "Can't happen" with IF1 ROM code */
   }
 

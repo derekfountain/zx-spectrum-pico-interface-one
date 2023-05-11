@@ -37,8 +37,6 @@ if (TARGET tinyusb_device)
                                           pico_multicore
                                           hardware_pio
                                           hardware_spi
-                                          hardware_flash
-                                          hardware_dma
 					  hardware_uart)
 
   pico_enable_stdio_usb(zx_pico_if1_io_fw 0)

@@ -180,7 +180,7 @@ void encoder_callback( uint gpio, uint32_t events )
  * This implementation loads the MDR image out of flash, where the test
  * images are compiled in. It'll have to work with the SD card in due course.
  */
-void insert_mdr_image( uint8_t which, uint8_t *src )
+void insert_mdr_image( uint8_t which, uint8_t *src, uint32_t length )
 {
   ssd1306_clear(&display);
   ssd1306_draw_string(&display, 10, 10, 1, "Send cmd");
@@ -195,7 +195,7 @@ void insert_mdr_image( uint8_t which, uint8_t *src )
   ui_to_io_insert_mdr_t cmd_struct =
     {
       .microdrive_index   = which,
-      .data_size          = MICRODRIVE_CARTRIDGE_LENGTH,
+      .data_size          = length,
       .write_protected    = WRITE_PROTECT_OFF,    // Needs to come from final byte of the MDR file
       .checksum           = 0
     };
@@ -208,7 +208,7 @@ void insert_mdr_image( uint8_t which, uint8_t *src )
   ssd1306_draw_string(&display, 10, 10, 1, "Sending data");
   ssd1306_show(&display);
 
-  for( uint32_t i=0; i < MICRODRIVE_CARTRIDGE_LENGTH; i++ )
+  for( uint32_t i=0; i < length; i++ )
   {
     /* Feedback on screen, probably redundant when I get a proper GUI */
     if( (i % 16384) == 0 )
@@ -222,6 +222,70 @@ void insert_mdr_image( uint8_t which, uint8_t *src )
 
     uart_putc_raw(UI_PICO_UART_ID, *(src+i));
   }
+
+  ssd1306_clear(&display);
+  ssd1306_draw_string(&display, 0, 0, 1, "Done");
+  ssd1306_show(&display);
+
+  return;
+}
+
+void insert_mdr_file( uint8_t which, uint8_t *filename )
+{
+  ssd1306_clear(&display);
+  ssd1306_draw_string(&display, 10, 10, 1, filename);
+  ssd1306_show(&display);
+
+  uart_putc_raw(UI_PICO_UART_ID, UI_TO_IO_INSERT_MDR);
+  UI_TO_IO_CMD ack = uart_getc(UI_PICO_UART_ID);
+  if( ack != UI_TO_IO_ACK )
+    gpio_put( LED_PIN, 0 );   // Just break the pattern so I can see it's wrong
+
+
+  /* Write the data which describes the command */
+  ui_to_io_insert_mdr_t cmd_struct =
+    {
+      .microdrive_index   = which,
+      .data_size          = 97197,
+      .write_protected    = WRITE_PROTECT_ON,    // Needs to come from final byte of the MDR file
+      .checksum           = 0
+    };
+  uart_write_blocking(UI_PICO_UART_ID, (uint8_t*)&cmd_struct, sizeof(cmd_struct)); 	
+  ack = uart_getc(UI_PICO_UART_ID);
+  if( ack != UI_TO_IO_ACK )
+    gpio_put( LED_PIN, 1 );   // Just break the pattern so I can see it's wrong
+
+  ssd1306_clear(&display);
+  ssd1306_draw_string(&display, 10, 10, 1, "Sending data");
+  ssd1306_show(&display);
+
+
+  FIL fil;
+  FRESULT fr = f_open(&fil, filename, FA_READ);
+  if (FR_OK != fr && FR_EXIST != fr)
+        panic("f_open(%s) error: %s (%d)\n", filename, FRESULT_str(fr), fr);
+
+  for( uint32_t i=0; i < 97197; i++ )
+  {
+    /* Feedback on screen, probably redundant when I get a proper GUI */
+    if( (i % 16384) == 0 )
+    {
+      uint8_t msg[32];
+      snprintf( msg, 16, "Drive %d, %d", which, i );
+      ssd1306_clear(&display);
+      ssd1306_draw_string(&display, 0, 0, 1, msg);
+      ssd1306_show(&display);
+    }
+
+    uint8_t byte;
+    UINT    br;
+    fr = f_read(&fil, &byte, 1, &br);
+    if (br == 0) break; /* error or eof */
+
+    uart_putc_raw(UI_PICO_UART_ID, byte);
+  }
+
+  fr = f_close(&fil);
 
   ssd1306_clear(&display);
   ssd1306_draw_string(&display, 0, 0, 1, "Done");
@@ -275,6 +339,7 @@ int main( void )
     FRESULT fr = f_mount(&pSD->fatfs, pSD->pcName, 1);
     if (FR_OK != fr) panic("f_mount error: %s (%d)\n", FRESULT_str(fr), fr);
     FIL fil;
+
     const char* const filename = "filen_df.txt";
     fr = f_open(&fil, filename, FA_OPEN_APPEND | FA_WRITE);
     if (FR_OK != fr && FR_EXIST != fr)
@@ -283,10 +348,11 @@ int main( void )
         printf("f_printf failed\n");
     }
     fr = f_close(&fil);
+
     if (FR_OK != fr) {
         printf("f_close error: %s (%d)\n", FRESULT_str(fr), fr);
     }
-    f_unmount(pSD->pcName);
+//    f_unmount(pSD->pcName);
 
 
   /*
@@ -316,11 +382,24 @@ int main( void )
   uart_set_format(UI_PICO_UART_ID, PICOS_DATA_BITS, PICOS_STOP_BITS, PICOS_PARITY);
   uart_set_translate_crlf(UI_PICO_UART_ID, false);
 
+#if 0
   /* Send test flash images over to the IO Pico */
   for( microdrive_index_t microdrive_index=0; microdrive_index < NUM_MICRODRIVES; microdrive_index++ )
   {
-    insert_mdr_image( microdrive_index, flash_mdr_image[microdrive_index].flash_address );
+    insert_mdr_image( microdrive_index, flash_mdr_image[microdrive_index].flash_address, flash_mdr_image[microdrive_index].length );
   }
+#else
+
+  /* Read files from SD card and insert each one */
+  /* h8_254.mdr  mm.mdr  test_image_32blk.mdr  test_image.mdr */
+
+  uint8_t *mdr_files[] = {"mm.mdr"};//, "h8_254.mdr", "test_image_32blk.mdr", "test_image.mdr" };
+
+//  for( uint8_t mdr_file_index=0; mdr_file_index < sizeof(mdr_files); mdr_file_index++ )
+//  {
+    insert_mdr_file( 0, mdr_files[0] );
+//  }
+#endif
 
   while( 1 )
   {

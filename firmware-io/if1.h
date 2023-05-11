@@ -149,8 +149,8 @@ typedef int32_t flash_mdr_image_index_t;
 typedef uint32_t psram_offset_t;
 
 int32_t if1_init( void );
-int32_t if1_mdr_insert( const microdrive_index_t which, uint32_t psram_offset, uint32_t length_in_bytes,
-			write_protect_t write_protected );
+void    if1_mdr_insert( const microdrive_index_t which, const uint32_t psram_offset, const uint32_t length_in_bytes,
+			const write_protect_t write_protected );
 
 uint8_t port_ctr_in( void );
 void port_ctr_out( uint8_t val );

@@ -605,13 +605,10 @@ int __time_critical_func(main)( void )
       }
 
       /* Insert MDR so the IF1 code can start using it */
-      if( if1_mdr_insert( cmd_struct.microdrive_index,
-			  MICRODRIVE_CARTRIDGE_LENGTH * cmd_struct.microdrive_index,
-			  cmd_struct.data_size,
-	                  cmd_struct.write_protected ) )
-      {
-	status.error = true;
-      }
+      if1_mdr_insert( cmd_struct.microdrive_index,
+		      MICRODRIVE_CARTRIDGE_LENGTH * cmd_struct.microdrive_index,
+		      cmd_struct.data_size,
+		      cmd_struct.write_protected );
 
     }
     break;
