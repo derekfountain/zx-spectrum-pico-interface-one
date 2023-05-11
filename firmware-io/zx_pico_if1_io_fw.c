@@ -382,6 +382,15 @@ static void write_psram_block( uint32_t psram_offset, uint8_t *block_buffer, uin
 }
 
 
+/*
+ * Receive and return a command from the UI Pico. This waits for and sorts
+ * out the preamble, then returns the command byte.
+ *
+ * It doesn't time out. If this code is being called it's assumed that the
+ * core is waiting for a command and has nothing else to do. So it'll
+ * wait forever, bypassing anything which doesn't look like a command
+ * sequence.
+ */
 UI_TO_IO_CMD get_ui_to_io_cmd( void )
 {
   uint8_t preamble[] = UI_TO_IO_CMD_PREAMBLE;
@@ -433,6 +442,23 @@ UI_TO_IO_CMD get_ui_to_io_cmd( void )
 
   return uart_getc(IO_PICO_UART_ID);
 }
+
+
+/*
+ * Send an ACK back to the UI Pico. If our end of the UART is
+ * clogged, don't do anything. Not sure what, if any, scenario
+ * this might help.
+ */
+void send_ack_to_ui( void )
+{
+  if( uart_is_writable(IO_PICO_UART_ID) )
+  {
+    uart_putc_raw(IO_PICO_UART_ID, UI_TO_IO_ACK);
+  }
+
+  return;
+}
+
 
 int __time_critical_func(main)( void )
 {
@@ -598,27 +624,26 @@ int __time_critical_func(main)( void )
     {
     case UI_TO_IO_TEST_LED_ON:
       gpio_put(LED_PIN, 1);
-      uart_putc_raw(IO_PICO_UART_ID, UI_TO_IO_ACK);
+      send_ack_to_ui();
       break;
         
     case UI_TO_IO_TEST_LED_OFF:
       gpio_put(LED_PIN, 0);
-      uart_putc_raw(IO_PICO_UART_ID, UI_TO_IO_ACK);
+      send_ack_to_ui();
       break;
 
     case UI_TO_IO_INSERT_MDR:
     {
       /* ACK the command */
-      UI_TO_IO_CMD ack = UI_TO_IO_ACK;
-      uart_putc_raw(IO_PICO_UART_ID, UI_TO_IO_ACK);
+      send_ack_to_ui();
 
       ui_to_io_insert_mdr_t cmd_struct;
 
       /* UI will respond with a structure describing the incoming MDR data */
       uart_read_blocking(IO_PICO_UART_ID, (uint8_t*)&cmd_struct, sizeof(cmd_struct) );
-      uart_putc_raw(IO_PICO_UART_ID, UI_TO_IO_ACK);
+      send_ack_to_ui();
 
-      trace(TRC_RCV_INSERT_MDR_STRUCT, cmd_struct.microdrive_index);
+      // trace(TRC_RCV_INSERT_MDR_STRUCT, cmd_struct.microdrive_index);
 
       /*
        * There isn't enough room to store the whole 137KB image, so receive it in 256 byte pages.
@@ -652,7 +677,7 @@ int __time_critical_func(main)( void )
         write_psram_block( psram_offset, page_buffer, final_page_size );
       }
 
-      /* Insert MDR so the IF1 code can start using it */
+      /* Insert MDR image in PSRAM into the IF1 code so it can be accessed */
       if1_mdr_insert( cmd_struct.microdrive_index,
                       MICRODRIVE_CARTRIDGE_LENGTH * cmd_struct.microdrive_index,
                       cmd_struct.data_size,

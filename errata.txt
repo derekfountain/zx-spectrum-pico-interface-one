@@ -186,3 +186,8 @@ UART0 (GPIOs 0 to 3) on UI Pico to UART0 (GPIOs 12 to 15) on IO Pico.
 : Fixed on board (soldered wires)
 : Fixed in code
 : Needs doing on schematic and PCB
+
+
+SD Card reader card detect pin needs connecting up. Need to test first to see
+if it works, it looks like if should.
+: Needs doing

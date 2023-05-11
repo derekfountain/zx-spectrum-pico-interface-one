@@ -43,6 +43,9 @@ write_protect_t;
 #define MICRODRIVE_CARTRIDGE_LENGTH \
         ( MICRODRIVE_BLOCK_MAX * MICRODRIVE_BLOCK_LEN )    /* 97740 for 180 block cartridge 137922 for 254 blocks */
 
+/* MDR image is data size plus one more for the write protect flag */
+#define MICRODRIVE_MDR_MAX_LENGTH ( MICRODRIVE_CARTRIDGE_LENGTH + 1)
+
 #endif
 
 

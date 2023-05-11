@@ -13,6 +13,7 @@ if (TARGET tinyusb_device)
   add_executable(zx_pico_if1_ui_fw
     zx_pico_if1_ui_fw.c
     ssd1306.c
+    sd_card.c
     hw_config.c
   )
 
@@ -24,8 +25,6 @@ if (TARGET tinyusb_device)
                                           pico_mem_ops	
                                           pico_multicore
                                           hardware_spi
-                                          hardware_flash
-                                          hardware_dma
                                           hardware_i2c
 					  hardware_uart
                                           FatFs_SPI)

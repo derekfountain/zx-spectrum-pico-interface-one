@@ -42,57 +42,11 @@
 #include "hardware/spi.h"
 #include "hardware/uart.h"
 
-/* These are the FAT filesystem library headers */
-#include "f_util.h"
-#include "ff.h"
-#include "rtc.h"
-#include "hw_config.h"
-
 #include "uart.h"
 #include "microdrive.h"
 #include "ui_io_comms.h"
 
-/* This file is generated from test data, don't change what's in it manually */
-#include "flash_images.h"
-
-/*
- * These are the test images in flash. They can be memcpy'ed from flash memory,
- * but writing them back is more elaborate.
- *
- * Examine, for example, 98304 bytes of flash memory with:
- *
- * (gdb) x/98304xb flash_mdr_image[0].flash_address
- *
- * Remove any cruft from the bottom of the output (left side is OK) then convert
- * to binary with
- *
- * > perl -ne 'while( m/ (0x..)/g) {print chr(hex($1))}' < ram.txt > ram.bin
- */
-
-/*
- * Details of an MDR image in flash. At the moment the address points to
- * the tape bytes. This will eventually be the complete MDR image sent
- * from SD card
- */
-typedef struct _flash_mdr_image
-{
-  void     *flash_address;
-  uint32_t  length;
-}
-flash_mdr_image_t;
-
-static flash_mdr_image_t flash_mdr_image[NUM_MICRODRIVES] =
-{
-  { tape1_image, tape1_image_len },
-  { tape2_image, tape2_image_len },
-  { tape3_image, tape3_image_len },
-  { tape4_image, tape4_image_len },
-  { tape5_image, tape5_image_len },
-  { tape6_image, tape6_image_len },
-  { tape7_image, tape7_image_len },
-  { tape8_image, tape8_image_len },
-};
-
+#include "sd_card.h"
 #include "ssd1306.h"
 
 ssd1306_t display;
@@ -113,7 +67,7 @@ ssd1306_t display;
 //#define OVERCLOCK 150000
 //#define OVERCLOCK 270000
 
-//const uint8_t LED_PIN = PICO_DEFAULT_LED_PIN;
+const uint8_t LED_PIN = PICO_DEFAULT_LED_PIN;
 
 /* https://lastminuteengineers.com/rotary-encoder-arduino-tutorial/ is useful */
 
@@ -124,6 +78,9 @@ ssd1306_t display;
 /* Something to show on the screen */
 uint8_t previous_value = 255;
 uint8_t value          = 0;
+
+/* Room for one full MDR image to work with */
+uint8_t working_image_buffer[MICRODRIVE_MDR_MAX_LENGTH];
 
 void encoder_callback( uint gpio, uint32_t events ) 
 {
@@ -176,63 +133,13 @@ void encoder_callback( uint gpio, uint32_t events )
 }
 
 
-/*
- * This implementation loads the MDR image out of flash, where the test
- * images are compiled in. It'll have to work with the SD card in due course.
- */
-void insert_mdr_image( uint8_t which, uint8_t *src, uint32_t length )
-{
-  ssd1306_clear(&display);
-  ssd1306_draw_string(&display, 10, 10, 1, "Send cmd");
-  ssd1306_show(&display);
-
-  uart_putc_raw(UI_PICO_UART_ID, UI_TO_IO_INSERT_MDR);
-  UI_TO_IO_CMD ack = uart_getc(UI_PICO_UART_ID);
-  if( ack != UI_TO_IO_ACK )
-    gpio_put( LED_PIN, 0 );   // Just break the pattern so I can see it's wrong
-
-  /* Write the data which describes the command */
-  ui_to_io_insert_mdr_t cmd_struct =
-    {
-      .microdrive_index   = which,
-      .data_size          = length,
-      .write_protected    = WRITE_PROTECT_OFF,    // Needs to come from final byte of the MDR file
-      .checksum           = 0
-    };
-  uart_write_blocking(UI_PICO_UART_ID, (uint8_t*)&cmd_struct, sizeof(cmd_struct)); 	
-  ack = uart_getc(UI_PICO_UART_ID);
-  if( ack != UI_TO_IO_ACK )
-    gpio_put( LED_PIN, 1 );   // Just break the pattern so I can see it's wrong
-
-  ssd1306_clear(&display);
-  ssd1306_draw_string(&display, 10, 10, 1, "Sending data");
-  ssd1306_show(&display);
-
-  for( uint32_t i=0; i < length; i++ )
-  {
-    /* Feedback on screen, probably redundant when I get a proper GUI */
-    if( (i % 16384) == 0 )
-    {
-      uint8_t msg[32];
-      snprintf( msg, 16, "Drive %d, %d", which, i );
-      ssd1306_clear(&display);
-      ssd1306_draw_string(&display, 0, 0, 1, msg);
-      ssd1306_show(&display);
-    }
-
-    uart_putc_raw(UI_PICO_UART_ID, *(src+i));
-  }
-
-  ssd1306_clear(&display);
-  ssd1306_draw_string(&display, 0, 0, 1, "Done");
-  ssd1306_show(&display);
-
-  return;
-}
-
 void insert_mdr_file( uint8_t which, uint8_t *filename )
 {
   uint8_t preamble[] = UI_TO_IO_CMD_PREAMBLE;
+
+  /* Load image into the working buffer */
+  if( read_mdr_file( filename, working_image_buffer, MICRODRIVE_MDR_MAX_LENGTH ) != 0 )
+    return;
 
   for( uint8_t preamble_index=0; preamble_index < sizeof(preamble); preamble_index++ )
     uart_putc_raw(UI_PICO_UART_ID, preamble[preamble_index]);
@@ -246,12 +153,14 @@ void insert_mdr_file( uint8_t which, uint8_t *filename )
   if( ack != UI_TO_IO_ACK )
     gpio_put( LED_PIN, 0 );   // Just break the pattern so I can see it's wrong
 
+  /* Stat the file, find its length */
+  /* Seek to end, read final byte for w/p flag */
 
   /* Write the data which describes the command */
   ui_to_io_insert_mdr_t cmd_struct =
     {
       .microdrive_index   = which,
-      .data_size          = 97197,
+      .data_size          = MICRODRIVE_MDR_MAX_LENGTH,
       .write_protected    = WRITE_PROTECT_ON,    // Needs to come from final byte of the MDR file
       .checksum           = 0
     };
@@ -264,13 +173,7 @@ void insert_mdr_file( uint8_t which, uint8_t *filename )
   ssd1306_draw_string(&display, 10, 10, 1, "Sending data");
   ssd1306_show(&display);
 
-
-  FIL fil;
-  FRESULT fr = f_open(&fil, filename, FA_READ);
-  if (FR_OK != fr && FR_EXIST != fr)
-        panic("f_open(%s) error: %s (%d)\n", filename, FRESULT_str(fr), fr);
-
-  for( uint32_t i=0; i < 97197; i++ )
+  for( uint32_t i=0; i < cmd_struct.data_size; i++ )
   {
     /* Feedback on screen, probably redundant when I get a proper GUI */
     if( (i % 16384) == 0 )
@@ -282,15 +185,8 @@ void insert_mdr_file( uint8_t which, uint8_t *filename )
       ssd1306_show(&display);
     }
 
-    uint8_t byte;
-    UINT    br;
-    fr = f_read(&fil, &byte, 1, &br);
-    if (br == 0) break; /* error or eof */
-
-    uart_putc_raw(UI_PICO_UART_ID, byte);
+    uart_putc_raw( UI_PICO_UART_ID, working_image_buffer[i] );
   }
-
-  fr = f_close(&fil);
 
   ssd1306_clear(&display);
   ssd1306_draw_string(&display, 0, 0, 1, "Done");
@@ -337,28 +233,8 @@ int main( void )
   gpio_set_irq_enabled( ENC_A, GPIO_IRQ_EDGE_FALL, true );
   gpio_set_irq_enabled( ENC_B, GPIO_IRQ_EDGE_FALL, true );
 
-  /* hw_config, i think? */
-    // See FatFs - Generic FAT Filesystem Module, "Application Interface",
-    // http://elm-chan.org/fsw/ff/00index_e.html
-    sd_card_t *pSD = sd_get_by_num(0);
-    FRESULT fr = f_mount(&pSD->fatfs, pSD->pcName, 1);
-    if (FR_OK != fr) panic("f_mount error: %s (%d)\n", FRESULT_str(fr), fr);
-    FIL fil;
-
-    const char* const filename = "filen_df.txt";
-    fr = f_open(&fil, filename, FA_OPEN_APPEND | FA_WRITE);
-    if (FR_OK != fr && FR_EXIST != fr)
-        panic("f_open(%s) error: %s (%d)\n", filename, FRESULT_str(fr), fr);
-    if (f_printf(&fil, "Hello, world!\n") < 0) {
-        printf("f_printf failed\n");
-    }
-    fr = f_close(&fil);
-
-    if (FR_OK != fr) {
-        printf("f_close error: %s (%d)\n", FRESULT_str(fr), fr);
-    }
-//    f_unmount(pSD->pcName);
-
+  /* Mount the SD card, if it's ready */
+  mount_sd_card();
 
   /*
    * Set up our UART to talk to the IO Pico
@@ -387,24 +263,15 @@ int main( void )
   uart_set_format(UI_PICO_UART_ID, PICOS_DATA_BITS, PICOS_STOP_BITS, PICOS_PARITY);
   uart_set_translate_crlf(UI_PICO_UART_ID, false);
 
-#if 0
-  /* Send test flash images over to the IO Pico */
-  for( microdrive_index_t microdrive_index=0; microdrive_index < NUM_MICRODRIVES; microdrive_index++ )
-  {
-    insert_mdr_image( microdrive_index, flash_mdr_image[microdrive_index].flash_address, flash_mdr_image[microdrive_index].length );
-  }
-#else
-
-  /* Read files from SD card and insert each one */
+  /* TEST SETUP Read files from SD card and insert each one */
   /* h8_254.mdr  mm.mdr  test_image_32blk.mdr  test_image.mdr */
 
-  uint8_t *mdr_files[] = {"mm.mdr"};//, "h8_254.mdr", "test_image_32blk.mdr", "test_image.mdr" };
+  uint8_t *mdr_files[] = {"mm.mdr", "h8_254.mdr", "test_image_32blk.mdr", "test_image.mdr" };
 
-//  for( uint8_t mdr_file_index=0; mdr_file_index < sizeof(mdr_files); mdr_file_index++ )
-//  {
-    insert_mdr_file( 0, mdr_files[0] );
-//  }
-#endif
+  for( uint8_t mdr_file_index=0; mdr_file_index < (sizeof(mdr_files)/sizeof(uint8_t*)); mdr_file_index++ )
+  {
+    insert_mdr_file( mdr_file_index, mdr_files[mdr_file_index] );
+  }
 
   while( 1 )
   {
