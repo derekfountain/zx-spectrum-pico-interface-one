@@ -232,6 +232,11 @@ void insert_mdr_image( uint8_t which, uint8_t *src, uint32_t length )
 
 void insert_mdr_file( uint8_t which, uint8_t *filename )
 {
+  uint8_t preamble[] = UI_TO_IO_CMD_PREAMBLE;
+
+  for( uint8_t preamble_index=0; preamble_index < sizeof(preamble); preamble_index++ )
+    uart_putc_raw(UI_PICO_UART_ID, preamble[preamble_index]);
+
   ssd1306_clear(&display);
   ssd1306_draw_string(&display, 10, 10, 1, filename);
   ssd1306_show(&display);
@@ -403,6 +408,10 @@ int main( void )
 
   while( 1 )
   {
+    uint8_t preamble[] = UI_TO_IO_CMD_PREAMBLE;
+
+    for( uint8_t preamble_index=0; preamble_index < sizeof(preamble); preamble_index++ )
+      uart_putc_raw(UI_PICO_UART_ID, preamble[preamble_index]);
     uart_putc_raw(UI_PICO_UART_ID, UI_TO_IO_TEST_LED_ON);
     gpio_put( LED_PIN, 1 );
 
@@ -415,6 +424,8 @@ int main( void )
 
 
 
+    for( uint8_t preamble_index=0; preamble_index < sizeof(preamble); preamble_index++ )
+      uart_putc_raw(UI_PICO_UART_ID, preamble[preamble_index]);
     uart_putc_raw(UI_PICO_UART_ID, UI_TO_IO_TEST_LED_OFF);
     gpio_put( LED_PIN, 0 );
 

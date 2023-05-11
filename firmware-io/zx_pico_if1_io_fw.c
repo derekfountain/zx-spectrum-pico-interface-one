@@ -382,6 +382,58 @@ static void write_psram_block( uint32_t psram_offset, uint8_t *block_buffer, uin
 }
 
 
+UI_TO_IO_CMD get_ui_to_io_cmd( void )
+{
+  uint8_t preamble[] = UI_TO_IO_CMD_PREAMBLE;
+
+  uint8_t preamble_received = 0;
+
+  uint8_t preamble_index = 0;
+
+  /*
+   * This makes an effort at spotting the preamble of a command byte.
+   * The premable is a handful of bytes which are easy to see on a 
+   * scope, followed by a command byte. If the sequence happens to
+   * exist in a stream of cartridge data which might be being sent
+   * over then this won't help, but in most cases it might sort
+   * things out when the UI pico gets restarted.
+   */
+  while( ! preamble_received )
+  {
+    uint8_t received_byte = uart_getc(IO_PICO_UART_ID);
+
+    if( received_byte != preamble[preamble_index] )
+    {
+      if( preamble_index == 0 )
+      {
+	continue;
+      }
+      else
+      {
+	if( received_byte != preamble[0] )
+	{
+	  preamble_index = 0;
+	  continue;
+	}
+	else
+	{
+	  /*
+	   * Byte matches the first of the preamble sequence. It could be
+	   * the start of the preamble. Run with it from here.
+	   */
+	}
+      }
+    }
+
+    if( ++preamble_index == sizeof(preamble) )
+    {
+      preamble_received = 1;
+    }
+  }
+
+  return uart_getc(IO_PICO_UART_ID);
+}
+
 int __time_critical_func(main)( void )
 {
   bi_decl(bi_program_description("ZX Spectrum Pico IF1 board binary."));
@@ -540,7 +592,7 @@ int __time_critical_func(main)( void )
   while( 1 )
   {
     /* Wait for IU Pico to say something */
-    UI_TO_IO_CMD cmd = uart_getc(IO_PICO_UART_ID);
+    UI_TO_IO_CMD cmd = get_ui_to_io_cmd();
 
     switch( cmd )
     {

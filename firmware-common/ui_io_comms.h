@@ -29,6 +29,9 @@
  */
 #define MICRODRIVE_CARTRIDGE_PAGE_SIZE (MICRODRIVE_CARTRIDGE_LENGTH/181)
 
+/* Sequence of byte to preceed a UI to IO command */
+#define UI_TO_IO_CMD_PREAMBLE { 0xDF, 0xAA, 0x55 }
+
 /*
  * My commands from UI to IO Pico. UI is always "master", so it needs to 
  * poll the IO Pico to receive requests for action from the IO Pico
