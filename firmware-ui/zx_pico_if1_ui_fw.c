@@ -45,6 +45,7 @@
 #include "uart.h"
 #include "microdrive.h"
 #include "ui_io_comms.h"
+#include "work_queue.h"
 
 #include "sd_card.h"
 #include "ssd1306.h"
@@ -196,6 +197,68 @@ void insert_mdr_file( uint8_t which, uint8_t *filename )
 }
 
 
+void __time_critical_func(core1_main)( void )
+{
+  while( 1 )
+  {
+    if( work_queue_is_empty() )
+      continue;
+
+    work_queue_type_t type;
+    void             *data;
+    if( remove_work( &type, &data  ) )
+    {
+      switch( type )
+      {
+      case WORK_INSERT_MDR:
+      {
+	work_insert_mdr_t *insert_mdr_data = (work_insert_mdr_t*)data;
+
+	insert_mdr_file( insert_mdr_data->microdrive_index, insert_mdr_data->filename );
+	free(insert_mdr_data);
+      }
+      break;
+
+      default:
+	break;
+      }
+    }
+
+
+
+
+#if 0
+    uint8_t preamble[] = UI_TO_IO_CMD_PREAMBLE;
+
+    for( uint8_t preamble_index=0; preamble_index < sizeof(preamble); preamble_index++ )
+      uart_putc_raw(UI_PICO_UART_ID, preamble[preamble_index]);
+    uart_putc_raw(UI_PICO_UART_ID, UI_TO_IO_TEST_LED_ON);
+    gpio_put( LED_PIN, 1 );
+
+    UI_TO_IO_CMD ack = uart_getc(UI_PICO_UART_ID);
+    if( ack != UI_TO_IO_ACK )
+      gpio_put( LED_PIN, 0 );   // Just break the pattern so I can see it's wrong
+      
+    sleep_ms(1000);
+
+
+
+
+    for( uint8_t preamble_index=0; preamble_index < sizeof(preamble); preamble_index++ )
+      uart_putc_raw(UI_PICO_UART_ID, preamble[preamble_index]);
+    uart_putc_raw(UI_PICO_UART_ID, UI_TO_IO_TEST_LED_OFF);
+    gpio_put( LED_PIN, 0 );
+
+    ack = uart_getc(UI_PICO_UART_ID);
+    if( ack != UI_TO_IO_ACK )
+      gpio_put( LED_PIN, 1 );   // Just break the pattern so I can see it's wrong
+
+    sleep_ms(1000);
+#endif
+  } /* Infinite loop */
+}
+
+
 int main( void )
 {
   bi_decl(bi_program_description("ZX Spectrum Pico IF1 board binary."));
@@ -263,6 +326,17 @@ int main( void )
   uart_set_format(UI_PICO_UART_ID, PICOS_DATA_BITS, PICOS_STOP_BITS, PICOS_PARITY);
   uart_set_translate_crlf(UI_PICO_UART_ID, false);
 
+  work_queue_init();
+
+  /*
+   * For some reason the second core code doesn't get started after SWD programming
+   * unless I pause for a moment here
+   */
+  busy_wait_us_32(100000);
+
+  /* Init complete, run 2nd core code */
+  multicore_launch_core1( core1_main ); 
+
   /* TEST SETUP Read files from SD card and insert each one */
   /* h8_254.mdr  mm.mdr  test_image_32blk.mdr  test_image.mdr */
 
@@ -270,42 +344,16 @@ int main( void )
 
   for( uint8_t mdr_file_index=0; mdr_file_index < (sizeof(mdr_files)/sizeof(uint8_t*)); mdr_file_index++ )
   {
-    insert_mdr_file( mdr_file_index, mdr_files[mdr_file_index] );
+    work_insert_mdr_t *work_ptr = malloc( sizeof(work_insert_mdr_t) );
+
+    work_ptr->microdrive_index = mdr_file_index;
+    work_ptr->filename         = mdr_files[mdr_file_index];
+
+    insert_work( WORK_INSERT_MDR, work_ptr );
   }
 
   while( 1 )
   {
-    uint8_t preamble[] = UI_TO_IO_CMD_PREAMBLE;
-
-    for( uint8_t preamble_index=0; preamble_index < sizeof(preamble); preamble_index++ )
-      uart_putc_raw(UI_PICO_UART_ID, preamble[preamble_index]);
-    uart_putc_raw(UI_PICO_UART_ID, UI_TO_IO_TEST_LED_ON);
-    gpio_put( LED_PIN, 1 );
-
-    UI_TO_IO_CMD ack = uart_getc(UI_PICO_UART_ID);
-    if( ack != UI_TO_IO_ACK )
-      gpio_put( LED_PIN, 0 );   // Just break the pattern so I can see it's wrong
-      
-    sleep_ms(1000);
-
-
-
-
-    for( uint8_t preamble_index=0; preamble_index < sizeof(preamble); preamble_index++ )
-      uart_putc_raw(UI_PICO_UART_ID, preamble[preamble_index]);
-    uart_putc_raw(UI_PICO_UART_ID, UI_TO_IO_TEST_LED_OFF);
-    gpio_put( LED_PIN, 0 );
-
-    ack = uart_getc(UI_PICO_UART_ID);
-    if( ack != UI_TO_IO_ACK )
-      gpio_put( LED_PIN, 1 );   // Just break the pattern so I can see it's wrong
-
-    sleep_ms(1000);
-
-#if 0
-    gpio_put( LED_PIN, 0 );
-    sleep_ms(1000);
-
     if( value != previous_value )
     {
       uint8_t value_str[4];
@@ -317,8 +365,6 @@ int main( void )
 
       previous_value = value;
     }
-
-#endif
 
   } /* Infinite loop */
 

@@ -15,9 +15,12 @@ if (TARGET tinyusb_device)
     ssd1306.c
     sd_card.c
     hw_config.c
+    work_queue.c
+    gui/gui.c
   )
 
   target_include_directories(zx_pico_if1_ui_fw PRIVATE ../firmware-common)
+  target_include_directories(zx_pico_if1_ui_fw PRIVATE gui)
 
   add_subdirectory(no-OS-FatFS-SD-SPI-RPi-Pico/FatFs_SPI)
 
