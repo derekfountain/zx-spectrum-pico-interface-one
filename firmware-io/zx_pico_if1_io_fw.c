@@ -391,7 +391,7 @@ static void write_psram_block( uint32_t psram_offset, uint8_t *block_buffer, uin
  * wait forever, bypassing anything which doesn't look like a command
  * sequence.
  */
-UI_TO_IO_CMD get_ui_to_io_cmd( void )
+static UI_TO_IO_CMD get_ui_to_io_cmd( void )
 {
   uint8_t preamble[] = UI_TO_IO_CMD_PREAMBLE;
 
@@ -453,7 +453,8 @@ void send_ack_to_ui( void )
 {
   if( uart_is_writable(IO_PICO_UART_ID) )
   {
-    uart_putc_raw(IO_PICO_UART_ID, UI_TO_IO_ACK);
+    uint8_t ack = UI_TO_IO_ACK;
+    uart_write_blocking(IO_PICO_UART_ID, (uint8_t*)&ack, sizeof(uint8_t) );
   }
 
   return;
@@ -620,23 +621,27 @@ int __time_critical_func(main)( void )
     /* Wait for IU Pico to say something */
     UI_TO_IO_CMD cmd = get_ui_to_io_cmd();
 
+    /* ACK the command */
+    send_ack_to_ui();
+
     switch( cmd )
     {
+    case UI_TO_IO_INIALISE:
+    {
+      /* This doesn't do anything. The command is ACK'ed (above). */
+    }
+    break;
+
     case UI_TO_IO_TEST_LED_ON:
       gpio_put(LED_PIN, 1);
-      send_ack_to_ui();
       break;
         
     case UI_TO_IO_TEST_LED_OFF:
       gpio_put(LED_PIN, 0);
-      send_ack_to_ui();
       break;
 
     case UI_TO_IO_INSERT_MDR:
     {
-      /* ACK the command */
-      send_ack_to_ui();
-
       ui_to_io_insert_mdr_t cmd_struct;
 
       /* UI will respond with a structure describing the incoming MDR data */
@@ -686,7 +691,29 @@ int __time_critical_func(main)( void )
     }
     break;
 
+    case UI_TO_IO_REQUEST_STATUS:
+    {
+      /* Command structure is currently a dummy, nothing is required */
+      ui_to_io_request_status_t cmd_struct;
+      uart_read_blocking(IO_PICO_UART_ID, (uint8_t*)&cmd_struct, sizeof(ui_to_io_request_status_t) );
+
+      io_to_ui_status_response_t status_response;
+      status_response.status[0] = 0x11; //query_microdrives_status();
+      status_response.status[1] = 0x22; //query_microdrives_status();
+      status_response.status[2] = 0x33; //query_microdrives_status();
+      status_response.status[3] = 0x44; //query_microdrives_status();
+      status_response.status[4] = 0x55; //query_microdrives_status();
+      status_response.status[5] = 0x66; //query_microdrives_status();
+      status_response.status[6] = 0x77; //query_microdrives_status();
+      status_response.status[7] = 0x88; //query_microdrives_status();
+
+      uart_write_blocking(IO_PICO_UART_ID, (uint8_t*)&status_response, sizeof(io_to_ui_status_response_t) );
+    }
+    break;
+
     default:
+
+      blip_test_pin();      
       break;
     }
 

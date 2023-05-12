@@ -31,7 +31,18 @@
 #include "hardware/uart.h"
 
 /* 921600 is as fast as it goes. 135KB goes over in about 1.5secs */
-#define PICOS_BAUD_RATE     921600
+//#define PICOS_BAUD_RATE     921600
+/*
+ * Further testing suggests errors appear in the request status response at
+ * anything over 115200. Odd, it's very consistent, the ACK byte is duplicated
+ * and the first byte of the response becomes the ACK. The scope decode shows
+ * the ACK then 11 22 33 44 55 66 77 88 is on the wire, it's the receiving
+ * UART which is receving AC 22 33 44 55 66 77 (and not seeing the 88). I 
+ * can't help thinking something odd is going on with the code, but it's
+ * really simple and slowing down to 115200 makes the problem go away. Moving
+ * on for now, but this needs fixing.
+ */
+#define PICOS_BAUD_RATE     115200
 #define PICOS_DATA_BITS     8
 #define PICOS_STOP_BITS     1
 #define PICOS_PARITY        UART_PARITY_NONE

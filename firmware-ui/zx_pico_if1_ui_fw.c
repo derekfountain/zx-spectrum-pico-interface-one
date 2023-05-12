@@ -34,6 +34,7 @@
 #include <string.h>
 #include <stdlib.h>
 #include "pico/stdlib.h"
+#include "pico/time.h"
 #include "hardware/gpio.h"
 #include "pico/binary_info.h"
 #include "pico/multicore.h"
@@ -134,25 +135,55 @@ void encoder_callback( uint gpio, uint32_t events )
 }
 
 
-void insert_mdr_file( uint8_t which, uint8_t *filename )
+/*
+ * Send the given command to the IO Pico. The preamble is sent first so
+ * the IO Pico can sync with the command byte which follows, then the
+ * command byte itself, then it waits for the ACK to come back saying
+ * the IO Pico has received it
+ */
+static bool send_cmd( UI_TO_IO_CMD cmd )
 {
   uint8_t preamble[] = UI_TO_IO_CMD_PREAMBLE;
 
+  /* Send the preamble */
+  for( uint8_t preamble_index=0; preamble_index < sizeof(preamble); preamble_index++ )
+    uart_putc_raw(UI_PICO_UART_ID, preamble[preamble_index]);
+
+  /* Send the command, this is just one byte */
+  uart_putc_raw(UI_PICO_UART_ID, cmd);
+
+  /* Read the ACK from the IO Pico */
+  UI_TO_IO_CMD ack = uart_getc(UI_PICO_UART_ID);
+
+  /* Update display, test code, to be removed */
+  ssd1306_clear(&display);
+  uint8_t value_str[32];
+  snprintf( value_str, 32, "Sent cmd 0x%02X", cmd );
+  ssd1306_draw_string(&display, 0, 0, 1, value_str);
+  snprintf( value_str, 32, "ACK back 0x%02X", ack );
+  ssd1306_draw_string(&display, 0, 8, 1, value_str);
+  ssd1306_show(&display);
+
+  if( ack != UI_TO_IO_ACK )
+  {
+    return false;
+  }
+
+  return true;
+}
+
+
+static void insert_mdr_file( uint8_t which, uint8_t *filename )
+{
   /* Load image into the working buffer */
   if( read_mdr_file( filename, working_image_buffer, MICRODRIVE_MDR_MAX_LENGTH ) != 0 )
     return;
-
-  for( uint8_t preamble_index=0; preamble_index < sizeof(preamble); preamble_index++ )
-    uart_putc_raw(UI_PICO_UART_ID, preamble[preamble_index]);
 
   ssd1306_clear(&display);
   ssd1306_draw_string(&display, 10, 10, 1, filename);
   ssd1306_show(&display);
 
-  uart_putc_raw(UI_PICO_UART_ID, UI_TO_IO_INSERT_MDR);
-  UI_TO_IO_CMD ack = uart_getc(UI_PICO_UART_ID);
-  if( ack != UI_TO_IO_ACK )
-    gpio_put( LED_PIN, 0 );   // Just break the pattern so I can see it's wrong
+  (void)send_cmd( UI_TO_IO_INSERT_MDR );
 
   /* Stat the file, find its length */
   /* Seek to end, read final byte for w/p flag */
@@ -166,7 +197,7 @@ void insert_mdr_file( uint8_t which, uint8_t *filename )
       .checksum           = 0
     };
   uart_write_blocking(UI_PICO_UART_ID, (uint8_t*)&cmd_struct, sizeof(cmd_struct)); 	
-  ack = uart_getc(UI_PICO_UART_ID);
+  UI_TO_IO_CMD ack = uart_getc(UI_PICO_UART_ID);
   if( ack != UI_TO_IO_ACK )
     gpio_put( LED_PIN, 1 );   // Just break the pattern so I can see it's wrong
 
@@ -197,25 +228,97 @@ void insert_mdr_file( uint8_t which, uint8_t *filename )
 }
 
 
-void __time_critical_func(core1_main)( void )
+static void init_io_link( void )
+{
+  /*
+   * All this does is repeatedly try to get a preamble/cmd/ack sequence
+   * from the IO Pico. If it fails, it tries again. It's hard to see
+   * why this wouldn't work (once the Picos are booted and running)
+   * but if it doesn't we can't really proceed so we might as well
+   * just spin trying.
+   */
+  while( send_cmd( UI_TO_IO_INIALISE ) == false );
+
+  return;
+}
+
+
+static void request_status( void )
+{
+  (void)send_cmd( UI_TO_IO_REQUEST_STATUS );
+    
+  /* Write the data which describes the command */
+  ui_to_io_request_status_t cmd_struct =
+    {
+      .dummy              = 0xFF,        // Eyecatcher, nothing actually required here as yet
+    };
+  uart_write_blocking(UI_PICO_UART_ID, (uint8_t*)&cmd_struct, sizeof(ui_to_io_request_status_t)); 	
+
+  io_to_ui_status_response_t status_struct;
+  uart_read_blocking(UI_PICO_UART_ID, (uint8_t*)&status_struct, sizeof(io_to_ui_status_response_t)); 	
+
+  /* I need to emit the values into the GUI somehow. For now, just print it */
+  uint8_t line = 16;
+  for( uint8_t i=0; i<8; i+=2 )
+  {
+    uint8_t value_str[32];
+    snprintf( value_str, 16, "0x%02X 0x%02X", status_struct.status[i], status_struct.status[i+1] );
+
+    ssd1306_draw_string(&display, 0, line+=8, 1, value_str);
+    ssd1306_show(&display);
+  }
+}
+
+
+/* Timer function, called repeatedly to set up a request of status from the IO Pico */
+static bool add_work_request_status( repeating_timer_t *rt )
+{
+  work_request_status_t *request_status_ptr = malloc( sizeof(work_request_status_t) );
+  request_status_ptr->dummy = 0;
+  insert_work( WORK_REQUEST_STATUS, request_status_ptr );
+
+  return true;
+}
+
+
+static void __time_critical_func(core1_main)( void )
 {
   while( 1 )
   {
-    if( work_queue_is_empty() )
-      continue;
-
     work_queue_type_t type;
     void             *data;
     if( remove_work( &type, &data  ) )
     {
+      /* There's work to be done - what is it? */
       switch( type )
       {
+      case WORK_INIT_IO_LINK:
+      {
+	/* Work required is to link to the IO Pico, can't proceed without this */
+	work_init_io_link_t *init_io_link_data = (work_init_io_link_t*)data;
+
+	init_io_link();
+	free(init_io_link_data);
+      }
+      break;
+
       case WORK_INSERT_MDR:
       {
+	/* Work required is the insertion of a cartridge. The mdr/filename is in the data structure */
 	work_insert_mdr_t *insert_mdr_data = (work_insert_mdr_t*)data;
 
 	insert_mdr_file( insert_mdr_data->microdrive_index, insert_mdr_data->filename );
 	free(insert_mdr_data);
+      }
+      break;
+
+      case WORK_REQUEST_STATUS:
+      {
+	/* Work required is to ask the IO Pico to send its status */
+	work_request_status_t *request_status_data = (work_request_status_t*)data;
+
+	request_status();
+	free(request_status_data);
       }
       break;
 
@@ -328,6 +431,10 @@ int main( void )
 
   work_queue_init();
 
+  /* First piece of work is to establish the link to the IO Pico */
+  work_init_io_link_t *init_io_work_ptr = malloc( sizeof(work_init_io_link_t) );
+  insert_work( WORK_INIT_IO_LINK, init_io_work_ptr );
+
   /*
    * For some reason the second core code doesn't get started after SWD programming
    * unless I pause for a moment here
@@ -339,21 +446,38 @@ int main( void )
 
   /* TEST SETUP Read files from SD card and insert each one */
   /* h8_254.mdr  mm.mdr  test_image_32blk.mdr  test_image.mdr */
-
   uint8_t *mdr_files[] = {"mm.mdr", "h8_254.mdr", "test_image_32blk.mdr", "test_image.mdr" };
 
   for( uint8_t mdr_file_index=0; mdr_file_index < (sizeof(mdr_files)/sizeof(uint8_t*)); mdr_file_index++ )
   {
+    /* Insert MDR files into some drives. This is test code, to be removed */
     work_insert_mdr_t *work_ptr = malloc( sizeof(work_insert_mdr_t) );
 
     work_ptr->microdrive_index = mdr_file_index;
     work_ptr->filename         = mdr_files[mdr_file_index];
 
     insert_work( WORK_INSERT_MDR, work_ptr );
+
+    /* Testing is slow when loading 4 cartridges, just do the first one for now */
+    break;
   }
+
+  /*
+   * The above adds the work which sends the test cartridge image(s) to the IO Pico.
+   * The comms process starts on the other core, but takes a while to finish. During
+   * that time the next work items will be added to the queue but not actioned.
+   * The next actions are loaded from the below - a repeating timer piles on a load
+   * of status requests. These all run after the MDR image(s) are uploaded.
+   */
+
+  /* Set requests for microdrive status running. Don't move the var anywhere it might get lost */
+  repeating_timer_t repeating_status_timer;
+  add_repeating_timer_ms( 500, add_work_request_status, NULL, &repeating_status_timer );
+ 
 
   while( 1 )
   {
+#if 0
     if( value != previous_value )
     {
       uint8_t value_str[4];
@@ -365,7 +489,7 @@ int main( void )
 
       previous_value = value;
     }
-
+#endif
   } /* Infinite loop */
 
 

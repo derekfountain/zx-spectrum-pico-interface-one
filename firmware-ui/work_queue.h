@@ -24,9 +24,18 @@
 
 typedef enum
 {
+  WORK_NULL            = 0,
+  WORK_INIT_IO_LINK,
   WORK_INSERT_MDR,
+  WORK_REQUEST_STATUS,
 } work_queue_type_t;
 
+
+typedef struct _work_init_io_link_t
+{
+  uint8_t  dummy;
+}
+work_init_io_link_t;
 
 typedef struct _work_insert_mdr_t
 {
@@ -34,6 +43,12 @@ typedef struct _work_insert_mdr_t
   uint8_t *filename;
 }
 work_insert_mdr_t;
+
+typedef struct _work_request_status_t
+{
+  uint8_t  dummy;
+}
+work_request_status_t;
 
 void work_queue_init( void );
 void insert_work( work_queue_type_t type, void *data );

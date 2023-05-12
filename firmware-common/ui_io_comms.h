@@ -38,8 +38,10 @@
  */
 typedef enum
 {
-  UI_TO_IO_REQUEST_TO_SEND    = 0x01,
-  UI_TO_IO_ACK,
+  UI_TO_IO_ACK                = 0xAC,
+
+  UI_TO_IO_INIALISE           = 0xF1, 
+  UI_TO_IO_REQUEST_TO_SEND,
   UI_TO_IO_TEST_LED_ON,                                // Tell IO Pico to turn its LED on
   UI_TO_IO_TEST_LED_OFF,                               // Tell IO Pico to turn its LED off
   UI_TO_IO_INSERT_MDR,                                 // Tell IO Pico to insert the attached MDR image
@@ -48,6 +50,14 @@ typedef enum
   UI_TO_IO_REQUEST_MDR_TO_SAVE,                        // Request the IO Pico returns data from MD to save to SD card
 }
 UI_TO_IO_CMD;
+
+typedef enum
+{
+  MD_STATUS_EMPTY,
+  MD_STATUS_MDR_LOADED_UNCHANGED,
+  MD_STATUS_MDR_LOADED_NEEDS_SAVING,
+}
+microdrive_status_t;
 
 /* Not sure where this is going yet */
 typedef struct _io_status_t
@@ -65,6 +75,21 @@ typedef struct _ui_to_io_insert_mdr_t
   uint32_t           checksum;                         // Checksum, not sure if this is needed
 }
 ui_to_io_insert_mdr_t;
+
+/* Data structure to request IO Pico reports status of the microdrives */
+typedef struct _ui_to_io_request_status_t
+{
+  uint8_t dummy;                                       // Not sure anything is needed here?
+}
+ui_to_io_request_status_t;
+
+/* Response from IO Pico informing status of each microdrive */
+typedef struct _io_to_ui_status_response_t
+{
+  uint8_t status[NUM_MICRODRIVES];
+//  microdrive_status_t status[NUM_MICRODRIVES];
+}
+io_to_ui_status_response_t;
 
 #endif
 
