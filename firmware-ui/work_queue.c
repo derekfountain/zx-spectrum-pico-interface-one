@@ -20,7 +20,7 @@
 #include "pico/util/queue.h"
 #include "work_queue.h"
 
-#define QUEUE_DEPTH     5
+#define QUEUE_DEPTH     250
 
 static queue_t q;
 
@@ -45,14 +45,36 @@ bool work_queue_is_empty( void )
 }
 
 
+/*
+ * I'm not quite sure how to handle this... If a piece of work takes
+ * a long time, such as sending an MDR image, a number of request
+ * status items will be added via the timer - 2 per second. There's
+ * no point collecting all these up and running them all at once
+ * when the MDR send completes. So I'm specifically checking here
+ * to see if the last work item was a request status and if it was
+ * I'm not adding the new one to the queue if that's also a request
+ * status. I need to watch for the queue emptying. If it does, and
+ * the last item was a request status, no more request statuses will
+ * be added. To guard against that the last added type is reset when
+ * the queue empties.
+ *
+ * This seems like a hack, but I'm not sure how else to handle it.
+ */
+static work_queue_type_t last_added_type = WORK_NULL;
+
 void insert_work( work_queue_type_t type, void *data )
 {
   work_queue_entry_t entry;
+
+  if( (type == WORK_REQUEST_STATUS) && (last_added_type == WORK_REQUEST_STATUS) )
+    return;
 
   entry.work_type = type;
   entry.work_data = data;
 
   queue_add_blocking( &q, &entry );
+
+  last_added_type = type;
 
   return;
 }
@@ -71,6 +93,7 @@ bool remove_work( work_queue_type_t *type, void **data  )
   }
   else
   {
+    last_added_type = WORK_NULL;
     return false;
   }
 }
