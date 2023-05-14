@@ -26,15 +26,6 @@
 #include "cartridge.h"
 #include "microdrive.h"
 
-/* Probably won't need this in the long term */
-typedef struct utils_file {
-
-  unsigned char *buffer;
-  size_t length;
-
-} utils_file;
-
-
 /*
  * Very basic trace table, at least allows me to see the bringup sequence has completed
  *
@@ -97,14 +88,10 @@ void trace( TRACE_CODE code, uint32_t data );
  */
 typedef struct _microdrive_t
 {
-  utils_file file;
-  char *filename;               /* old filename */
-  int inserted;
-  int modified;  // This isn't used, but might be needed for the save code
-  int motor_on;
-  int head_pos;
-  int transfered;
-  int max_bytes;
+  bool    motor_on;
+  int     head_pos;
+  int     transfered;
+  int     max_bytes;
   uint8_t pream[512];   /* preamble/sync area written. 256 header blocks and 256 data blocks */
   uint8_t last;
   uint8_t gap;
@@ -133,17 +120,15 @@ typedef struct _microdrive_t
    * MDR file.
    *
    */
-  uint32_t  cartridge_data_psram_offset;
+  uint32_t cartridge_data_psram_offset;
 
-  uint8_t   cartridge_data_modified;
-  uint8_t   cartridge_write_protect;
-  uint8_t   cartridge_len_in_blocks;
+  bool     cartridge_inserted;
+  bool     cartridge_data_modified;
+  bool     cartridge_write_protect;
+  uint8_t  cartridge_len_in_blocks;
 
 } microdrive_t;
 
-
-/* Index of MDR image into flash array */
-typedef int32_t flash_mdr_image_index_t;
 
 /* Offset into external RAM device to find something */
 typedef uint32_t psram_offset_t;
@@ -158,5 +143,7 @@ void port_ctr_out( uint8_t val );
 uint8_t port_mdr_in( void );
 void port_mdr_out( uint8_t val );
 
+bool is_cartridge_inserted( microdrive_index_t which );
+bool is_cartridge_modified( microdrive_index_t which );
 
 #endif

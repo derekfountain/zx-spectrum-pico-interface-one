@@ -23,13 +23,7 @@
 #include "cartridge.h"
 #include "microdrive.h"
 
-/*
- * This is the page size for inter-Pico transfers. 137922 divides into 181 762 byte pages. This will need
- * revisiting if the max cartridge length changes, which, since it was defined in 1983, is quite unlikely.
- */
-#define MICRODRIVE_CARTRIDGE_PAGE_SIZE (MICRODRIVE_CARTRIDGE_LENGTH/181)
-
-/* Sequence of byte to preceed a UI to IO command */
+/* Sequence of bytes to preceed a UI to IO command. Arbitrary. */
 #define UI_TO_IO_CMD_PREAMBLE { 0xDF, 0xAA, 0x55 }
 
 /*
@@ -51,6 +45,10 @@ typedef enum
 }
 UI_TO_IO_CMD;
 
+/*
+ * Status the drive can be in. Whether it has a cartridge inserted,
+ * whether that cartridge has been modified, etc.
+ */
 typedef enum
 {
   MD_STATUS_EMPTY,
@@ -86,8 +84,7 @@ ui_to_io_request_status_t;
 /* Response from IO Pico informing status of each microdrive */
 typedef struct _io_to_ui_status_response_t
 {
-  uint8_t status[NUM_MICRODRIVES];
-//  microdrive_status_t status[NUM_MICRODRIVES];
+  microdrive_status_t status[NUM_MICRODRIVES];
 }
 io_to_ui_status_response_t;
 

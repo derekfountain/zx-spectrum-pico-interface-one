@@ -703,7 +703,7 @@ int __time_critical_func(main)( void )
       }
       else
       {
-	/* Need to send back a try-again or something */
+	/* FIXME Need to send back a try-again or something */
 	while(1)
 	{
 	  gpio_put(LED_PIN, 0);
@@ -722,14 +722,24 @@ int __time_critical_func(main)( void )
       uart_read_blocking(IO_PICO_UART_ID, (uint8_t*)&cmd_struct, sizeof(ui_to_io_request_status_t) );
 
       io_to_ui_status_response_t status_response;
-      status_response.status[0] = 0x11; //query_microdrives_status();
-      status_response.status[1] = 0x22; //query_microdrives_status();
-      status_response.status[2] = 0x33; //query_microdrives_status();
-      status_response.status[3] = 0x44; //query_microdrives_status();
-      status_response.status[4] = 0x55; //query_microdrives_status();
-      status_response.status[5] = 0x66; //query_microdrives_status();
-      status_response.status[6] = 0x77; //query_microdrives_status();
-      status_response.status[7] = 0x88; //query_microdrives_status();
+      for( uint8_t i=0; i < NUM_MICRODRIVES; i++ )
+      {
+	if( is_cartridge_inserted(i) )
+	{
+	  if( is_cartridge_modified(i) )
+	  {
+	    status_response.status[i] = MD_STATUS_MDR_LOADED_NEEDS_SAVING;
+	  }
+	  else
+	  {
+	    status_response.status[i] = MD_STATUS_MDR_LOADED_UNCHANGED;
+	  }
+	}
+	else
+	{
+	  status_response.status[i] = MD_STATUS_EMPTY;
+	}
+      }
 
       uart_write_blocking(IO_PICO_UART_ID, (uint8_t*)&status_response, sizeof(io_to_ui_status_response_t) );
     }

@@ -80,17 +80,17 @@ void if1_init( void )
 
   for( microdrive_index_t m=0; m<NUM_MICRODRIVES; m++ )
   {
-    microdrive[m].inserted   = 0;
-    microdrive[m].modified   = 0;
-    microdrive[m].head_pos   = 0;
-    microdrive[m].motor_on   = 0;
-    microdrive[m].gap        = 15;
-    microdrive[m].sync       = 15;
-    microdrive[m].transfered = 0;
+    microdrive[m].cartridge_inserted          = false;
+    microdrive[m].cartridge_data_modified     = false;
+    microdrive[m].head_pos                    = 0;
+    microdrive[m].motor_on                    = false;
+    microdrive[m].gap                         = 15;
+    microdrive[m].sync                        = 15;
+    microdrive[m].transfered                  = 0;
 
     microdrive[m].cartridge_data_psram_offset = 0;
-    microdrive[m].cartridge_data_modified     = 0;
-    microdrive[m].cartridge_write_protect     = 0;
+    microdrive[m].cartridge_data_modified     = false;
+    microdrive[m].cartridge_write_protect     = false;
     microdrive[m].cartridge_len_in_blocks     = 0;
   }
 
@@ -101,6 +101,8 @@ void if1_init( void )
 /*
  * "Insert" one of the tape images into the PSRAM buffer. The PSRAM buffer
  * is where the image will be read from and written to.
+ *
+ * FIXME There's no eject routine as yet
  */
 void if1_mdr_insert( const microdrive_index_t which, const uint32_t psram_offset, const uint32_t length_in_bytes,
                      const write_protect_t write_protected )
@@ -108,8 +110,7 @@ void if1_mdr_insert( const microdrive_index_t which, const uint32_t psram_offset
   microdrive[which].cartridge_data_psram_offset = psram_offset;
   microdrive[which].cartridge_len_in_blocks     = (length_in_bytes / MICRODRIVE_BLOCK_LEN);
   microdrive[which].cartridge_write_protect     = write_protected;
-  microdrive[which].inserted                    = 1;
-  microdrive[which].modified                    = 0;
+  microdrive[which].cartridge_inserted          = true;
 
   /*
    * pream is 512 bytes in the microdrive_t structure. It's actually 2 256 byte
@@ -131,6 +132,20 @@ void if1_mdr_insert( const microdrive_index_t which, const uint32_t psram_offset
   trace(TRC_IMAGE_INIT, which);
 
   return;
+}
+
+
+/* Answers true if the drive has a cartridge inserted */
+bool is_cartridge_inserted( microdrive_index_t which )
+{
+  return microdrive[which].cartridge_inserted;
+}
+
+
+/* Answers true if the drive has a cartridge inserted and modified */
+bool is_cartridge_modified( microdrive_index_t which )
+{
+  return microdrive[which].cartridge_data_modified;
 }
 
 
@@ -216,7 +231,7 @@ inline uint8_t __time_critical_func(port_ctr_in)( void )
   }
   else 
   {
-    if( microdrive[active_microdrive_index].motor_on && microdrive[active_microdrive_index].inserted )
+    if( microdrive[active_microdrive_index].motor_on && microdrive[active_microdrive_index].cartridge_inserted )
     {
       /* Calculate the block under the head */
       /* max_bytes is the number of bytes which can be read from the current block */
@@ -287,7 +302,7 @@ inline uint8_t __time_critical_func(port_ctr_in)( void )
        * for FORMAT, WRITE and the other write operations. It doesn't keep
        * the value cached, it reads it fresh each time.
        */
-      if( microdrive[active_microdrive_index].cartridge_write_protect )
+      if( microdrive[active_microdrive_index].cartridge_write_protect == true )
       {
         /* If write protected flag is true, pull the bit in the status byte low */
         ret &= 0xfe;
@@ -349,13 +364,13 @@ inline void __time_critical_func(port_ctr_out)( uint8_t val )
      * We have a new pulse, shift all the previous ones along and
      * put this new one (inverted) in the right-most microdrive's motor
      */
-    uint8_t any_motor_on = 0;
+    uint8_t any_motor_on = false;
     for( microdrive_index_t m = LAST_MICRODRIVE_INDEX; m > 0; m-- )
     {
       microdrive[m].motor_on = microdrive[m - 1].motor_on;
       any_motor_on |= microdrive[m].motor_on;
     }
-    microdrive[0].motor_on = (val & 0x01) ? 0 : 1;
+    microdrive[0].motor_on = (val & 0x01) ? false : true;
     any_motor_on |= microdrive[0].motor_on;
 
 #if 0
@@ -403,7 +418,7 @@ inline uint8_t __time_critical_func(port_mdr_in)( void )
     return ret;  /* "Can't happen" with IF1 ROM code */
   }
 
-  if( microdrive[active_microdrive_index].motor_on && microdrive[active_microdrive_index].inserted )
+  if( microdrive[active_microdrive_index].motor_on && microdrive[active_microdrive_index].cartridge_inserted )
   {
     /*
      * max_bytes is the number of bytes in the block under
@@ -483,7 +498,7 @@ inline void __time_critical_func(port_mdr_out)( uint8_t val )
     return;  /* "Can't happen" with IF1 ROM code */
   }
 
-  if( microdrive[active_microdrive_index].motor_on && microdrive[active_microdrive_index].inserted )
+  if( microdrive[active_microdrive_index].motor_on && microdrive[active_microdrive_index].cartridge_inserted )
   {
     /* Calculate the block under the head */
     /* max_bytes is the number of bytes which can be read from the current block */
@@ -547,7 +562,7 @@ inline void __time_critical_func(port_mdr_out)( uint8_t val )
 
       increment_head(active_microdrive_index);
 
-      microdrive[active_microdrive_index].cartridge_data_modified = 1;
+      microdrive[active_microdrive_index].cartridge_data_modified = true;
     }
 
     /* transfered does include the preamble */
