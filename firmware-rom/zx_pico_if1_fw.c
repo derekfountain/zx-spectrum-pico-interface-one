@@ -256,10 +256,6 @@ int main()
   irq_set_mask_enabled( 0xFFFFFFFF, 0 );
   irq_set_mask_enabled( 0x0000000F, 1 );
 
-#if RECORDING
-  create_unconvert_table();
-#endif
-
   /* Pull the buses to zeroes */
   gpio_init( A0_GP  ); gpio_set_dir( A0_GP,  GPIO_IN );  gpio_pull_down( A0_GP  );
   gpio_init( A1_GP  ); gpio_set_dir( A1_GP,  GPIO_IN );  gpio_pull_down( A1_GP  );
