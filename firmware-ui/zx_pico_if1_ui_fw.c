@@ -193,7 +193,7 @@ static void insert_mdr_file( uint8_t which, uint8_t *filename )
     {
       .microdrive_index   = which,
       .data_size          = MICRODRIVE_MDR_MAX_LENGTH,
-      .write_protected    = WRITE_PROTECT_ON,    // Needs to come from final byte of the MDR file
+      .write_protected    = WRITE_PROTECT_OFF,    // Needs to come from final byte of the MDR file
       .checksum           = 0
     };
   uart_write_blocking(UI_PICO_UART_ID, (uint8_t*)&cmd_struct, sizeof(cmd_struct)); 	
@@ -444,9 +444,17 @@ int main( void )
   /* Init complete, run 2nd core code */
   multicore_launch_core1( core1_main ); 
 
-  /* TEST SETUP Read files from SD card and insert each one */
-  /* h8_254.mdr  mm.mdr  test_image_32blk.mdr  test_image.mdr */
-  uint8_t *mdr_files[] = {"mm.mdr", "h8_254.mdr", "test_image_32blk.mdr", "test_image.mdr" };
+#define TEST_SETUP 1
+#if TEST_SETUP
+  /* Read named files from SD card and insert each one */
+  uint8_t *mdr_files[] = {"1.mdr", 
+			  "2.mdr", 
+			  "3.mdr", 
+			  "4.mdr", 
+			  "5.mdr", 
+			  "6.mdr", 
+			  "7.mdr", 
+			  "8.mdr"};
 
   for( uint8_t mdr_file_index=0; mdr_file_index < (sizeof(mdr_files)/sizeof(uint8_t*)); mdr_file_index++ )
   {
@@ -457,10 +465,8 @@ int main( void )
     work_ptr->filename         = mdr_files[mdr_file_index];
 
     insert_work( WORK_INSERT_MDR, work_ptr );
-
-    /* Testing is slow when loading 4 cartridges, just do the first one for now */
-    break;
   }
+#endif
 
   /*
    * The above adds the work which sends the test cartridge image(s) to the IO Pico.
