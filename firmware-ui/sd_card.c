@@ -63,18 +63,21 @@ uint8_t unmount_sd_card( void )
 }
 
 
-uint8_t read_mdr_file( uint8_t *filename, uint8_t *buffer, uint32_t max_length )
+uint8_t read_mdr_file( uint8_t *filename, uint8_t *buffer, uint32_t max_length, uint32_t *bytes_read_ptr )
 {
   FIL fsrc;
-  UINT br;
+  UINT bytes_read;
 
   FRESULT fr = f_open( &fsrc, filename, FA_READ );
   if( fr )
     return (uint8_t)fr;
 
-  f_read( &fsrc, buffer, max_length, &br );
+  *bytes_read_ptr = 0;
+  f_read( &fsrc, buffer, max_length, &bytes_read );
 
   f_close(&fsrc);
+
+  *bytes_read_ptr = bytes_read;
 
   return 0;
 }

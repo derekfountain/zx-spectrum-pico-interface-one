@@ -23,7 +23,9 @@
 #ifndef __SD_CARD_H
 #define __SD_CARD_H
 
+#include <stdint.h>
+
 uint8_t query_ds_card_mounted( void );
 uint8_t mount_sd_card( void );
-uint8_t read_mdr_file( uint8_t *filename, uint8_t *buffer, uint32_t max_length );
+uint8_t read_mdr_file( uint8_t *filename, uint8_t *buffer, uint32_t max_length, uint32_t *bytes_read_ptr );
 #endif

@@ -81,7 +81,7 @@ const uint8_t LED_PIN = PICO_DEFAULT_LED_PIN;
 uint8_t previous_value = 255;
 uint8_t value          = 0;
 
-/* Room for one full MDR image to work with */
+/* Room for one full MDR image to work with. Includes w/p byte */
 uint8_t working_image_buffer[MICRODRIVE_MDR_MAX_LENGTH];
 
 void encoder_callback( uint gpio, uint32_t events ) 
@@ -175,8 +175,21 @@ static bool send_cmd( UI_TO_IO_CMD cmd )
 
 static void insert_mdr_file( uint8_t which, uint8_t *filename )
 {
-  /* Load image into the working buffer */
-  if( read_mdr_file( filename, working_image_buffer, MICRODRIVE_MDR_MAX_LENGTH ) != 0 )
+  /* Load full image, inc w/p byte, into the working buffer */
+  uint32_t bytes_read;
+  if( read_mdr_file( filename, working_image_buffer, MICRODRIVE_MDR_MAX_LENGTH, &bytes_read ) != 0 )
+    return;
+  
+  /* Empty file? Not good... */
+  if( bytes_read == 0 )
+    return;
+
+  /* Must be a round number of blocks otherwise it's probably not an MDR file */
+  if( ((bytes_read-1) / MICRODRIVE_BLOCK_LEN) * MICRODRIVE_BLOCK_LEN != (bytes_read-1) )
+    return;
+
+  /* Minimum size in blocks, arbitrary for now */
+  if( (bytes_read-1) / MICRODRIVE_BLOCK_LEN < 10 )
     return;
 
   ssd1306_clear(&display);
@@ -185,15 +198,12 @@ static void insert_mdr_file( uint8_t which, uint8_t *filename )
 
   (void)send_cmd( UI_TO_IO_INSERT_MDR );
 
-  /* Stat the file, find its length */
-  /* Seek to end, read final byte for w/p flag */
-
   /* Write the data which describes the command */
   ui_to_io_insert_mdr_t cmd_struct =
     {
       .microdrive_index   = which,
-      .data_size          = MICRODRIVE_MDR_MAX_LENGTH,
-      .write_protected    = WRITE_PROTECT_OFF,    // Needs to come from final byte of the MDR file
+      .data_size          = bytes_read-1,
+      .write_protected    = working_image_buffer[bytes_read-1] ? WRITE_PROTECT_ON : WRITE_PROTECT_OFF,
       .checksum           = 0
     };
   uart_write_blocking(UI_PICO_UART_ID, (uint8_t*)&cmd_struct, sizeof(cmd_struct)); 	
