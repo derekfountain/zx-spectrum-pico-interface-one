@@ -72,7 +72,7 @@ typedef struct _ui_to_io_insert_mdr_t
   microdrive_index_t microdrive_index;                 // Which microdrive
   write_protect_t    write_protected;                  // Whether the cartridge is write protected
   uint32_t           data_size;                        // Size of cartridge data in bytes
-  uint32_t           checksum;                         // Checksum, not sure if this is needed
+  uint8_t            checksum;                         // Very basic 8 bit addition checksum, need to improve this
 }
 ui_to_io_insert_mdr_t;
 

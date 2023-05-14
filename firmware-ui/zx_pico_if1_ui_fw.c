@@ -198,13 +198,19 @@ static void insert_mdr_file( uint8_t which, uint8_t *filename )
 
   (void)send_cmd( UI_TO_IO_INSERT_MDR );
 
+  uint8_t checksum = 0;
+  for( uint32_t i=0; i < bytes_read-1; i++ )
+  {
+    checksum += working_image_buffer[i];
+  }
+
   /* Write the data which describes the command */
   ui_to_io_insert_mdr_t cmd_struct =
     {
       .microdrive_index   = which,
       .data_size          = bytes_read-1,
       .write_protected    = working_image_buffer[bytes_read-1] ? WRITE_PROTECT_ON : WRITE_PROTECT_OFF,
-      .checksum           = 0
+      .checksum           = checksum
     };
   uart_write_blocking(UI_PICO_UART_ID, (uint8_t*)&cmd_struct, sizeof(cmd_struct)); 	
   UI_TO_IO_CMD ack = uart_getc(UI_PICO_UART_ID);

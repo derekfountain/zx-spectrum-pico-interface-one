@@ -653,6 +653,7 @@ int __time_critical_func(main)( void )
       /*
        * There isn't enough room to store the whole 137KB image, so receive it in 256 byte pages.
        */
+      uint8_t  checksum = 0;
       uint32_t pages = cmd_struct.data_size / 256;
       uint32_t final_page_size = cmd_struct.data_size - (pages * 256);
       for( uint32_t page=0; page < pages; page++ )
@@ -660,6 +661,11 @@ int __time_critical_func(main)( void )
         /* Load a page from the UI Pico into a local buffer */
         uint8_t page_buffer[ 256 ];
         uart_read_blocking(IO_PICO_UART_ID, page_buffer, sizeof(page_buffer) );
+
+	for( uint32_t checksum_index=0; checksum_index < 256; checksum_index++ )
+	{
+	  checksum += page_buffer[checksum_index];
+	}
 
         /* Work out where to store this page in the PSRAM and write it in */
         uint32_t psram_offset = (MICRODRIVE_CARTRIDGE_LENGTH * cmd_struct.microdrive_index)
@@ -675,6 +681,11 @@ int __time_critical_func(main)( void )
         uint8_t page_buffer[ final_page_size ];
         uart_read_blocking(IO_PICO_UART_ID, page_buffer, sizeof(page_buffer) );
 
+	for( uint32_t checksum_index=0; checksum_index < final_page_size; checksum_index++ )
+	{
+	  checksum += page_buffer[checksum_index];
+	}
+
         uint32_t psram_offset = (MICRODRIVE_CARTRIDGE_LENGTH * cmd_struct.microdrive_index)
                                  +
                                 (pages*256);
@@ -682,12 +693,25 @@ int __time_critical_func(main)( void )
         write_psram_block( psram_offset, page_buffer, final_page_size );
       }
 
-      /* Insert MDR image in PSRAM into the IF1 code so it can be accessed */
-      if1_mdr_insert( cmd_struct.microdrive_index,
-                      MICRODRIVE_CARTRIDGE_LENGTH * cmd_struct.microdrive_index,
-                      cmd_struct.data_size,
-                      cmd_struct.write_protected );
-
+      if( checksum == cmd_struct.checksum )
+      {
+	/* Insert MDR image in PSRAM into the IF1 code so it can be accessed */
+	if1_mdr_insert( cmd_struct.microdrive_index,
+			MICRODRIVE_CARTRIDGE_LENGTH * cmd_struct.microdrive_index,
+			cmd_struct.data_size,
+			cmd_struct.write_protected );
+      }
+      else
+      {
+	/* Need to send back a try-again or something */
+	while(1)
+	{
+	  gpio_put(LED_PIN, 0);
+	  busy_wait_us_32(25000);
+	  gpio_put(LED_PIN, 1);
+	  busy_wait_us_32(25000);
+	}
+      }
     }
     break;
 
