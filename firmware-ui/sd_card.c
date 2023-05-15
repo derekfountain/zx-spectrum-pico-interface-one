@@ -81,3 +81,24 @@ uint8_t read_mdr_file( uint8_t *filename, uint8_t *buffer, uint32_t max_length, 
 
   return 0;
 }
+
+
+uint8_t write_mdr_file( uint8_t *filename, uint8_t *buffer, uint32_t length, uint32_t *bytes_written_ptr )
+{
+  FIL fsrc;
+  UINT bytes_written;
+
+  FRESULT fr = f_open( &fsrc, filename, FA_WRITE | FA_OPEN_ALWAYS );
+  if( fr )
+    return (uint8_t)fr;
+
+  *bytes_written_ptr = 0;
+  f_write( &fsrc, buffer, length, &bytes_written );
+
+  f_close(&fsrc);
+
+  *bytes_written_ptr = bytes_written;
+
+  return 0;
+}
+

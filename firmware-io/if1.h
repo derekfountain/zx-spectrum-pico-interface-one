@@ -123,7 +123,7 @@ typedef struct _microdrive_t
   uint32_t cartridge_data_psram_offset;
 
   bool     cartridge_inserted;
-  bool     cartridge_data_modified;
+  bool     cartridge_data_modified;  // FIXME Needs to be a 2 second last-write type timer
   bool     cartridge_write_protect;
   uint8_t  cartridge_len_in_blocks;
 
@@ -145,5 +145,6 @@ void port_mdr_out( uint8_t val );
 
 bool is_cartridge_inserted( microdrive_index_t which );
 bool is_cartridge_modified( microdrive_index_t which );
+void set_cartridge_modified( microdrive_index_t which, bool modified );
 
 #endif

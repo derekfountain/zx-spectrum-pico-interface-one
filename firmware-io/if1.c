@@ -149,6 +149,12 @@ bool is_cartridge_modified( microdrive_index_t which )
 }
 
 
+void set_cartridge_modified( microdrive_index_t which, bool modified )
+{
+  microdrive[which].cartridge_data_modified = modified;
+}
+
+
 /*
  * Advance the given microdrive's head position on the tape.
  * Wrap at the "end" of the tape.

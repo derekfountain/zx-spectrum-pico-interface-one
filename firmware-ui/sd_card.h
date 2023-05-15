@@ -28,4 +28,5 @@
 uint8_t query_ds_card_mounted( void );
 uint8_t mount_sd_card( void );
 uint8_t read_mdr_file( uint8_t *filename, uint8_t *buffer, uint32_t max_length, uint32_t *bytes_read_ptr );
+uint8_t write_mdr_file( uint8_t *filename, uint8_t *buffer, uint32_t length, uint32_t *bytes_written_ptr );
 #endif

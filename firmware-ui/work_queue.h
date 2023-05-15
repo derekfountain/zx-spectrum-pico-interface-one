@@ -20,7 +20,8 @@
 #ifndef __WORK_QUEUE_H
 #define __WORK_QUEUE_H
 
-#include "stdint.h"
+#include <stdint.h>
+#include "microdrive.h"
 
 typedef enum
 {
@@ -28,6 +29,7 @@ typedef enum
   WORK_INIT_IO_LINK,
   WORK_INSERT_MDR,
   WORK_REQUEST_STATUS,
+  WORK_REQUEST_MDR_DATA,
 } work_queue_type_t;
 
 
@@ -49,6 +51,13 @@ typedef struct _work_request_status_t
   uint8_t  dummy;
 }
 work_request_status_t;
+
+typedef struct _work_request_mdr_data_t
+{
+  microdrive_index_t microdrive_index;
+}
+work_request_mdr_data_t;
+
 
 void work_queue_init( void );
 void insert_work( work_queue_type_t type, void *data );

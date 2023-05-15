@@ -88,6 +88,15 @@ typedef struct _io_to_ui_status_response_t
 }
 io_to_ui_status_response_t;
 
+/* Data structure to request IO Pico reports returns cartridge data from one of the microdrives */
+typedef struct _ui_to_io_request_mdr_data_t
+{
+  microdrive_index_t microdrive_index;
+  uint32_t           bytes_expected;
+}
+ui_to_io_request_mdr_data_t;
+
+
 #endif
 
 

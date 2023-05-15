@@ -81,8 +81,23 @@ const uint8_t LED_PIN = PICO_DEFAULT_LED_PIN;
 uint8_t previous_value = 255;
 uint8_t value          = 0;
 
+/*
+ * This describes the data which has been loaded from the SD card and
+ * sent to the IO pico for use by the Spectrum. I need to keep this in
+ * order to be able to save data back to SD card, etc
+ */
+typedef struct _live_microdrive_data_t
+{
+  char           *filename;                // Name of SD card file loaded
+  uint32_t        cartridge_data_length;   // Number of bytes in the cartridge image
+  write_protect_t write_protected;         // Whether the cartridge is write protected in the IO Pico
+}
+live_microdrive_data_t;
+
+static live_microdrive_data_t live_microdrive_data[NUM_MICRODRIVES];
+
 /* Room for one full MDR image to work with. Includes w/p byte */
-uint8_t working_image_buffer[MICRODRIVE_MDR_MAX_LENGTH];
+static uint8_t working_image_buffer[MICRODRIVE_MDR_MAX_LENGTH];
 
 void encoder_callback( uint gpio, uint32_t events ) 
 {
@@ -198,6 +213,7 @@ static void insert_mdr_file( uint8_t which, uint8_t *filename )
 
   (void)send_cmd( UI_TO_IO_INSERT_MDR );
 
+  /* Calculate the correct checksum */
   uint8_t checksum = 0;
   for( uint32_t i=0; i < bytes_read-1; i++ )
   {
@@ -205,17 +221,18 @@ static void insert_mdr_file( uint8_t which, uint8_t *filename )
   }
 
   /* Write the data which describes the command */
+  write_protect_t write_protected = working_image_buffer[bytes_read-1] ? WRITE_PROTECT_ON : WRITE_PROTECT_OFF;
   ui_to_io_insert_mdr_t cmd_struct =
     {
       .microdrive_index   = which,
       .data_size          = bytes_read-1,
-      .write_protected    = working_image_buffer[bytes_read-1] ? WRITE_PROTECT_ON : WRITE_PROTECT_OFF,
+      .write_protected    = write_protected,
       .checksum           = checksum
     };
   uart_write_blocking(UI_PICO_UART_ID, (uint8_t*)&cmd_struct, sizeof(cmd_struct)); 	
   UI_TO_IO_CMD ack = uart_getc(UI_PICO_UART_ID);
   if( ack != UI_TO_IO_ACK )
-    gpio_put( LED_PIN, 1 );   // Just break the pattern so I can see it's wrong
+    gpio_put( LED_PIN, 1 );
 
   ssd1306_clear(&display);
   ssd1306_draw_string(&display, 10, 10, 1, "Sending data");
@@ -235,6 +252,11 @@ static void insert_mdr_file( uint8_t which, uint8_t *filename )
 
     uart_putc_raw( UI_PICO_UART_ID, working_image_buffer[i] );
   }
+
+  /* Store away what the IO Pico is using */
+  live_microdrive_data[which].filename              = filename;
+  live_microdrive_data[which].cartridge_data_length = bytes_read-1;
+  live_microdrive_data[which].write_protected       = write_protected;
 
   ssd1306_clear(&display);
   ssd1306_draw_string(&display, 0, 0, 1, "Done");
@@ -256,6 +278,32 @@ static void init_io_link( void )
   while( send_cmd( UI_TO_IO_INIALISE ) == false );
 
   return;
+}
+
+
+/* Timer function, called repeatedly to set up a request of status from the IO Pico */
+static bool add_work_request_status( repeating_timer_t *rt )
+{
+  work_request_status_t *request_status_ptr = malloc( sizeof(work_request_status_t) );
+  request_status_ptr->dummy = 0;
+  insert_work( WORK_REQUEST_STATUS, request_status_ptr );
+
+  return true;
+}
+
+
+/*
+ * When status indicates the IO Pico has a microdrive with a cartridge
+ * which has changed data, add a work item to request the data so it
+ * can be saved back to SD card
+ */
+static bool add_work_request_mdr_data( microdrive_index_t microdrive_index )
+{
+  work_request_mdr_data_t *request_data_ptr = malloc( sizeof(work_request_mdr_data_t) );
+  request_data_ptr->microdrive_index = microdrive_index;
+  insert_work( WORK_REQUEST_MDR_DATA, request_data_ptr );
+
+  return true;
 }
 
 
@@ -283,17 +331,40 @@ static void request_status( void )
     ssd1306_draw_string(&display, 0, line+=8, 1, value_str);
     ssd1306_show(&display);
   }
+
+  /* Look for microdrives which need their cartridge saving */
+  for( microdrive_index_t microdrive_index = 0; microdrive_index < NUM_MICRODRIVES; microdrive_index++ )
+  {
+    if( status_struct.status[microdrive_index] == MD_STATUS_MDR_LOADED_NEEDS_SAVING )
+    {
+      add_work_request_mdr_data( microdrive_index );
+    } 
+  }
 }
 
 
-/* Timer function, called repeatedly to set up a request of status from the IO Pico */
-static bool add_work_request_status( repeating_timer_t *rt )
+static void request_mdr_data_to_save( microdrive_index_t microdrive_index )
 {
-  work_request_status_t *request_status_ptr = malloc( sizeof(work_request_status_t) );
-  request_status_ptr->dummy = 0;
-  insert_work( WORK_REQUEST_STATUS, request_status_ptr );
+  (void)send_cmd( UI_TO_IO_REQUEST_MDR_TO_SAVE );
 
-  return true;
+  /* Write the data which describes the command */
+  ui_to_io_request_mdr_data_t cmd_struct =
+    {
+      .microdrive_index = microdrive_index,
+      .bytes_expected   = live_microdrive_data[microdrive_index].cartridge_data_length,
+    };
+  uart_write_blocking(UI_PICO_UART_ID, (uint8_t*)&cmd_struct, sizeof(ui_to_io_request_mdr_data_t)); 
+
+  /* Read the cartridge contents back. This is sent by the IO Pico in pages, but arrives all in one go */
+  uart_read_blocking(UI_PICO_UART_ID, working_image_buffer, live_microdrive_data[microdrive_index].cartridge_data_length);
+
+  working_image_buffer[live_microdrive_data[microdrive_index].cartridge_data_length] =
+                                                                   live_microdrive_data[microdrive_index].write_protected;
+  
+  uint32_t bytes_written;
+  write_mdr_file( live_microdrive_data[microdrive_index].filename,
+		  working_image_buffer,
+		  live_microdrive_data[microdrive_index].cartridge_data_length+1, &bytes_written );
 }
 
 
@@ -335,6 +406,16 @@ static void __time_critical_func(core1_main)( void )
 
 	request_status();
 	free(request_status_data);
+      }
+      break;
+
+      case WORK_REQUEST_MDR_DATA:
+      {
+	/* Work required is to ask the IO Pico to send the data for one of the drives */
+	work_request_mdr_data_t *request_mdr_data = (work_request_mdr_data_t*)data;
+
+	request_mdr_data_to_save( request_mdr_data->microdrive_index );
+	free(request_mdr_data);
       }
       break;
 
@@ -447,10 +528,6 @@ int main( void )
 
   work_queue_init();
 
-  /* First piece of work is to establish the link to the IO Pico */
-  work_init_io_link_t *init_io_work_ptr = malloc( sizeof(work_init_io_link_t) );
-  insert_work( WORK_INIT_IO_LINK, init_io_work_ptr );
-
   /*
    * For some reason the second core code doesn't get started after SWD programming
    * unless I pause for a moment here
@@ -460,9 +537,17 @@ int main( void )
   /* Init complete, run 2nd core code */
   multicore_launch_core1( core1_main ); 
 
+  /* First piece of work is to establish the link to the IO Pico */
+  work_init_io_link_t *init_io_work_ptr = malloc( sizeof(work_init_io_link_t) );
+  insert_work( WORK_INIT_IO_LINK, init_io_work_ptr );
+
+  /* Set requests for microdrive status running. Don't move the var anywhere it might get lost */
+  repeating_timer_t repeating_status_timer;
+  add_repeating_timer_ms( 500, add_work_request_status, NULL, &repeating_status_timer );
+
 #define TEST_SETUP 1
 #if TEST_SETUP
-  /* Read named files from SD card and insert each one */
+  /* Read named files from SD card and insert each one that exists */
   uint8_t *mdr_files[] = {"1.mdr", 
 			  "2.mdr", 
 			  "3.mdr", 
@@ -484,18 +569,6 @@ int main( void )
   }
 #endif
 
-  /*
-   * The above adds the work which sends the test cartridge image(s) to the IO Pico.
-   * The comms process starts on the other core, but takes a while to finish. During
-   * that time the next work items will be added to the queue but not actioned.
-   * The next actions are loaded from the below - a repeating timer piles on a load
-   * of status requests. These all run after the MDR image(s) are uploaded.
-   */
-
-  /* Set requests for microdrive status running. Don't move the var anywhere it might get lost */
-  repeating_timer_t repeating_status_timer;
-  add_repeating_timer_ms( 500, add_work_request_status, NULL, &repeating_status_timer );
- 
 
   while( 1 )
   {

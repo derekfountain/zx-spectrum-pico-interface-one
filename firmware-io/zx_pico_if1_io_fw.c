@@ -218,8 +218,13 @@ void trace( TRACE_CODE code, uint32_t data )
 PIO pio;
 uint sm_mreq;
 
-/* Status of this Pico, reported to UI Pico for action/user feedback */
-io_status_t status;
+/*
+ * Mutex to protect the PSRAM SPI device from concurrent access.
+ * I can't have the Z80 IO reads and writes getting mixed up with the
+ * GUI functions of inserting and saving cartride data which is
+ * on the PSRAM.
+ */
+auto_init_mutex( psram_mutex );
 
 /*
  * I/O port handling runs in the second core.
@@ -257,6 +262,9 @@ void __time_critical_func(core1_main)( void )
       gpio_set_dir(WAIT_GP, GPIO_OUT);
       gpio_put(WAIT_GP, 0);
 
+      /* Writing to PSRAM, critical section */
+      mutex_enter_blocking( &psram_mutex );
+
       // trace(TRC_WRITE_E7_DATA, z80_written_byte);
 
       /* Write the byte out */
@@ -264,6 +272,8 @@ void __time_critical_func(core1_main)( void )
 
       /* Done waiting */
       gpio_set_dir(WAIT_GP, GPIO_IN);
+
+      mutex_exit( &psram_mutex );
 
       /* Wait for the IO request to complete */
       while( (gpio_get_all() & IORQ_BIT_MASK) == 0 );
@@ -301,6 +311,9 @@ void __time_critical_func(core1_main)( void )
       gpio_set_dir(WAIT_GP, GPIO_OUT);
       gpio_put(WAIT_GP, 0);
 
+      /* Reading from PSRAM, critical section */
+      mutex_enter_blocking( &psram_mutex );
+
       /* Direction needs to be Pico->ZX */
       pio_sm_put( pio, sm_mreq, 1 );
 
@@ -312,6 +325,8 @@ void __time_critical_func(core1_main)( void )
       gpio_put_masked( DBUS_MASK, md_data );
 
       // trace(TRC_READ_E7_DATA, md_data);
+
+      mutex_exit( &psram_mutex );
 
       /* Done waiting */
       gpio_set_dir(WAIT_GP, GPIO_IN);
@@ -367,6 +382,9 @@ void __time_critical_func(core1_main)( void )
  */
 static void write_psram_block( uint32_t psram_offset, uint8_t *block_buffer, uint32_t length )
 {
+  /* Writing to PSRAM, critical section */
+  mutex_enter_blocking( &psram_mutex );
+
   gpio_put( PSRAM_SPI_CSN_PIN, 0 );
 
   uint8_t write_cmd[] = { PSRAM_CMD_WRITE,
@@ -377,6 +395,32 @@ static void write_psram_block( uint32_t psram_offset, uint8_t *block_buffer, uin
   spi_write_blocking(PSRAM_SPI, block_buffer, length);
 
   gpio_put( PSRAM_SPI_CSN_PIN, 1 );
+
+  mutex_exit( &psram_mutex );
+
+  return;
+}
+
+
+/*
+ * Read a block of data from pseudo RAM device
+ */
+static void read_psram_block( uint32_t psram_offset, uint8_t *block_buffer, uint32_t length )
+{
+  /* Reading from PSRAM, critical section */
+  mutex_enter_blocking( &psram_mutex );
+
+  gpio_put( PSRAM_SPI_CSN_PIN, 0 );
+
+  uint8_t read_cmd[] = { PSRAM_CMD_READ,
+			 psram_offset >> 16, psram_offset >> 8, psram_offset };
+  spi_write_blocking(PSRAM_SPI, read_cmd, sizeof(read_cmd));
+
+  spi_read_blocking(PSRAM_SPI, 0, block_buffer, length ); 
+
+  gpio_put( PSRAM_SPI_CSN_PIN, 1 );
+
+  mutex_exit( &psram_mutex );
 
   return;
 }
@@ -523,6 +567,8 @@ int __time_critical_func(main)( void )
    *
    * Enable SPI 0 at <n> MHz and connect to GPIOs. Might as well ask for the theoretical maximum.
    */
+  mutex_init( &psram_mutex );
+  mutex_enter_blocking( &psram_mutex );
   spi_init(PSRAM_SPI, 62 * 1000 * 1000);
   gpio_set_function(PSRAM_SPI_RX_PIN, GPIO_FUNC_SPI);
   gpio_set_function(PSRAM_SPI_SCK_PIN, GPIO_FUNC_SPI);
@@ -573,6 +619,8 @@ int __time_critical_func(main)( void )
       busy_wait_us_32(100000);
     }
   }
+
+  mutex_exit( &psram_mutex );
 
   trace(TRC_SPI_INIT, 0);
 
@@ -721,6 +769,7 @@ int __time_critical_func(main)( void )
       ui_to_io_request_status_t cmd_struct;
       uart_read_blocking(IO_PICO_UART_ID, (uint8_t*)&cmd_struct, sizeof(ui_to_io_request_status_t) );
 
+      /* Loop over drives, tell the UI if each is inserted, needs saving, etc */
       io_to_ui_status_response_t status_response;
       for( uint8_t i=0; i < NUM_MICRODRIVES; i++ )
       {
@@ -745,8 +794,52 @@ int __time_critical_func(main)( void )
     }
     break;
 
-    default:
+    case UI_TO_IO_REQUEST_MDR_TO_SAVE:
+    {
+      /* UI Pico wants the contents of an inserted cartridge so it can save it back to SD card */
+      ui_to_io_request_mdr_data_t cmd_struct;
+      uart_read_blocking(IO_PICO_UART_ID, (uint8_t*)&cmd_struct, sizeof(ui_to_io_request_mdr_data_t) );
+      
+      /* Work out where in the psuedo RAM the microdrive's data is held */
+      uint32_t psram_offset = (MICRODRIVE_CARTRIDGE_LENGTH * cmd_struct.microdrive_index);
 
+      /*
+       * Mark as no longer modified. This is done now, before the transfer to the UI Pico,
+       * because the ZX could write to the image during the transfer. If it were to be
+       * marked as "not modified" after the transfer, any modifications the ZX writes
+       * during the transfer won't be marked as needing to be saved.
+       */
+      set_cartridge_modified( cmd_struct.microdrive_index, false );
+
+      /* Send it page by page over to the UI Pico */
+      uint32_t pages = cmd_struct.bytes_expected / 256;
+      uint32_t final_page_size = cmd_struct.bytes_expected - (pages * 256);
+      for( uint32_t page=0; page < pages; page++ )
+      {
+        /* Load a page from the PSRAM device into a local buffer */
+        uint8_t page_buffer[ 256 ];
+	read_psram_block( psram_offset, page_buffer, 256 );
+
+	/* Send it over to the UI Pico for saving to SD card */
+	uart_write_blocking(IO_PICO_UART_ID, page_buffer, sizeof(page_buffer) );
+
+        /* Work out where the start of the next page is */
+        psram_offset += 256;
+      }
+
+      if( final_page_size != 0 )
+      {
+	uint8_t page_buffer[final_page_size];
+	read_psram_block( psram_offset, page_buffer, final_page_size );
+	uart_write_blocking(IO_PICO_UART_ID, page_buffer, sizeof(page_buffer) );
+      }
+
+      /* I don't send back the w/p flag, the UI Pico already has that */
+
+    }
+    break;
+
+    default:
       blip_test_pin();      
       break;
     }
