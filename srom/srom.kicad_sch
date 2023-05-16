@@ -3857,6 +3857,9 @@
     (path "/acda4c69-0a65-473b-ab4f-e765252d7da2/93673449-babe-4629-b5c4-4cd05c3c812a"
       (reference "J303") (unit 1) (value "Conn_01x03_Female") (footprint "Connector_PinHeader_2.54mm:PinHeader_1x03_P2.54mm_Vertical")
     )
+    (path "/acda4c69-0a65-473b-ab4f-e765252d7da2/b286c952-0d40-46dc-91e0-859f779bcde5"
+      (reference "J304") (unit 1) (value "Conn_01x06_Female") (footprint "Connector_PinHeader_2.54mm:PinHeader_1x06_P2.54mm_Vertical")
+    )
     (path "/e33c0819-efed-4286-8863-9252958751f9"
       (reference "Q1") (unit 1) (value "PMBT2222A") (footprint "Package_TO_SOT_SMD:TSOT-23_HandSoldering")
     )
