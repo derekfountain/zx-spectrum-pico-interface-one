@@ -49,17 +49,13 @@
 #include "work_queue.h"
 
 #include "sd_card.h"
+
+#include "oled_display.h"
 #include "ssd1306.h"
 
-ssd1306_t display;
-
-#define OLED_I2C    (i2c0)
-#define OLED_FREQ   400000
-#define OLED_WIDTH  128
-#define OLED_HEIGHT 64
-#define OLED_ADDR   0x3C
-#define OLED_SCK    4
-#define OLED_SDA    5
+/* Something to show on the screen */
+uint8_t previous_value = 255;
+uint8_t value          = 0;
 
 /* 1 instruction on the 133MHz microprocessor is 7.5ns */
 /* 1 instruction on the 140MHz microprocessor is 7.1ns */
@@ -76,10 +72,6 @@ const uint8_t LED_PIN = PICO_DEFAULT_LED_PIN;
 #define ENC_SW	 6     // Marked SW or Switch on some devices
 #define ENC_B	 7     // Marked DT on some devices
 #define ENC_A	 8     // Marked CLK on some devices
-
-/* Something to show on the screen */
-uint8_t previous_value = 255;
-uint8_t value          = 0;
 
 /*
  * This describes the data which has been loaded from the SD card and
@@ -170,15 +162,6 @@ static bool send_cmd( UI_TO_IO_CMD cmd )
   /* Read the ACK from the IO Pico */
   UI_TO_IO_CMD ack = uart_getc(UI_PICO_UART_ID);
 
-  /* Update display, test code, to be removed */
-  ssd1306_clear(&display);
-  uint8_t value_str[32];
-  snprintf( value_str, 32, "Sent cmd 0x%02X", cmd );
-  ssd1306_draw_string(&display, 0, 0, 1, value_str);
-  snprintf( value_str, 32, "ACK back 0x%02X", ack );
-  ssd1306_draw_string(&display, 0, 8, 1, value_str);
-  ssd1306_show(&display);
-
   if( ack != UI_TO_IO_ACK )
   {
     return false;
@@ -207,9 +190,7 @@ static void insert_mdr_file( uint8_t which, uint8_t *filename )
   if( (bytes_read-1) / MICRODRIVE_BLOCK_LEN < 10 )
     return;
 
-  ssd1306_clear(&display);
-  ssd1306_draw_string(&display, 10, 10, 1, filename);
-  ssd1306_show(&display);
+  oled_display_filename( filename );
 
   (void)send_cmd( UI_TO_IO_INSERT_MDR );
 
@@ -234,20 +215,12 @@ static void insert_mdr_file( uint8_t which, uint8_t *filename )
   if( ack != UI_TO_IO_ACK )
     gpio_put( LED_PIN, 1 );
 
-  ssd1306_clear(&display);
-  ssd1306_draw_string(&display, 10, 10, 1, "Sending data");
-  ssd1306_show(&display);
-
   for( uint32_t i=0; i < cmd_struct.data_size; i++ )
   {
     /* Feedback on screen, probably redundant when I get a proper GUI */
     if( (i % 16384) == 0 )
     {
-      uint8_t msg[32];
-      snprintf( msg, 16, "Drive %d, %d", which, i );
-      ssd1306_clear(&display);
-      ssd1306_draw_string(&display, 0, 0, 1, msg);
-      ssd1306_show(&display);
+      oled_display_show_progress( which, i );
     }
 
     uart_putc_raw( UI_PICO_UART_ID, working_image_buffer[i] );
@@ -258,9 +231,7 @@ static void insert_mdr_file( uint8_t which, uint8_t *filename )
   live_microdrive_data[which].cartridge_data_length = bytes_read-1;
   live_microdrive_data[which].write_protected       = write_protected;
 
-  ssd1306_clear(&display);
-  ssd1306_draw_string(&display, 0, 0, 1, "Done");
-  ssd1306_show(&display);
+  oled_display_done();
 
   return;
 }
@@ -322,16 +293,8 @@ static void request_status( void )
   uart_read_blocking(UI_PICO_UART_ID, (uint8_t*)&status_struct, sizeof(io_to_ui_status_response_t)); 	
 
   /* I need to emit the values into the GUI somehow. For now, just print it */
-  uint8_t line = 16;
-  for( uint8_t i=0; i<8; i+=2 )
-  {
-    uint8_t value_str[32];
-    snprintf( value_str, 16, "0x%02X 0x%02X", status_struct.status[i], status_struct.status[i+1] );
-
-    ssd1306_draw_string(&display, 0, line+=8, 1, value_str);
-    ssd1306_show(&display);
-  }
-
+  oled_display_status_bytes( &status_struct );
+  
   /* Look for microdrives which need their cartridge saving */
   for( microdrive_index_t microdrive_index = 0; microdrive_index < NUM_MICRODRIVES; microdrive_index++ )
   {
@@ -473,16 +436,7 @@ int main( void )
   /*
    * First, set up the screen. It's an I2C device.
    */
-  i2c_init(OLED_I2C, OLED_FREQ);
-  gpio_set_function( OLED_SCK, GPIO_FUNC_I2C ); gpio_pull_up( OLED_SCK );
-  gpio_set_function( OLED_SDA, GPIO_FUNC_I2C ); gpio_pull_up( OLED_SDA );
-  display.external_vcc=false;
-
-  ssd1306_init( &display, OLED_WIDTH, OLED_HEIGHT, OLED_ADDR, OLED_I2C );
-  ssd1306_clear( &display );
-
-  ssd1306_draw_string(&display, 10, 10, 2, "ZX Pico");
-  ssd1306_show(&display);
+  oled_display_init();
 
   /*
    * Rotary encoder, 3 GPIOs
@@ -526,6 +480,7 @@ int main( void )
   uart_set_format(UI_PICO_UART_ID, PICOS_DATA_BITS, PICOS_STOP_BITS, PICOS_PARITY);
   uart_set_translate_crlf(UI_PICO_UART_ID, false);
 
+  /* Initialise the never ending list of things that need doing */
   work_queue_init();
 
   /*

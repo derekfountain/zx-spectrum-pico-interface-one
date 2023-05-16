@@ -14,6 +14,7 @@ if (TARGET tinyusb_device)
     zx_pico_if1_ui_fw.c
     ssd1306.c
     sd_card.c
+    oled_display.c
     hw_config.c
     work_queue.c
     gui/gui.c
