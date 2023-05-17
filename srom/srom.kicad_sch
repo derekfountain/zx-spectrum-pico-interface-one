@@ -3788,6 +3788,12 @@
     (path "/ca47a1ba-8ffc-4a05-9443-5aa7b9eaa848"
       (reference "#PWR0105") (unit 1) (value "GND") (footprint "")
     )
+    (path "/95a6eb69-d4c1-4a7e-a8e8-144430faf0e2/1bd2e752-47c8-4b06-9642-e0a6745a8c84"
+      (reference "#PWR0106") (unit 1) (value "GND") (footprint "")
+    )
+    (path "/acda4c69-0a65-473b-ab4f-e765252d7da2/390a0fcb-da78-419e-a9c8-13dcea8c5808"
+      (reference "#PWR0107") (unit 1) (value "GND") (footprint "")
+    )
     (path "/78272bc1-e790-4b4d-9e97-4eab6b1a3675"
       (reference "#PWR0108") (unit 1) (value "GND") (footprint "")
     )
@@ -3835,6 +3841,12 @@
     )
     (path "/986f0686-4dd2-4d11-a20b-857347ffd112"
       (reference "D1") (unit 1) (value "D_Schottky") (footprint "Diode_SMD:D_1206_3216Metric_Pad1.42x1.75mm_HandSolder")
+    )
+    (path "/95a6eb69-d4c1-4a7e-a8e8-144430faf0e2/57b7f0a0-8101-45d6-8809-7e4d5a606894"
+      (reference "D201") (unit 1) (value "LED_Small") (footprint "LED_THT:LED_D3.0mm")
+    )
+    (path "/acda4c69-0a65-473b-ab4f-e765252d7da2/dd1afd5a-4803-4c9f-9eed-69db22719f8f"
+      (reference "D301") (unit 1) (value "LED_Small") (footprint "LED_THT:LED_D3.0mm")
     )
     (path "/f1c41838-eb1e-47a4-8dba-8e7e84008063"
       (reference "J1") (unit 1) (value "Conn_01x03_Female") (footprint "Connector_PinHeader_2.54mm:PinHeader_1x03_P2.54mm_Vertical")
@@ -3889,6 +3901,12 @@
     )
     (path "/5081447a-5988-49f7-9cc5-92809e9d009c"
       (reference "R108") (unit 1) (value "R150") (footprint "Resistor_SMD:R_1206_3216Metric_Pad1.30x1.75mm_HandSolder")
+    )
+    (path "/95a6eb69-d4c1-4a7e-a8e8-144430faf0e2/9fa9b1fc-1e37-4fd7-8348-a04ead454f86"
+      (reference "R201") (unit 1) (value "R330") (footprint "Resistor_SMD:R_1206_3216Metric_Pad1.30x1.75mm_HandSolder")
+    )
+    (path "/acda4c69-0a65-473b-ab4f-e765252d7da2/5f547c99-2361-4fd1-92a4-8ab5051cabbd"
+      (reference "R301") (unit 1) (value "R330") (footprint "Resistor_SMD:R_1206_3216Metric_Pad1.30x1.75mm_HandSolder")
     )
     (path "/43a7bd42-380d-437f-8b75-117d267c89f1"
       (reference "U1") (unit 1) (value "4075") (footprint "Package_SO:SOIC-14_3.9x8.7mm_P1.27mm")

@@ -195,3 +195,21 @@ SD Card reader card detect pin needs connecting up.
 :: Needs fixing on PCB
 
 
+LED output. 8 LEDs for 8 microdrives isn't practical, I don't have the GPIOs and
+the wiring is going to get very complicated. So 2 LEDs: one green to show any
+microdrive is inserted, and one red to show any microdrive is motor on. For the
+motor on LED, connect IO GPIO11 a output to a red LED via suitable resistor. Also
+connect that signal to UI Pico GPIO27 as input, allowing UI Pico to know when any
+motor is on. This is assumed to be useful for the GUI, but might not be
+required.
+For cartridge-inserted, connect UI GPIO11 as output to the green LED via series
+resistor according to LED chosen.
+Code can then set green LED on whenever a cartridge is inserted. Red LED can be lit
+by IO Pico when a motor is on, and the UI Pico will see that signal so can update
+the GUI if deemed required.
+: Schematic updated, nothing tested
+:: Confirm R value and footprint for suitable LEDs
+: All needs doing after test on breadboard
+
+
+
