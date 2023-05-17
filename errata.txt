@@ -185,12 +185,13 @@ SPI is not suitable for the Pico to Pico comms. Switched to UART. Connected
 UART0 (GPIOs 0 to 3) on UI Pico to UART0 (GPIOs 12 to 15) on IO Pico.
 : Fixed on board (soldered wires)
 : Fixed in code
-: Needs doing on schematic and PCB
+: Fixed on schematic
+:: Needs fixing on PCB
 
 
-SD Card reader card detect pin needs connecting up. Need to test first to see
-if it works, it looks like if should.
+SD Card reader card detect pin needs connecting up.
 : Done on board, I used GPIO28 as input
 : Fixed on schematic
+:: Needs fixing on PCB
 
 
