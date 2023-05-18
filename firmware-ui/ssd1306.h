@@ -161,7 +161,7 @@ void ssd1306_draw_pixel(ssd1306_t *p, uint32_t x, uint32_t y);
 	@param[in] x2 : x position of end point
 	@param[in] y2 : y position of end point
 */
-void ssd1306_draw_line(ssd1306_t *p, int32_t x1, int32_t y1, int32_t x2, int32_t y2);
+void ssd1306_draw_line(ssd1306_t *p, int32_t x1, int32_t y1, int32_t x2, int32_t y2, bool invert);
 
 /**
 	@brief draw filled square at given position with given size
@@ -172,7 +172,8 @@ void ssd1306_draw_line(ssd1306_t *p, int32_t x1, int32_t y1, int32_t x2, int32_t
 	@param[in] width : width of square
 	@param[in] height : height of square
 */
-void ssd1306_draw_square(ssd1306_t *p, uint32_t x, uint32_t y, uint32_t width, uint32_t height);
+void ssd1306_clear_square(ssd1306_t *p, uint32_t x, uint32_t y, uint32_t width, uint32_t height);
+void ssd1306_draw_filled_square(ssd1306_t *p, uint32_t x, uint32_t y, uint32_t width, uint32_t height);
 
 /**
 	@brief draw empty square at given position with given size
@@ -215,7 +216,7 @@ void ssd1306_bmp_show_image(ssd1306_t *p, const uint8_t *data, const long size);
 	@param[in] font : pointer to font
 	@param[in] c : character to draw
 */
-void ssd1306_draw_char_with_font(ssd1306_t *p, uint32_t x, uint32_t y, uint32_t scale, const uint8_t *font, char c);
+void ssd1306_draw_char_with_font(ssd1306_t *p, uint32_t x, uint32_t y, uint32_t scale, const uint8_t *font, char c, bool invert);
 
 /**
 	@brief draw char with builtin font
@@ -226,7 +227,7 @@ void ssd1306_draw_char_with_font(ssd1306_t *p, uint32_t x, uint32_t y, uint32_t 
 	@param[in] scale : scale font to n times of original size (default should be 1)
 	@param[in] c : character to draw
 */
-void ssd1306_draw_char(ssd1306_t *p, uint32_t x, uint32_t y, uint32_t scale, char c);
+void ssd1306_draw_char(ssd1306_t *p, uint32_t x, uint32_t y, uint32_t scale, char c, bool invert);
 
 /**
 	@brief draw string with given font
@@ -238,7 +239,7 @@ void ssd1306_draw_char(ssd1306_t *p, uint32_t x, uint32_t y, uint32_t scale, cha
 	@param[in] font : pointer to font
 	@param[in] s : text to draw
 */
-void ssd1306_draw_string_with_font(ssd1306_t *p, uint32_t x, uint32_t y, uint32_t scale, const uint8_t *font, const char *s );
+void ssd1306_draw_string_with_font(ssd1306_t *p, uint32_t x, uint32_t y, uint32_t scale, const uint8_t *font, const char *s, bool invert );
 
 /**
 	@brief draw string with builtin font
@@ -249,6 +250,11 @@ void ssd1306_draw_string_with_font(ssd1306_t *p, uint32_t x, uint32_t y, uint32_
 	@param[in] scale : scale font to n times of original size (default should be 1)
 	@param[in] s : text to draw
 */
-void ssd1306_draw_string(ssd1306_t *p, uint32_t x, uint32_t y, uint32_t scale, const char *s);
+void ssd1306_draw_string(ssd1306_t *p, uint32_t x, uint32_t y, uint32_t scale, const char *s, bool invert);
+
+
+/* DF additions */
+
+void ssd1306_clear_pixel(ssd1306_t *p, uint32_t x, uint32_t y);
 
 #endif

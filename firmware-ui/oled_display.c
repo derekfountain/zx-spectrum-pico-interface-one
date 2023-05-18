@@ -42,9 +42,52 @@ void oled_display_init( void )
   ssd1306_init( &display, OLED_WIDTH, OLED_HEIGHT, OLED_ADDR, OLED_I2C );
   ssd1306_clear( &display );
 
-  ssd1306_draw_string(&display, 10, 10, 2, "ZX Pico");
-  ssd1306_show(&display);
+  return;
+}
 
+
+void oled_update( void )
+{
+  ssd1306_show(&display);
+}
+
+
+/*
+ * Not sure about this, the screen is too small to have a menu
+ * Particularly one which happens to need long words!
+ */
+void oled_draw_status_menu( uint8_t selected )
+{
+  /* Plan is to underline one of these and have the screen toggle when it's selected */
+  uint8_t *entries[2] = { "Microdrives", "Cartridges" };
+
+  const uint8_t menu_y_pos = 0;
+
+  ssd1306_draw_string(&display, 0,      menu_y_pos, 1, entries[0], 0);
+  ssd1306_draw_string(&display, 11*6+3, menu_y_pos, 1, entries[1], 0);
+
+
+  // Test
+  ssd1306_draw_filled_square(&display, 0, 48, 128, 16);
+  ssd1306_clear_pixel(&display, 0, 48);
+  ssd1306_draw_string(&display, 0, 50, 2, "Hello", 1);
+  
+}
+
+void oled_draw_status_microdrive( microdrive_index_t microdrive_index, bool inserted )
+{
+  const uint8_t md_y_pos = 10;
+
+  uint8_t x_offset = 125 - ((microdrive_index+1)*15);
+  if( inserted )
+    ssd1306_draw_filled_square(&display, x_offset, md_y_pos, 12, 11 );
+  else
+    ssd1306_draw_empty_square(&display, x_offset, md_y_pos, 12, 11 );
+
+  uint8_t num_str[2];
+  snprintf( num_str, 2, "%01d", microdrive_index+1 );
+  ssd1306_draw_string(&display, x_offset+4, md_y_pos+2, 1, num_str, inserted);
+  
   return;
 }
 
@@ -53,6 +96,7 @@ void oled_display_init( void )
 /* Hardcoded nonense to print some values which are currently useful */
 void oled_display_status_bytes( io_to_ui_status_response_t *status_struct )
 {
+#if 0
   uint8_t line = 16;
   for( uint8_t i=0; i<8; i+=2 )
   {
@@ -62,29 +106,35 @@ void oled_display_status_bytes( io_to_ui_status_response_t *status_struct )
     ssd1306_draw_string(&display, 0, line+=8, 1, value_str);
     ssd1306_show(&display);
   }
-
+#endif
   return;
 }
 
 void oled_display_done( void )
 {
+#if 0
   ssd1306_clear(&display);
   ssd1306_draw_string(&display, 0, 0, 1, "Done");
   ssd1306_show(&display);
+#endif
 }
 
 void oled_display_filename( uint8_t *filename )
 {
+#if 0
   ssd1306_clear(&display);
   ssd1306_draw_string(&display, 10, 10, 1, filename);
   ssd1306_show(&display);
+#endif
 }
 
 void oled_display_show_progress( uint8_t which, uint32_t i )
 {
+#if 0
   uint8_t msg[32];
   snprintf( msg, 16, "Drive %d, %d", which, i );
   ssd1306_clear(&display);
   ssd1306_draw_string(&display, 0, 0, 1, msg);
   ssd1306_show(&display);
+#endif
 }

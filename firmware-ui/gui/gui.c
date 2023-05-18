@@ -29,7 +29,7 @@ void draw_status_screen( status_screen_t *status )
 
   for( uint8_t microdrive_index=0; microdrive_index< NUM_MICRODRIVES; microdrive_index++ )
   {
-    oled_draw_status_microdrive( microdrive_index );
+    oled_draw_status_microdrive( microdrive_index, status->md_inserted[microdrive_index] );
   }
   
   oled_update();
