@@ -1,0 +1,129 @@
+FSM gui
+
+  // Initial
+  //
+  STATE STATE_GUI_INIT
+    ENTRY
+      gui_sm_init
+
+    TRANSITIONS
+      ST_YES                            STATE_GUI_SHOW_STATUS
+
+
+  // Show status, this is the state the GUI tends to sit in while
+  // idle. It shows the 8 MD statuses along the top, the SD card
+  // insertion status, etc.
+  // One of the MDs is "selected" and the main display area shows
+  // details of that MD, MDR file inserted, size, saving back to
+  // SD card, etc.
+  // Timeout 1 is maybe 500ms and comes back here after scrolling
+  // the inserted filename across the screen
+  //
+  STATE STATE_GUI_SHOW_STATUS
+    ENTRY
+      gui_sm_show_status
+
+    TRANSITIONS
+      ST_MDR_INSERTED                   STATE_GUI_INSERTING_MDR
+      ST_MDR_EJECTED                    STATE_GUI_EJECTING_MDR
+      ST_SD_CARD_INSERTED               STATE_GUI_INSERTING_SD_CARD
+      ST_SD_CARD_EJECTED                STATE_GUI_EJECTING_SD_CARD
+      ST_TIMEOUT_1                      STATE_GUI_SCROLLING_FILENAME
+      ST_ROTATE_CCW                     STATE_GUI_SELECTING_NEXT_MD
+      ST_ROTATE_CW                      STATE_GUI_SELECTING_PREVIOUS_MD
+      ST_BUTTON_PRESS                   STATE_GUI_SHOW_MD_MENU
+
+
+  // An MDR image has been inserted. Deal with it, then drop back
+  // to the status screen.
+  // Needs error handling, file not found, file not valid, etc.
+  //
+  STATE STATE_GUI_INSERTING_MDR
+    ENTRY
+      gui_sm_insert_mdr
+
+    TRANSITIONS
+      ST_YES                            STATE_GUI_SHOW_STATUS
+
+
+  // An MDR image has been ejected. Deal with it, then drop back
+  // to the status screen
+  // Needs error handling, no MDR in that drive, etc.
+  //
+  STATE STATE_GUI_EJECTING_MDR
+    ENTRY
+      gui_sm_eject_mdr
+
+    TRANSITIONS
+      ST_YES                            STATE_GUI_SHOW_STATUS
+
+
+  // An SD card has been inserted. Deal with it, then drop back
+  // to the status screen.
+  // Needs error handling, maybe
+  //
+  STATE STATE_GUI_INSERTING_SD_CARD
+    ENTRY
+      gui_sm_insert_sd_card
+
+    TRANSITIONS
+      ST_YES                            STATE_GUI_SHOW_STATUS
+
+
+  // The SD card has been ejected. Deal with it, then drop back
+  // to the status screen
+  // Needs error handling, maybe
+  //
+  STATE STATE_GUI_EJECTING_SD_CARD
+    ENTRY
+      gui_sm_eject_sd_card
+
+    TRANSITIONS
+      ST_YES                            STATE_GUI_SHOW_STATUS
+
+
+  // Timeout one status screen, scroll the inserted MDR filename
+  //
+  STATE STATE_GUI_SCROLLING_FILENAME
+    ENTRY
+      gui_sm_scroll_inserted_filename
+
+    TRANSITIONS
+      ST_YES                            STATE_GUI_SHOW_STATUS
+
+
+  // Select next MD, so the one to the left of the current one.
+  // (Increment selected MD number)
+  //
+  STATE STATE_GUI_SELECTING_NEXT_MD
+    ENTRY
+      gui_sm_selected_next_md
+
+    TRANSITIONS
+      ST_YES                            STATE_GUI_SHOW_STATUS
+
+
+  // Select previous MD, so the one to the right of the current one.
+  // (Decrement selected MD number)
+  //
+  STATE STATE_GUI_SELECTING_PREVIOUS_MD
+    ENTRY
+      gui_sm_selected_previous_md
+
+    TRANSITIONS
+      ST_YES                            STATE_GUI_SHOW_STATUS
+
+
+  // Microdrive menu screen. If the MD has no cartridge inserted this
+  // will be the "insert" button. If the MD has a cartridge inserted
+  // this will be "eject".
+  //
+  STATE STATE_SHOW_MD_MENU
+    ENTRY
+      gui_sm_show_md_menu
+
+    // Not much clue yet
+    TRANSITIONS
+      ST_BUTTON_PRESS                   STATE_GUI_SHOW_STATUS
+
+

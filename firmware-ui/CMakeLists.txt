@@ -21,7 +21,7 @@ if (TARGET tinyusb_device)
   )
 
   target_include_directories(zx_pico_if1_ui_fw PRIVATE ../firmware-common)
-  target_include_directories(zx_pico_if1_ui_fw PRIVATE gui)
+  target_include_directories(zx_pico_if1_ui_fw PRIVATE ./ gui/)
 
   add_subdirectory(no-OS-FatFS-SD-SPI-RPi-Pico/FatFs_SPI)
 

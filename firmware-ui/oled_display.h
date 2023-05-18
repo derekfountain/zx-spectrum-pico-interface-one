@@ -21,8 +21,13 @@
 #define __OLED_DISPLAY_H
 
 #include "ui_io_comms.h"
+#include "microdrive.h"
 
 void oled_display_init( void );
+void oled_update( void );
+void oled_draw_status_menu( uint8_t selected );
+void oled_draw_status_microdrive( microdrive_index_t microdrive_index );
+
 void oled_display_status_bytes( io_to_ui_status_response_t *status_struct );
 void oled_display_done( void );
 void oled_display_filename( uint8_t *filename );

@@ -52,6 +52,7 @@
 
 #include "oled_display.h"
 #include "ssd1306.h"
+#include "gui.h"
 
 /* Something to show on the screen */
 uint8_t previous_value = 255;
@@ -527,6 +528,18 @@ int main( void )
 
   while( 1 )
   {
+    status_screen_t status;
+
+    status.md_inserted[0] = 1;
+    status.md_inserted[1] = 1;
+    status.md_inserted[2] = 1;
+    status.md_inserted[3] = 1;
+    status.md_inserted[4] = 0;
+    status.md_inserted[5] = 0;
+    status.md_inserted[6] = 0;
+    status.md_inserted[7] = 0;
+    draw_status_screen( &status );
+
 #if 0
     if( value != previous_value )
     {
