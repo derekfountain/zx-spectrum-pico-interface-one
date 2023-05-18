@@ -17,18 +17,28 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  */
 
-#ifndef __GUI_H
-#define __GUI_H
+#ifndef __GUI_FSM_H
+#define __GUI_FSM_H
 
-#include "pico/stdlib.h"
+#include "fsm.h"
 
-typedef struct _status_screen_t
+
+typedef enum
 {
-  bool   md_inserted[8];
-  int8_t selected;
+  STATE_GUI_INIT         = FSM_STIMULUS_LAST,
+  STATE_GUI_SHOW_STATUS,
 }
-status_screen_t;
+gui_fsm_state_t;
 
-void draw_status_screen( status_screen_t *status );
+
+typedef enum
+{
+  NONE
+}
+gui_fsm_stimulus_t;
+
+
+fsm_map_t      *query_gui_fsm_map( void );
+gui_fsm_state_t query_gui_fsm_initial_state( void );
 
 #endif

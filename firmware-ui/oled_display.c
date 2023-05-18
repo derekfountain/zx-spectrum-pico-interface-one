@@ -52,12 +52,13 @@ void oled_update( void )
 }
 
 
+void oled_draw_status_menu( uint8_t selected )
+{
+#if 0
 /*
  * Not sure about this, the screen is too small to have a menu
  * Particularly one which happens to need long words!
  */
-void oled_draw_status_menu( uint8_t selected )
-{
   /* Plan is to underline one of these and have the screen toggle when it's selected */
   uint8_t *entries[2] = { "Microdrives", "Cartridges" };
 
@@ -65,7 +66,7 @@ void oled_draw_status_menu( uint8_t selected )
 
   ssd1306_draw_string(&display, 0,      menu_y_pos, 1, entries[0], 0);
   ssd1306_draw_string(&display, 11*6+3, menu_y_pos, 1, entries[1], 0);
-
+#endif
 
   // Test
   ssd1306_draw_filled_square(&display, 0, 48, 128, 16);
@@ -74,20 +75,27 @@ void oled_draw_status_menu( uint8_t selected )
   
 }
 
-void oled_draw_status_microdrive( microdrive_index_t microdrive_index, bool inserted )
+void oled_draw_status_microdrive( microdrive_index_t microdrive_index, bool inserted, bool selected )
 {
-  const uint8_t md_y_pos = 10;
+  const uint8_t md_y_pos = 0;
 
   uint8_t x_offset = 125 - ((microdrive_index+1)*15);
   if( inserted )
-    ssd1306_draw_filled_square(&display, x_offset, md_y_pos, 12, 11 );
+    ssd1306_draw_filled_square(&display, x_offset, md_y_pos, 13, 11 );
   else
-    ssd1306_draw_empty_square(&display, x_offset, md_y_pos, 12, 11 );
+    ssd1306_draw_empty_square(&display, x_offset, md_y_pos, 13, 11 );
 
+  ssd1306_clear_pixel(&display, x_offset, md_y_pos);
+  ssd1306_clear_pixel(&display, x_offset+12, md_y_pos);
+  
   uint8_t num_str[2];
   snprintf( num_str, 2, "%01d", microdrive_index+1 );
   ssd1306_draw_string(&display, x_offset+4, md_y_pos+2, 1, num_str, inserted);
   
+  if( selected )
+  {
+    ssd1306_draw_line(&display, x_offset, md_y_pos+13, x_offset+12, md_y_pos+13, 0);
+  }
   return;
 }
 

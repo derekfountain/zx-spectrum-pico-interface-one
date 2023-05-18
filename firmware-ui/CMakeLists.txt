@@ -17,7 +17,9 @@ if (TARGET tinyusb_device)
     oled_display.c
     hw_config.c
     work_queue.c
+    fsm.c
     gui/gui.c
+    gui/gui_fsm.c
   )
 
   target_include_directories(zx_pico_if1_ui_fw PRIVATE ../firmware-common)

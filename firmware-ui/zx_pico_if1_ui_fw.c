@@ -43,6 +43,9 @@
 #include "hardware/spi.h"
 #include "hardware/uart.h"
 
+#include "fsm.h"
+#include "gui_fsm.h"
+
 #include "uart.h"
 #include "microdrive.h"
 #include "ui_io_comms.h"
@@ -238,21 +241,6 @@ static void insert_mdr_file( uint8_t which, uint8_t *filename )
 }
 
 
-static void init_io_link( void )
-{
-  /*
-   * All this does is repeatedly try to get a preamble/cmd/ack sequence
-   * from the IO Pico. If it fails, it tries again. It's hard to see
-   * why this wouldn't work (once the Picos are booted and running)
-   * but if it doesn't we can't really proceed so we might as well
-   * just spin trying.
-   */
-  while( send_cmd( UI_TO_IO_INIALISE ) == false );
-
-  return;
-}
-
-
 /* Timer function, called repeatedly to set up a request of status from the IO Pico */
 static bool add_work_request_status( repeating_timer_t *rt )
 {
@@ -276,6 +264,21 @@ static bool add_work_request_mdr_data( microdrive_index_t microdrive_index )
   insert_work( WORK_REQUEST_MDR_DATA, request_data_ptr );
 
   return true;
+}
+
+
+static void init_io_link( void )
+{
+  /*
+   * All this does is repeatedly try to get a preamble/cmd/ack sequence
+   * from the IO Pico. If it fails, it tries again. It's hard to see
+   * why this wouldn't work (once the Picos are booted and running)
+   * but if it doesn't we can't really proceed so we might as well
+   * just spin trying.
+   */
+  while( send_cmd( UI_TO_IO_INIALISE ) == false );
+
+  return;
 }
 
 
@@ -332,6 +335,13 @@ static void request_mdr_data_to_save( microdrive_index_t microdrive_index )
 }
 
 
+/*
+ * Core1 does what is termed "the work". This is the meaty stuff - comms with the IO Pico,
+ * copying cartridge image data around, updating status, etc. The work here can block for
+ * a while, or take some time to complete. (Copying an MDR image to or from a Pico via the
+ * UART can take significant time.) So this work happens in the background and doesn't
+ * interfere with the GUI.
+ */
 static void __time_critical_func(core1_main)( void )
 {
   while( 1 )
@@ -388,37 +398,6 @@ static void __time_critical_func(core1_main)( void )
       }
     }
 
-
-
-
-#if 0
-    uint8_t preamble[] = UI_TO_IO_CMD_PREAMBLE;
-
-    for( uint8_t preamble_index=0; preamble_index < sizeof(preamble); preamble_index++ )
-      uart_putc_raw(UI_PICO_UART_ID, preamble[preamble_index]);
-    uart_putc_raw(UI_PICO_UART_ID, UI_TO_IO_TEST_LED_ON);
-    gpio_put( LED_PIN, 1 );
-
-    UI_TO_IO_CMD ack = uart_getc(UI_PICO_UART_ID);
-    if( ack != UI_TO_IO_ACK )
-      gpio_put( LED_PIN, 0 );   // Just break the pattern so I can see it's wrong
-      
-    sleep_ms(1000);
-
-
-
-
-    for( uint8_t preamble_index=0; preamble_index < sizeof(preamble); preamble_index++ )
-      uart_putc_raw(UI_PICO_UART_ID, preamble[preamble_index]);
-    uart_putc_raw(UI_PICO_UART_ID, UI_TO_IO_TEST_LED_OFF);
-    gpio_put( LED_PIN, 0 );
-
-    ack = uart_getc(UI_PICO_UART_ID);
-    if( ack != UI_TO_IO_ACK )
-      gpio_put( LED_PIN, 1 );   // Just break the pattern so I can see it's wrong
-
-    sleep_ms(1000);
-#endif
   } /* Infinite loop */
 }
 
@@ -525,20 +504,24 @@ int main( void )
   }
 #endif
 
+  /* Create the finite state machine which operates the GUI */
+  fsm_t *gui_fsm;
+  if( (gui_fsm=create_fsm( query_gui_fsm_map(), query_gui_fsm_initial_state() )) == NULL )
+    panic("Unable to create GUI FSM");
 
+  /*
+   * This loop looks after the user interface. It's a state machine which monitors devices
+   * driven by interrupts, etc. Anything which takes more than trivial time is considered
+   * "work" and will be added by this to the work queue, from where the other core will
+   * do it in due course. Nothing here should block or take any significant time, otherwise
+   * the GUI will freeze up.
+   *
+   * Start by kicking the state machine.
+   */
+  generate_stimulus( gui_fsm, FSM_STIMULUS_YES );
   while( 1 )
   {
-    status_screen_t status;
-
-    status.md_inserted[0] = 1;
-    status.md_inserted[1] = 1;
-    status.md_inserted[2] = 1;
-    status.md_inserted[3] = 1;
-    status.md_inserted[4] = 0;
-    status.md_inserted[5] = 0;
-    status.md_inserted[6] = 0;
-    status.md_inserted[7] = 0;
-    draw_status_screen( &status );
+    process_fsms();
 
 #if 0
     if( value != previous_value )

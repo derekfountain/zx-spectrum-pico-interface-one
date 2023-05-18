@@ -17,18 +17,41 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  */
 
-#ifndef __GUI_H
-#define __GUI_H
+#include "gui_fsm.h"
+#include "gui.h"
+#include "oled_display.h"
 
-#include "pico/stdlib.h"
-
-typedef struct _status_screen_t
+void gui_sm_show_status( void *fsm_data )
 {
-  bool   md_inserted[8];
-  int8_t selected;
+  status_screen_t status;
+
+  status.md_inserted[0] = 1;
+  status.md_inserted[1] = 1;
+  status.md_inserted[2] = 1;
+  status.md_inserted[3] = 1;
+  status.md_inserted[4] = 0;
+  status.md_inserted[5] = 0;
+  status.md_inserted[6] = 0;
+  status.md_inserted[7] = 0;
+  status.selected       = 7;
+  draw_status_screen( &status );
 }
-status_screen_t;
 
-void draw_status_screen( status_screen_t *status );
+static fsm_map_t gui_fsm_map[] =
+{
+  {STATE_GUI_INIT, FSM_STIMULUS_YES, STATE_GUI_SHOW_STATUS, gui_sm_show_status},
 
-#endif
+  {FSM_STATE_NONE, FSM_STIMULUS_YES, FSM_STATE_NONE, NULL}
+};
+
+fsm_map_t *query_gui_fsm_map( void )
+{
+  return gui_fsm_map;
+}
+
+
+gui_fsm_state_t query_gui_fsm_initial_state( void )
+{
+  return STATE_GUI_INIT;
+}
+
