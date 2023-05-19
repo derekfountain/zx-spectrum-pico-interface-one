@@ -46,29 +46,45 @@ typedef enum _fsm_stimulus
 fsm_stimulus_t;
 
 
-typedef struct _fsm_map
+/*
+ * This binds a state to a piece of code which runs when that state is
+ * entered. One function per state at the moment.
+ */
+typedef struct _fsm_state_entry_fn_binding_t
 {
   fsm_state_t          state;
-  fsm_stimulus_t       stimulus;
-  fsm_state_t          dest_state;
-  fsm_state_entry_fn_t entry_fn;
+  fsm_state_entry_fn_t entry_fn;  
+}
+fsm_state_entry_fn_binding_t;
+
+
+/*
+ * This maps the state transitions. When in 'state', if 'stimulus'
+ * appears, transit to 'dest_state'.
+ */
+typedef struct _fsm_map
+{
+  fsm_state_t                  state;
+  fsm_stimulus_t               stimulus;
+  fsm_state_t                  dest_state;
 }
 fsm_map_t;
 
 
 typedef struct _fsm
 {
-  uint16_t     id;
-  fsm_state_t  current_state;
-  fsm_map_t   *map;
-  void        *fsm_data;
+  uint16_t                      id;
+  fsm_state_t                   current_state;
+  fsm_map_t                    *map;
+  fsm_state_entry_fn_binding_t *binding;
+  void                         *fsm_data;
 
   fsm_stimulus_t pending_stimulus;
 }
 fsm_t;
 
 
-fsm_t *create_fsm( fsm_map_t*, fsm_state_t, void *fsm_data );
+fsm_t *create_fsm( fsm_map_t*, fsm_state_entry_fn_binding_t*, fsm_state_t, void *fsm_data );
 void   process_fsms( void );
 void   generate_stimulus( fsm_t*, fsm_stimulus_t );
 

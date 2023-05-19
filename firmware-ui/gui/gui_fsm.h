@@ -43,7 +43,8 @@ typedef enum
 gui_fsm_stimulus_t;
 
 
-fsm_map_t      *query_gui_fsm_map( void );
-gui_fsm_state_t query_gui_fsm_initial_state( void );
+fsm_map_t                    *query_gui_fsm_map( void );
+gui_fsm_state_t               query_gui_fsm_initial_state( void );
+fsm_state_entry_fn_binding_t *query_gui_fsm_binding( void );
 
 #endif

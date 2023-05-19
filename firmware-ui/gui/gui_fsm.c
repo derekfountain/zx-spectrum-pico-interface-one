@@ -75,6 +75,9 @@ void gui_sm_insert_mdr( fsm_t *fsm )
 }
 
 
+/*
+ * The UI needs to move the microdrive selection icon to the next one.
+ */
 void gui_sm_selecting_next_md( fsm_t *fsm )
 {
   if( ++status.selected == NUM_MICRODRIVES )
@@ -84,6 +87,9 @@ void gui_sm_selecting_next_md( fsm_t *fsm )
 }
 
 
+/*
+ * The UI needs to move the microdrive selection icon to the previous one.
+ */
 void gui_sm_selecting_previous_md( fsm_t *fsm )
 {
   if( status.selected-- == 0 )
@@ -94,18 +100,30 @@ void gui_sm_selecting_previous_md( fsm_t *fsm )
 
 
 
+/* State to entry function bindings */
+static fsm_state_entry_fn_binding_t binding[] = 
+{
+  { STATE_GUI_SHOW_STATUS,           gui_sm_show_status },
+  { STATE_GUI_INSERTING_MDR,         gui_sm_insert_mdr  },
+  { STATE_GUI_SELECTING_NEXT_MD,     gui_sm_selecting_next_md },
+  { STATE_GUI_SELECTING_PREVIOUS_MD, gui_sm_selecting_previous_md },
+
+  { FSM_STATE_NONE,                  NULL },
+};
+
+
+/* Map of states, stimulus, and destination */
 static fsm_map_t gui_fsm_map[] =
 {
-  /* This is wrong, I need a table of entry functions per state, not have them hardcoded here */
-  {STATE_GUI_INIT,                  FSM_STIMULUS_YES,  STATE_GUI_SHOW_STATUS,           gui_sm_show_status},
-  {STATE_GUI_SHOW_STATUS,           ST_MDR_INSERTED,   STATE_GUI_INSERTING_MDR,         gui_sm_insert_mdr },
-  {STATE_GUI_INSERTING_MDR,         FSM_STIMULUS_YES,  STATE_GUI_SHOW_STATUS,           gui_sm_show_status},
+  {STATE_GUI_INIT,                  FSM_STIMULUS_YES,  STATE_GUI_SHOW_STATUS,           },
+  {STATE_GUI_SHOW_STATUS,           ST_MDR_INSERTED,   STATE_GUI_INSERTING_MDR,         },
+  {STATE_GUI_INSERTING_MDR,         FSM_STIMULUS_YES,  STATE_GUI_SHOW_STATUS,           },
 
-  {STATE_GUI_SHOW_STATUS,           ST_ROTATE_CCW,     STATE_GUI_SELECTING_NEXT_MD,     gui_sm_selecting_next_md },
-  {STATE_GUI_SHOW_STATUS,           ST_ROTATE_CW,      STATE_GUI_SELECTING_PREVIOUS_MD, gui_sm_selecting_previous_md },
+  {STATE_GUI_SHOW_STATUS,           ST_ROTATE_CCW,     STATE_GUI_SELECTING_NEXT_MD,     },
+  {STATE_GUI_SHOW_STATUS,           ST_ROTATE_CW,      STATE_GUI_SELECTING_PREVIOUS_MD, },
 
-  {STATE_GUI_SELECTING_NEXT_MD,     FSM_STIMULUS_YES,  STATE_GUI_SHOW_STATUS,           gui_sm_show_status },
-  {STATE_GUI_SELECTING_PREVIOUS_MD, FSM_STIMULUS_YES,  STATE_GUI_SHOW_STATUS,           gui_sm_show_status },
+  {STATE_GUI_SELECTING_NEXT_MD,     FSM_STIMULUS_YES,  STATE_GUI_SHOW_STATUS,           },
+  {STATE_GUI_SELECTING_PREVIOUS_MD, FSM_STIMULUS_YES,  STATE_GUI_SHOW_STATUS,           },
 
 
   {FSM_STATE_NONE,          FSM_STIMULUS_NONE, FSM_STATE_NONE,                  NULL}
@@ -123,3 +141,8 @@ gui_fsm_state_t query_gui_fsm_initial_state( void )
   return STATE_GUI_INIT;
 }
 
+
+fsm_state_entry_fn_binding_t *query_gui_fsm_binding( void )
+{
+  return binding;
+}

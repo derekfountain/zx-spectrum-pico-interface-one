@@ -527,7 +527,10 @@ int main( void )
 #endif
 
   /* Create the finite state machine which operates the GUI */
-  if( (gui_fsm=create_fsm( query_gui_fsm_map(), query_gui_fsm_initial_state(), &live_microdrive_data )) == NULL )
+  if( (gui_fsm=create_fsm( query_gui_fsm_map(),
+			   query_gui_fsm_binding(),
+			   query_gui_fsm_initial_state(),
+			   &live_microdrive_data )) == NULL )
     panic("Unable to create GUI FSM");
 
   /*
