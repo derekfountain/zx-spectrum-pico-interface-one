@@ -29,8 +29,8 @@ FSM gui
       ST_SD_CARD_INSERTED               STATE_GUI_INSERTING_SD_CARD
       ST_SD_CARD_EJECTED                STATE_GUI_EJECTING_SD_CARD
       ST_TIMEOUT_1                      STATE_GUI_SCROLLING_FILENAME
-      ST_ROTATE_CCW                     STATE_GUI_SELECTING_NEXT_MD
       ST_ROTATE_CW                      STATE_GUI_SELECTING_PREVIOUS_MD
+      ST_ROTATE_CCW                     STATE_GUI_SELECTING_NEXT_MD
       ST_BUTTON_PRESS                   STATE_GUI_SHOW_MD_MENU
 
 
@@ -97,7 +97,7 @@ FSM gui
   //
   STATE STATE_GUI_SELECTING_NEXT_MD
     ENTRY
-      gui_sm_selected_next_md
+      gui_sm_selecting_next_md
 
     TRANSITIONS
       ST_YES                            STATE_GUI_SHOW_STATUS
@@ -108,7 +108,7 @@ FSM gui
   //
   STATE STATE_GUI_SELECTING_PREVIOUS_MD
     ENTRY
-      gui_sm_selected_previous_md
+      gui_sm_selecting_previous_md
 
     TRANSITIONS
       ST_YES                            STATE_GUI_SHOW_STATUS

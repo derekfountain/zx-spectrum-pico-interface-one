@@ -89,7 +89,6 @@ static uint8_t working_image_buffer[MICRODRIVE_MDR_MAX_LENGTH];
 
 void encoder_callback( uint gpio, uint32_t events ) 
 {
-#if 0
   uint32_t gpio_state = (gpio_get_all() >> ENC_B) & 0x0003;
   uint8_t  enc_value  = (gpio_state & 0x03);
 	
@@ -108,8 +107,7 @@ void encoder_callback( uint gpio, uint32_t events )
       counterclockwise_fall = 0;
 
       /* Do application action here */
-      value--;
-      gpio_put( LED_PIN, 1 );
+      generate_stimulus( gui_fsm, ST_ROTATE_CCW );  
     }
   }	
   else if( gpio == ENC_B )
@@ -124,8 +122,7 @@ void encoder_callback( uint gpio, uint32_t events )
       counterclockwise_fall = 0;
 
       /* Do application action here */
-      value++;
-      gpio_put( LED_PIN, 0 );
+      generate_stimulus( gui_fsm, ST_ROTATE_CW );  
     }    
   }
   else if( gpio == ENC_SW )
@@ -136,7 +133,6 @@ void encoder_callback( uint gpio, uint32_t events )
      */
     value = 0;
   }
-#endif
 }
 
 

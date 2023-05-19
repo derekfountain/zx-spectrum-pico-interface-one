@@ -26,6 +26,10 @@
 status_screen_t status;
 
 
+/*
+ * Initialise the GUI. The OLED is cleared as part of its configuration
+ * so that doesn't need doing here.
+ */
 void gui_sm_init( fsm_t *fsm )
 {
   status.selected = 0;
@@ -34,6 +38,12 @@ void gui_sm_init( fsm_t *fsm )
 }
 
 
+/*
+ * Pick up live data showing what's going on with the drives and draw it
+ * on OLED screen. For the time being I'm not protecting this with the
+ * mutex on the assumption that it's display-only and if things are
+ * changing they'll update again momentarily.
+ */
 void gui_sm_show_status( fsm_t *fsm )
 {
   /*
@@ -52,6 +62,11 @@ void gui_sm_show_status( fsm_t *fsm )
 }
 
 
+/*
+ * Microdrive has been inserted, update the GUI. This doesn't need to do
+ * anything at the moment, it can just drop through and the FSM will
+ * arrive back at the show status state which will update the screen.
+ */
 void gui_sm_insert_mdr( fsm_t *fsm )
 {
   /* Insertion routine will have updated live microdrive data, just advance */
@@ -60,14 +75,40 @@ void gui_sm_insert_mdr( fsm_t *fsm )
 }
 
 
+void gui_sm_selecting_next_md( fsm_t *fsm )
+{
+  if( ++status.selected == NUM_MICRODRIVES )
+    status.selected = 0;
+
+  generate_stimulus( fsm, FSM_STIMULUS_YES );  
+}
+
+
+void gui_sm_selecting_previous_md( fsm_t *fsm )
+{
+  if( status.selected-- == 0 )
+    status.selected = NUM_MICRODRIVES-1;
+
+  generate_stimulus( fsm, FSM_STIMULUS_YES );  
+}
+
+
+
 static fsm_map_t gui_fsm_map[] =
 {
   /* This is wrong, I need a table of entry functions per state, not have them hardcoded here */
-  {STATE_GUI_INIT,          FSM_STIMULUS_YES,  STATE_GUI_SHOW_STATUS,   gui_sm_show_status},
-  {STATE_GUI_SHOW_STATUS,   ST_MDR_INSERTED,   STATE_GUI_INSERTING_MDR, gui_sm_insert_mdr },
-  {STATE_GUI_INSERTING_MDR, FSM_STIMULUS_YES,  STATE_GUI_SHOW_STATUS,   gui_sm_show_status},
+  {STATE_GUI_INIT,                  FSM_STIMULUS_YES,  STATE_GUI_SHOW_STATUS,           gui_sm_show_status},
+  {STATE_GUI_SHOW_STATUS,           ST_MDR_INSERTED,   STATE_GUI_INSERTING_MDR,         gui_sm_insert_mdr },
+  {STATE_GUI_INSERTING_MDR,         FSM_STIMULUS_YES,  STATE_GUI_SHOW_STATUS,           gui_sm_show_status},
 
-  {FSM_STATE_NONE,          FSM_STIMULUS_NONE, FSM_STATE_NONE,          NULL}
+  {STATE_GUI_SHOW_STATUS,           ST_ROTATE_CCW,     STATE_GUI_SELECTING_NEXT_MD,     gui_sm_selecting_next_md },
+  {STATE_GUI_SHOW_STATUS,           ST_ROTATE_CW,      STATE_GUI_SELECTING_PREVIOUS_MD, gui_sm_selecting_previous_md },
+
+  {STATE_GUI_SELECTING_NEXT_MD,     FSM_STIMULUS_YES,  STATE_GUI_SHOW_STATUS,           gui_sm_show_status },
+  {STATE_GUI_SELECTING_PREVIOUS_MD, FSM_STIMULUS_YES,  STATE_GUI_SHOW_STATUS,           gui_sm_show_status },
+
+
+  {FSM_STATE_NONE,          FSM_STIMULUS_NONE, FSM_STATE_NONE,                  NULL}
 };
 
 
