@@ -19,30 +19,41 @@
 
 #include "gui_fsm.h"
 #include "gui.h"
+#include "microdrive.h"
+#include "live_microdrive_data.h"
 #include "oled_display.h"
 
-void gui_sm_show_status( void *fsm_data )
-{
-  status_screen_t status;
+status_screen_t status;
 
-  status.md_inserted[0] = 1;
-  status.md_inserted[1] = 1;
-  status.md_inserted[2] = 1;
-  status.md_inserted[3] = 1;
-  status.md_inserted[4] = 0;
-  status.md_inserted[5] = 0;
-  status.md_inserted[6] = 0;
-  status.md_inserted[7] = 0;
-  status.selected       = 7;
+
+void gui_sm_init( fsm_t *fsm )
+{
+  status.selected = 0;
+
+  generate_stimulus( fsm, FSM_STIMULUS_YES );
+}
+
+
+void gui_sm_show_status( fsm_t *fsm )
+{
+  live_microdrive_data_t *live_microdrive_data = (live_microdrive_data_t*)fsm->fsm_data;
+
+  for( microdrive_index_t microdrive_index = 0; microdrive_index < NUM_MICRODRIVES; microdrive_index++ )
+  {
+    status.md_inserted[microdrive_index] = (live_microdrive_data->filename != NULL);
+    live_microdrive_data++;
+  }
+
   draw_status_screen( &status );
 }
 
 static fsm_map_t gui_fsm_map[] =
 {
-  {STATE_GUI_INIT, FSM_STIMULUS_YES, STATE_GUI_SHOW_STATUS, gui_sm_show_status},
+  {STATE_GUI_INIT,    FSM_STIMULUS_YES, STATE_GUI_SHOW_STATUS, gui_sm_show_status},
 
   {FSM_STATE_NONE, FSM_STIMULUS_YES, FSM_STATE_NONE, NULL}
 };
+
 
 fsm_map_t *query_gui_fsm_map( void )
 {

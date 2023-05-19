@@ -1,6 +1,6 @@
 FSM gui
 
-  // Initial
+  // Initialise
   //
   STATE STATE_GUI_INIT
     ENTRY

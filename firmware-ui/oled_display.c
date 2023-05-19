@@ -69,32 +69,50 @@ void oled_draw_status_menu( uint8_t selected )
 #endif
 
   // Test
-  ssd1306_draw_filled_square(&display, 0, 48, 128, 16);
-  ssd1306_clear_pixel(&display, 0, 48);
-  ssd1306_draw_string(&display, 0, 50, 2, "Hello", 1);
+  uint8_t buffer[20];
+  snprintf(buffer,20,"%d",selected);
+  ssd1306_draw_string(&display, 0, 50, 1, buffer, 0);
   
 }
 
+
+/*
+ * This draws a box with a number in it, that being the current
+ * depiction of a microdrive. There's 8 of them across the 
+ * screen. Inserted means there's a cartridge in the drive, and
+ * it's drawn as an inverted box. Selected means the UI selection
+ * device is active on it, currently drawn as an underline.
+ */
 void oled_draw_status_microdrive( microdrive_index_t microdrive_index, bool inserted, bool selected )
 {
   const uint8_t md_y_pos = 0;
 
+  /* Draw the square */
   uint8_t x_offset = 125 - ((microdrive_index+1)*15);
   if( inserted )
     ssd1306_draw_filled_square(&display, x_offset, md_y_pos, 13, 11 );
   else
     ssd1306_draw_empty_square(&display, x_offset, md_y_pos, 13, 11 );
 
+  /* Knock out the top corners - ooh, arty! */
   ssd1306_clear_pixel(&display, x_offset, md_y_pos);
   ssd1306_clear_pixel(&display, x_offset+12, md_y_pos);
   
+  /* Number */
   uint8_t num_str[2];
   snprintf( num_str, 2, "%01d", microdrive_index+1 );
   ssd1306_draw_string(&display, x_offset+4, md_y_pos+2, 1, num_str, inserted);
   
+  /* Add or clear selection device */
   if( selected )
   {
+    /* Draw normally */
     ssd1306_draw_line(&display, x_offset, md_y_pos+13, x_offset+12, md_y_pos+13, 0);
+  }
+  else
+  {
+    /* Draw with "clear" to remove any previous line */
+    ssd1306_draw_line(&display, x_offset, md_y_pos+13, x_offset+12, md_y_pos+13, 1);
   }
   return;
 }

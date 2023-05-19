@@ -50,6 +50,7 @@
 #include "microdrive.h"
 #include "ui_io_comms.h"
 #include "work_queue.h"
+#include "live_microdrive_data.h"
 
 #include "sd_card.h"
 
@@ -77,19 +78,7 @@ const uint8_t LED_PIN = PICO_DEFAULT_LED_PIN;
 #define ENC_B	 7     // Marked DT on some devices
 #define ENC_A	 8     // Marked CLK on some devices
 
-/*
- * This describes the data which has been loaded from the SD card and
- * sent to the IO pico for use by the Spectrum. I need to keep this in
- * order to be able to save data back to SD card, etc
- */
-typedef struct _live_microdrive_data_t
-{
-  char           *filename;                // Name of SD card file loaded
-  uint32_t        cartridge_data_length;   // Number of bytes in the cartridge image
-  write_protect_t write_protected;         // Whether the cartridge is write protected in the IO Pico
-}
-live_microdrive_data_t;
-
+/* Keep tabs on what's happening so the GUI can offer the correct options */
 static live_microdrive_data_t live_microdrive_data[NUM_MICRODRIVES];
 
 /* Room for one full MDR image to work with. Includes w/p byte */
@@ -460,6 +449,14 @@ int main( void )
   uart_set_format(UI_PICO_UART_ID, PICOS_DATA_BITS, PICOS_STOP_BITS, PICOS_PARITY);
   uart_set_translate_crlf(UI_PICO_UART_ID, false);
 
+  /* Initialise the live data */
+  for( microdrive_index_t microdrive_index = 0; microdrive_index < NUM_MICRODRIVES; microdrive_index++ )
+  {
+    live_microdrive_data[microdrive_index].filename              = NULL;
+    live_microdrive_data[microdrive_index].cartridge_data_length = 0;
+    live_microdrive_data[microdrive_index].write_protected       = WRITE_PROTECT_OFF;
+  }
+
   /* Initialise the never ending list of things that need doing */
   work_queue_init();
 
@@ -506,7 +503,7 @@ int main( void )
 
   /* Create the finite state machine which operates the GUI */
   fsm_t *gui_fsm;
-  if( (gui_fsm=create_fsm( query_gui_fsm_map(), query_gui_fsm_initial_state() )) == NULL )
+  if( (gui_fsm=create_fsm( query_gui_fsm_map(), query_gui_fsm_initial_state(), live_microdrive_data )) == NULL )
     panic("Unable to create GUI FSM");
 
   /*

@@ -19,6 +19,7 @@
 
 #include <stdint.h>
 #include <malloc.h>
+#include "pico/platform.h"
 #include "fsm.h"
 
 /* I only need one so far.. */
@@ -29,17 +30,17 @@ static fsm_t *fsm_list[MAX_NUM_FSMS];
 static uint16_t next_fsm_id     = 0;
 static uint16_t num_active_fsms = 0;
 
-fsm_t *create_fsm( fsm_map_t *map, fsm_state_t initial_state )
+fsm_t *create_fsm( fsm_map_t *map, fsm_state_t initial_state, void *fsm_data )
 {
   if( num_active_fsms == MAX_NUM_FSMS )
-    return NULL;
+    panic("Out of FSMs");
 
   fsm_t *fsm = malloc( sizeof(fsm_t) );
 
   fsm->id               = next_fsm_id;
   fsm->current_state    = initial_state;
   fsm->map              = map;
-  fsm->fsm_data         = NULL;
+  fsm->fsm_data         = fsm_data;
   fsm->pending_stimulus = FSM_STIMULUS_NONE;
 
   /* Use ID as index, ewww */
@@ -68,7 +69,14 @@ void process_fsms( void )
 	{
 	  /* This map entry represents the transition we want to make */
 	  fsm->pending_stimulus = FSM_STIMULUS_NONE;
-	  (map->entry_fn)(fsm);
+
+	  /* Call the entry function if there is one */
+	  if( map->entry_fn != NULL )
+	  {
+	    (map->entry_fn)(fsm->fsm_data);
+	  }
+
+	  /* New state is achieved */
 	  fsm->current_state = map->dest_state;
 	}
 	map++;
@@ -80,7 +88,11 @@ void process_fsms( void )
 
 void generate_stimulus( fsm_t *fsm, fsm_stimulus_t stim )
 {
-  // TODO Check pending is none...
+  if( fsm->pending_stimulus != FSM_STIMULUS_NONE )
+  {
+    /* I think this is OK, stimulus will get lost, not sure what else I can do */
+  }
 
+// Going to need to lock something here? What if a new stim comes in from interrupt?
   fsm->pending_stimulus = stim;
 }

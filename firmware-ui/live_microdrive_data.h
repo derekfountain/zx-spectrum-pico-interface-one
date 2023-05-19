@@ -17,27 +17,22 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  */
 
-#include "gui.h"
-#include "microdrive.h"
+#ifndef __LIVE_MICRODRIVE_DATA_H
+#define __LIVE_MICRODRIVE_DATA_H
 
-#include "ssd1306.h"
-#include "oled_display.h"
+#include "cartridge.h"
 
-void draw_status_screen( status_screen_t *status )
+/*
+ * This describes the data which has been loaded from the SD card and
+ * sent to the IO pico for use by the Spectrum. I need to keep this in
+ * order to be able to save data back to SD card, etc
+ */
+typedef struct _live_microdrive_data_t
 {
-  oled_draw_status_menu( status->selected );
-
-  for( uint8_t microdrive_index=0; microdrive_index< NUM_MICRODRIVES; microdrive_index++ )
-  {
-    oled_draw_status_microdrive( microdrive_index, status->md_inserted[microdrive_index], (microdrive_index == status->selected) );
-  }
-  
-  oled_update();
+  char           *filename;                // Name of SD card file loaded
+  uint32_t        cartridge_data_length;   // Number of bytes in the cartridge image
+  write_protect_t write_protected;         // Whether the cartridge is write protected in the IO Pico
 }
+live_microdrive_data_t;
 
-
-
-
-#if 0
-#include "gui.fsm.c"
 #endif
