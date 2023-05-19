@@ -36,22 +36,38 @@ void gui_sm_init( fsm_t *fsm )
 
 void gui_sm_show_status( fsm_t *fsm )
 {
+  /*
+   * Pick up the live data which tells us what the current state is, and convert it to
+   * a status structure which can be presented on the screen 
+   */
+
   live_microdrive_data_t *live_microdrive_data = (live_microdrive_data_t*)fsm->fsm_data;
 
   for( microdrive_index_t microdrive_index = 0; microdrive_index < NUM_MICRODRIVES; microdrive_index++ )
   {
-    status.md_inserted[microdrive_index] = (live_microdrive_data->filename != NULL);
-    live_microdrive_data++;
+    status.md_inserted[microdrive_index] = (live_microdrive_data->currently_inserted[microdrive_index].filename != NULL);
   }
 
   draw_status_screen( &status );
 }
 
+
+void gui_sm_insert_mdr( fsm_t *fsm )
+{
+  /* Insertion routine will have updated live microdrive data, just advance */
+
+  generate_stimulus( fsm, FSM_STIMULUS_YES );  
+}
+
+
 static fsm_map_t gui_fsm_map[] =
 {
-  {STATE_GUI_INIT,    FSM_STIMULUS_YES, STATE_GUI_SHOW_STATUS, gui_sm_show_status},
+  /* This is wrong, I need a table of entry functions per state, not have them hardcoded here */
+  {STATE_GUI_INIT,          FSM_STIMULUS_YES,  STATE_GUI_SHOW_STATUS,   gui_sm_show_status},
+  {STATE_GUI_SHOW_STATUS,   ST_MDR_INSERTED,   STATE_GUI_INSERTING_MDR, gui_sm_insert_mdr },
+  {STATE_GUI_INSERTING_MDR, FSM_STIMULUS_YES,  STATE_GUI_SHOW_STATUS,   gui_sm_show_status},
 
-  {FSM_STATE_NONE, FSM_STIMULUS_YES, FSM_STATE_NONE, NULL}
+  {FSM_STATE_NONE,          FSM_STIMULUS_NONE, FSM_STATE_NONE,          NULL}
 };
 
 

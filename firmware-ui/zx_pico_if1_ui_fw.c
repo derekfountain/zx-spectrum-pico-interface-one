@@ -78,14 +78,18 @@ const uint8_t LED_PIN = PICO_DEFAULT_LED_PIN;
 #define ENC_B	 7     // Marked DT on some devices
 #define ENC_A	 8     // Marked CLK on some devices
 
+static fsm_t *gui_fsm;
+
 /* Keep tabs on what's happening so the GUI can offer the correct options */
-static live_microdrive_data_t live_microdrive_data[NUM_MICRODRIVES];
+static live_microdrive_data_t live_microdrive_data;
+auto_init_mutex( live_microdrive_data_mutex );
 
 /* Room for one full MDR image to work with. Includes w/p byte */
 static uint8_t working_image_buffer[MICRODRIVE_MDR_MAX_LENGTH];
 
 void encoder_callback( uint gpio, uint32_t events ) 
 {
+#if 0
   uint32_t gpio_state = (gpio_get_all() >> ENC_B) & 0x0003;
   uint8_t  enc_value  = (gpio_state & 0x03);
 	
@@ -132,6 +136,7 @@ void encoder_callback( uint gpio, uint32_t events )
      */
     value = 0;
   }
+#endif
 }
 
 
@@ -219,12 +224,20 @@ static void insert_mdr_file( uint8_t which, uint8_t *filename )
     uart_putc_raw( UI_PICO_UART_ID, working_image_buffer[i] );
   }
 
-  /* Store away what the IO Pico is using */
-  live_microdrive_data[which].filename              = filename;
-  live_microdrive_data[which].cartridge_data_length = bytes_read-1;
-  live_microdrive_data[which].write_protected       = write_protected;
+  /*
+   * Store away what the IO Pico is using. The other core is continuously reading
+   * this structure so mutex is required
+   */
+  mutex_enter_blocking( &live_microdrive_data_mutex );
+  live_microdrive_data.currently_inserted[which].filename              = filename;
+  live_microdrive_data.currently_inserted[which].cartridge_data_length = bytes_read-1;
+  live_microdrive_data.currently_inserted[which].write_protected       = write_protected;
+  mutex_exit( &live_microdrive_data_mutex );
 
   oled_display_done();
+
+  /* Poke state machine to update GUI */
+  generate_stimulus( gui_fsm, ST_MDR_INSERTED );
 
   return;
 }
@@ -303,24 +316,40 @@ static void request_mdr_data_to_save( microdrive_index_t microdrive_index )
 {
   (void)send_cmd( UI_TO_IO_REQUEST_MDR_TO_SAVE );
 
+  /*
+   * Take a copy of what's currently in the live data. I'm not sure if this mutex is
+   * required, but until the GUI is finished I'll keep it in to be safe
+   */
+  mutex_enter_blocking( &live_microdrive_data_mutex );
+
+  uint8_t         filename[strlen(live_microdrive_data.currently_inserted[microdrive_index].filename)+1];
+  strncpy(filename, live_microdrive_data.currently_inserted[microdrive_index].filename, sizeof(filename) );
+  filename[sizeof(filename)-1] = 0;
+
+  uint32_t        bytes_expected  = live_microdrive_data.currently_inserted[microdrive_index].cartridge_data_length;
+  write_protect_t write_protected = live_microdrive_data.currently_inserted[microdrive_index].write_protected;
+
+  mutex_exit( &live_microdrive_data_mutex );
+
+
   /* Write the data which describes the command */
   ui_to_io_request_mdr_data_t cmd_struct =
     {
       .microdrive_index = microdrive_index,
-      .bytes_expected   = live_microdrive_data[microdrive_index].cartridge_data_length,
+      .bytes_expected   = bytes_expected,
     };
   uart_write_blocking(UI_PICO_UART_ID, (uint8_t*)&cmd_struct, sizeof(ui_to_io_request_mdr_data_t)); 
 
   /* Read the cartridge contents back. This is sent by the IO Pico in pages, but arrives all in one go */
-  uart_read_blocking(UI_PICO_UART_ID, working_image_buffer, live_microdrive_data[microdrive_index].cartridge_data_length);
+  uart_read_blocking(UI_PICO_UART_ID, working_image_buffer, bytes_expected);
 
-  working_image_buffer[live_microdrive_data[microdrive_index].cartridge_data_length] =
-                                                                   live_microdrive_data[microdrive_index].write_protected;
+  working_image_buffer[bytes_expected] = write_protected;
   
+  /* Write the MDR file back out to SD card */
   uint32_t bytes_written;
-  write_mdr_file( live_microdrive_data[microdrive_index].filename,
-		  working_image_buffer,
-		  live_microdrive_data[microdrive_index].cartridge_data_length+1, &bytes_written );
+  write_mdr_file( filename, working_image_buffer, bytes_expected+1, &bytes_written );
+
+  return;
 }
 
 
@@ -452,9 +481,9 @@ int main( void )
   /* Initialise the live data */
   for( microdrive_index_t microdrive_index = 0; microdrive_index < NUM_MICRODRIVES; microdrive_index++ )
   {
-    live_microdrive_data[microdrive_index].filename              = NULL;
-    live_microdrive_data[microdrive_index].cartridge_data_length = 0;
-    live_microdrive_data[microdrive_index].write_protected       = WRITE_PROTECT_OFF;
+    live_microdrive_data.currently_inserted[microdrive_index].filename              = NULL;
+    live_microdrive_data.currently_inserted[microdrive_index].cartridge_data_length = 0;
+    live_microdrive_data.currently_inserted[microdrive_index].write_protected       = WRITE_PROTECT_OFF;
   }
 
   /* Initialise the never ending list of things that need doing */
@@ -475,7 +504,7 @@ int main( void )
 
   /* Set requests for microdrive status running. Don't move the var anywhere it might get lost */
   repeating_timer_t repeating_status_timer;
-  add_repeating_timer_ms( 500, add_work_request_status, NULL, &repeating_status_timer );
+//  add_repeating_timer_ms( 500, add_work_request_status, NULL, &repeating_status_timer );
 
 #define TEST_SETUP 1
 #if TEST_SETUP
@@ -502,8 +531,7 @@ int main( void )
 #endif
 
   /* Create the finite state machine which operates the GUI */
-  fsm_t *gui_fsm;
-  if( (gui_fsm=create_fsm( query_gui_fsm_map(), query_gui_fsm_initial_state(), live_microdrive_data )) == NULL )
+  if( (gui_fsm=create_fsm( query_gui_fsm_map(), query_gui_fsm_initial_state(), &live_microdrive_data )) == NULL )
     panic("Unable to create GUI FSM");
 
   /*
@@ -549,4 +577,15 @@ __asm volatile ("nop");
 __asm volatile ("nop");
 gpio_put( TEST_OUTPUT_GP, 0 );
 busy_wait_us_32(1);
+
+
+  for( uint8_t blink=0; blink<5; blink++)
+  {
+    gpio_put( LED_PIN, 1 );
+    busy_wait_us_32(500000);
+    gpio_put( LED_PIN, 0 );
+    busy_wait_us_32(500000);
+  }
+  busy_wait_us_32(5000000);
+
 #endif

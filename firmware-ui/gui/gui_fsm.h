@@ -25,15 +25,16 @@
 
 typedef enum
 {
-  STATE_GUI_INIT         = FSM_STIMULUS_LAST,
+  STATE_GUI_INIT            = FSM_STATE_LAST,
   STATE_GUI_SHOW_STATUS,
+  STATE_GUI_INSERTING_MDR,
 }
 gui_fsm_state_t;
 
 
 typedef enum
 {
-  NONE
+  ST_MDR_INSERTED           = FSM_STIMULUS_LAST,
 }
 gui_fsm_stimulus_t;
 

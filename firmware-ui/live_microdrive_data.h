@@ -20,6 +20,7 @@
 #ifndef __LIVE_MICRODRIVE_DATA_H
 #define __LIVE_MICRODRIVE_DATA_H
 
+#include "microdrive.h"
 #include "cartridge.h"
 
 /*
@@ -27,11 +28,18 @@
  * sent to the IO pico for use by the Spectrum. I need to keep this in
  * order to be able to save data back to SD card, etc
  */
-typedef struct _live_microdrive_data_t
+typedef struct _microdrive_inserted_data_t
 {
   char           *filename;                // Name of SD card file loaded
   uint32_t        cartridge_data_length;   // Number of bytes in the cartridge image
   write_protect_t write_protected;         // Whether the cartridge is write protected in the IO Pico
+}
+microdrive_inserted_data_t;
+
+
+typedef struct _live_microdrive_data_t
+{
+  microdrive_inserted_data_t currently_inserted[NUM_MICRODRIVES];
 }
 live_microdrive_data_t;
 

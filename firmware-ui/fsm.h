@@ -22,7 +22,9 @@
 
 #include <stdint.h>
 
-typedef void (*fsm_state_entry_fn_t)( void* );
+struct _fsm;
+typedef void (*fsm_state_entry_fn_t)( struct _fsm * );
+
 
 typedef enum _fsm_state
 {
@@ -31,6 +33,7 @@ typedef enum _fsm_state
   FSM_STATE_LAST
 }
 fsm_state_t;
+
 
 typedef enum _fsm_stimulus
 {
@@ -42,6 +45,7 @@ typedef enum _fsm_stimulus
 }
 fsm_stimulus_t;
 
+
 typedef struct _fsm_map
 {
   fsm_state_t          state;
@@ -50,6 +54,7 @@ typedef struct _fsm_map
   fsm_state_entry_fn_t entry_fn;
 }
 fsm_map_t;
+
 
 typedef struct _fsm
 {
@@ -63,7 +68,7 @@ typedef struct _fsm
 fsm_t;
 
 
-fsm_t *create_fsm( fsm_map_t*, fsm_state_t );
+fsm_t *create_fsm( fsm_map_t*, fsm_state_t, void *fsm_data );
 void   process_fsms( void );
 void   generate_stimulus( fsm_t*, fsm_stimulus_t );
 

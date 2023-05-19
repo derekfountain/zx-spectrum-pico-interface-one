@@ -63,9 +63,7 @@ void process_fsms( void )
       fsm_map_t *map = fsm->map;
       while( map && map->state != FSM_STATE_NONE )
       {
-	if( fsm->current_state == map->state
-	    &&
-	    fsm->pending_stimulus == map->stimulus )
+	if( (fsm->current_state == map->state) && (fsm->pending_stimulus == map->stimulus) )
 	{
 	  /* This map entry represents the transition we want to make */
 	  fsm->pending_stimulus = FSM_STIMULUS_NONE;
@@ -73,7 +71,7 @@ void process_fsms( void )
 	  /* Call the entry function if there is one */
 	  if( map->entry_fn != NULL )
 	  {
-	    (map->entry_fn)(fsm->fsm_data);
+	    (map->entry_fn)(fsm);
 	  }
 
 	  /* New state is achieved */
