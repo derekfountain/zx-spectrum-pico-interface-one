@@ -31,6 +31,10 @@ void draw_status_screen( status_screen_t *status )
   {
     oled_draw_status_microdrive( microdrive_index, status->md_inserted[microdrive_index], (microdrive_index == status->selected) );
   }
+
+  oled_display_inserted_filename( status->filename == NULL ? (uint8_t*)"No cartridge" : status->filename );
+  oled_display_inserted_num_blocks( status->num_blocks );
+  oled_display_inserted_write_protected( (status->filename == NULL) ? -1 : status->write_protected );
   
   oled_update();
 }

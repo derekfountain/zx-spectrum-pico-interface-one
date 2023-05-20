@@ -66,13 +66,12 @@ void oled_draw_status_menu( uint8_t selected )
 
   ssd1306_draw_string(&display, 0,      menu_y_pos, 1, entries[0], 0);
   ssd1306_draw_string(&display, 11*6+3, menu_y_pos, 1, entries[1], 0);
-#endif
 
   // Test
   uint8_t buffer[20];
   snprintf(buffer,20,"%d",selected);
   ssd1306_draw_string(&display, 0, 50, 1, buffer, 0);
-  
+#endif  
 }
 
 
@@ -117,6 +116,40 @@ void oled_draw_status_microdrive( microdrive_index_t microdrive_index, bool inse
   return;
 }
 
+
+void oled_display_inserted_filename( uint8_t *filename )
+{
+  ssd1306_clear_square( &display, 0, 16, 127, 16+8 );  
+
+  if( filename != NULL )
+  {
+    ssd1306_draw_string( &display, 0, 16, 1, filename, 0 );
+  }
+}
+
+
+void oled_display_inserted_num_blocks( uint8_t num_blocks )
+{
+  ssd1306_clear_square( &display, 0, 24, 127, 24+8 );  
+
+  if( num_blocks != 0 )
+  {
+    uint8_t num_blocks_str[32];
+    snprintf( num_blocks_str, 32, "%d blocks", num_blocks );
+    ssd1306_draw_string( &display, 0, 24, 1, num_blocks_str, 0 );
+  }
+}
+
+
+void oled_display_inserted_write_protected( int8_t write_protected )
+{
+  ssd1306_clear_square( &display, 0, 32, 127, 32+8 );  
+
+  if( write_protected != -1 )
+  {
+    ssd1306_draw_string( &display, 0, 32, 1, write_protected ? "Write protected" : "Not write protected", 0 );
+  }
+}
 
 
 /* Hardcoded nonense to print some values which are currently useful */

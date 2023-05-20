@@ -79,6 +79,7 @@ typedef struct _fsm
   fsm_state_entry_fn_binding_t *binding;
   void                         *fsm_data;
 
+  // FIXME This needs to be a queue, I don't want to drop stims
   fsm_stimulus_t pending_stimulus;
 }
 fsm_t;

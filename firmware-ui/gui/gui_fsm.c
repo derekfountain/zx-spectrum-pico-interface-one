@@ -20,6 +20,7 @@
 #include "gui_fsm.h"
 #include "gui.h"
 #include "microdrive.h"
+#include "cartridge.h"
 #include "live_microdrive_data.h"
 #include "oled_display.h"
 
@@ -56,6 +57,19 @@ void gui_sm_show_status( fsm_t *fsm )
   for( microdrive_index_t microdrive_index = 0; microdrive_index < NUM_MICRODRIVES; microdrive_index++ )
   {
     status.md_inserted[microdrive_index] = (live_microdrive_data->currently_inserted[microdrive_index].filename != NULL);
+  }
+
+  if( live_microdrive_data->currently_inserted[status.selected].filename == NULL )
+  {
+    status.filename        = NULL;
+    status.num_blocks      = 0;
+    status.write_protected = false;
+  }
+  else
+  {
+    status.filename        = live_microdrive_data->currently_inserted[status.selected].filename;
+    status.num_blocks      = live_microdrive_data->currently_inserted[status.selected].cartridge_data_length / MICRODRIVE_BLOCK_LEN;
+    status.write_protected = live_microdrive_data->currently_inserted[status.selected].write_protected;
   }
 
   draw_status_screen( &status );
@@ -126,7 +140,7 @@ static fsm_map_t gui_fsm_map[] =
   {STATE_GUI_SELECTING_PREVIOUS_MD, FSM_STIMULUS_YES,  STATE_GUI_SHOW_STATUS,           },
 
 
-  {FSM_STATE_NONE,          FSM_STIMULUS_NONE, FSM_STATE_NONE,                  NULL}
+  {FSM_STATE_NONE,                  FSM_STIMULUS_NONE, FSM_STATE_NONE,                  }
 };
 
 

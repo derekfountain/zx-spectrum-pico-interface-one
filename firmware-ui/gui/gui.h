@@ -24,8 +24,11 @@
 
 typedef struct _status_screen_t
 {
-  bool   md_inserted[8];
-  int8_t selected;
+  bool     md_inserted[8];
+  int8_t   selected;
+  uint8_t *filename;
+  uint8_t  num_blocks;
+  bool     write_protected;
 }
 status_screen_t;
 

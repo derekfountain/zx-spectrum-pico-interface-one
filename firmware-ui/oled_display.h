@@ -20,6 +20,8 @@
 #ifndef __OLED_DISPLAY_H
 #define __OLED_DISPLAY_H
 
+#include "pico/stdlib.h"
+
 #include "ui_io_comms.h"
 #include "microdrive.h"
 
@@ -32,5 +34,8 @@ void oled_display_status_bytes( io_to_ui_status_response_t *status_struct );
 void oled_display_done( void );
 void oled_display_filename( uint8_t *filename );
 void oled_display_show_progress( uint8_t which, uint32_t i );
+void oled_display_inserted_filename( uint8_t *filename );
+void oled_display_inserted_num_blocks( uint8_t num_blocks );
+void oled_display_inserted_write_protected( int8_t write_protected );
 
 #endif

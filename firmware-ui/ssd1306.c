@@ -203,10 +203,10 @@ void ssd1306_draw_empty_square(ssd1306_t *p, uint32_t x, uint32_t y, uint32_t wi
    */
   width--;
   height--;
-    ssd1306_draw_line(p, x, y, x+width, y, 0);
-    ssd1306_draw_line(p, x, y+height, x+width, y+height, 0);
-    ssd1306_draw_line(p, x, y, x, y+height, 0);
-    ssd1306_draw_line(p, x+width, y, x+width, y+height, 0);
+  ssd1306_draw_line(p, x, y, x+width, y, 0);
+  ssd1306_draw_line(p, x, y+height, x+width, y+height, 0);
+  ssd1306_draw_line(p, x, y, x, y+height, 0);
+  ssd1306_draw_line(p, x+width, y, x+width, y+height, 0);
 }
 
 void ssd1306_draw_char_with_font(ssd1306_t *p, uint32_t x, uint32_t y, uint32_t scale, const uint8_t *font, char c, bool invert) {
