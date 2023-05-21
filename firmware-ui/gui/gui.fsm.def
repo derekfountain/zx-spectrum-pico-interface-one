@@ -24,6 +24,8 @@ FSM gui
       gui_sm_show_status
 
     TRANSITIONS
+      ST_REQUEST_STATUS                 STATE_GUI_REQUESTING_STATUS
+      ST_REQUEST_STATUS_DONE            STATE_GUI_REQUESTING_STATUS_DONE
       ST_MDR_INSERTING                  STATE_GUI_INSERTING_MDR
       ST_MDR_INSERTED                   STATE_GUI_INSERTED_MDR
       ST_MDR_EJECTED                    STATE_GUI_EJECTING_MDR
@@ -33,6 +35,22 @@ FSM gui
       ST_ROTATE_CW                      STATE_GUI_SELECTING_PREVIOUS_MD
       ST_ROTATE_CCW                     STATE_GUI_SELECTING_NEXT_MD
       ST_BUTTON_PRESS                   STATE_GUI_SHOW_MD_MENU
+
+
+  STATE STATE_GUI_REQUESTING_STATUS
+    ENTRY
+      gui_sm_requesting_status
+
+    TRANSITIONS
+      ST_YES                            STATE_GUI_SHOW_STATUS
+
+
+  STATE STATE_GUI_REQUESTING_STATUS_DONE
+    ENTRY
+      gui_sm_requesting_status_done
+
+    TRANSITIONS
+      ST_YES                            STATE_GUI_SHOW_STATUS
 
 
   // An MDR image is being inserted.

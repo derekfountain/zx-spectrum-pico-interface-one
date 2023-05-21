@@ -24,6 +24,8 @@
 
 typedef struct _status_screen_t
 {
+  bool     requesting_status;
+
   bool     md_inserted[8];
   int8_t   selected;
 

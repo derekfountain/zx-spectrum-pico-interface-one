@@ -19,6 +19,7 @@
 
 #include "ssd1306.h"
 
+#include "oled_display.h"
 #include "ui_io_comms.h"     // Temp
 #include <stdio.h>
 
@@ -155,6 +156,33 @@ void oled_display_inserted_write_protected( int8_t write_protected )
   {
     ssd1306_draw_string( &display, 0, 32, 1, write_protected ? "Write protected" : "Not write protected", 0 );
   }
+}
+
+
+void oled_display_msg_requesting_status( void )
+{
+  oled_display_clear_msg();
+
+  ssd1306_draw_filled_square(&display, 125, 61, 2, 2 );
+  ssd1306_show(&display);
+}
+
+
+void oled_display_msg_saving_mdr_data( microdrive_index_t microdrive_index )
+{
+  oled_display_clear_msg();
+
+  uint8_t saving_msg[32];
+  snprintf( saving_msg, 32, "Saving MD%d to SD card", microdrive_index+1 );
+  ssd1306_draw_string( &display, 0, 56, 1, saving_msg, 0 );
+  ssd1306_show(&display);
+}
+
+
+void oled_display_clear_msg( void )
+{
+  ssd1306_clear_square( &display, 0, 56, 127, 7 );  
+  ssd1306_show(&display);
 }
 
 

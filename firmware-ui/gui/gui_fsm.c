@@ -128,37 +128,57 @@ void gui_sm_selecting_previous_md( fsm_t *fsm )
 }
 
 
+void gui_sm_requesting_status( fsm_t *fsm )
+{
+  status.requesting_status = true;
+  generate_stimulus( fsm, FSM_STIMULUS_YES );  
+}
+
+
+void gui_sm_requesting_status_done( fsm_t *fsm )
+{
+  status.requesting_status = false;
+  generate_stimulus( fsm, FSM_STIMULUS_YES );  
+}
+
 
 /* State to entry function bindings */
 static fsm_state_entry_fn_binding_t binding[] = 
 {
-  { STATE_GUI_SHOW_STATUS,           gui_sm_show_status },
-  { STATE_GUI_INSERTING_MDR,         gui_sm_inserting_mdr  },
-  { STATE_GUI_INSERTED_MDR,          gui_sm_inserted_mdr  },
-  { STATE_GUI_SELECTING_NEXT_MD,     gui_sm_selecting_next_md },
-  { STATE_GUI_SELECTING_PREVIOUS_MD, gui_sm_selecting_previous_md },
+  { STATE_GUI_SHOW_STATUS,            gui_sm_show_status },
+  { STATE_GUI_REQUESTING_STATUS,      gui_sm_requesting_status },
+  { STATE_GUI_REQUESTING_STATUS_DONE, gui_sm_requesting_status_done },
+  { STATE_GUI_INSERTING_MDR,          gui_sm_inserting_mdr  },
+  { STATE_GUI_INSERTED_MDR,           gui_sm_inserted_mdr  },
+  { STATE_GUI_SELECTING_NEXT_MD,      gui_sm_selecting_next_md },
+  { STATE_GUI_SELECTING_PREVIOUS_MD,  gui_sm_selecting_previous_md },
 
-  { FSM_STATE_NONE,                  NULL },
+  { FSM_STATE_NONE,                   NULL },
 };
 
 
 /* Map of states, stimulus, and destination */
 static fsm_map_t gui_fsm_map[] =
 {
-  {STATE_GUI_INIT,                  FSM_STIMULUS_YES,  STATE_GUI_SHOW_STATUS,           },
-  {STATE_GUI_SHOW_STATUS,           ST_MDR_INSERTING,  STATE_GUI_INSERTING_MDR,         },
-  {STATE_GUI_SHOW_STATUS,           ST_MDR_INSERTED,   STATE_GUI_INSERTED_MDR,          },
-  {STATE_GUI_INSERTING_MDR,         FSM_STIMULUS_YES,  STATE_GUI_SHOW_STATUS,           },
-  {STATE_GUI_INSERTED_MDR,          FSM_STIMULUS_YES,  STATE_GUI_SHOW_STATUS,           },
+  {STATE_GUI_INIT,                   FSM_STIMULUS_YES,       STATE_GUI_SHOW_STATUS,           },
+  {STATE_GUI_SHOW_STATUS,            ST_MDR_INSERTING,       STATE_GUI_INSERTING_MDR,         },
+  {STATE_GUI_SHOW_STATUS,            ST_MDR_INSERTED,        STATE_GUI_INSERTED_MDR,          },
+  {STATE_GUI_INSERTING_MDR,          FSM_STIMULUS_YES,       STATE_GUI_SHOW_STATUS,           },
+  {STATE_GUI_INSERTED_MDR,           FSM_STIMULUS_YES,       STATE_GUI_SHOW_STATUS,           },
 
-  {STATE_GUI_SHOW_STATUS,           ST_ROTATE_CCW,     STATE_GUI_SELECTING_NEXT_MD,     },
-  {STATE_GUI_SHOW_STATUS,           ST_ROTATE_CW,      STATE_GUI_SELECTING_PREVIOUS_MD, },
+  {STATE_GUI_SHOW_STATUS,            ST_ROTATE_CCW,          STATE_GUI_SELECTING_NEXT_MD,     },
+  {STATE_GUI_SHOW_STATUS,            ST_ROTATE_CW,           STATE_GUI_SELECTING_PREVIOUS_MD, },
 
-  {STATE_GUI_SELECTING_NEXT_MD,     FSM_STIMULUS_YES,  STATE_GUI_SHOW_STATUS,           },
-  {STATE_GUI_SELECTING_PREVIOUS_MD, FSM_STIMULUS_YES,  STATE_GUI_SHOW_STATUS,           },
+  {STATE_GUI_SHOW_STATUS,            ST_REQUEST_STATUS,      STATE_GUI_REQUESTING_STATUS,         },
+  {STATE_GUI_SHOW_STATUS,            ST_REQUEST_STATUS_DONE, STATE_GUI_REQUESTING_STATUS_DONE,         },
+  {STATE_GUI_REQUESTING_STATUS,      FSM_STIMULUS_YES,       STATE_GUI_SHOW_STATUS,           },
+  {STATE_GUI_REQUESTING_STATUS_DONE, FSM_STIMULUS_YES,       STATE_GUI_SHOW_STATUS,           },
+
+  {STATE_GUI_SELECTING_NEXT_MD,      FSM_STIMULUS_YES,       STATE_GUI_SHOW_STATUS,           },
+  {STATE_GUI_SELECTING_PREVIOUS_MD,  FSM_STIMULUS_YES,       STATE_GUI_SHOW_STATUS,           },
 
 
-  {FSM_STATE_NONE,                  FSM_STIMULUS_NONE, FSM_STATE_NONE,                  }
+  {FSM_STATE_NONE,                   FSM_STIMULUS_NONE,      FSM_STATE_NONE,                  }
 };
 
 

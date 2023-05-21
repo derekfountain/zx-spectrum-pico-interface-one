@@ -68,6 +68,16 @@ void draw_status_screen( status_screen_t *status )
     oled_display_inserted_write_protected( (status->filename == NULL) ? -1 : status->write_protected );
   }
   
+  if( status->requesting_status )
+  {
+    oled_display_msg_requesting_status();
+  }
+  else
+  {
+    oled_display_clear_msg();
+  }
+
+
   oled_update();
 }
 

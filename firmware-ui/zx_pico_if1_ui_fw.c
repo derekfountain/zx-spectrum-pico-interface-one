@@ -288,6 +288,8 @@ static void init_io_link( void )
 
 static void request_status( void )
 {
+  generate_stimulus( gui_fsm, ST_REQUEST_STATUS );
+  
   (void)send_cmd( UI_TO_IO_REQUEST_STATUS );
     
   /* Write the data which describes the command */
@@ -310,14 +312,19 @@ static void request_status( void )
 	||
         (status_struct.status[microdrive_index] == MD_STATUS_MDR_EJECTED_NEEDS_SAVING) )
     {
+      /* If this one needs its data saving back to SD card, request the data for the IO Pico */
       add_work_request_mdr_data( microdrive_index );
     } 
   }
+
+  generate_stimulus( gui_fsm, ST_REQUEST_STATUS_DONE );
 }
 
 
 static void request_mdr_data_to_save( microdrive_index_t microdrive_index )
 {
+//  oled_display_msg_saving_mdr_data( microdrive_index );
+
   (void)send_cmd( UI_TO_IO_REQUEST_MDR_TO_SAVE );
 
   /*
@@ -354,6 +361,7 @@ static void request_mdr_data_to_save( microdrive_index_t microdrive_index )
   uint32_t bytes_written;
   write_mdr_file( filename, working_image_buffer, bytes_expected+1, &bytes_written );
 
+//  oled_display_clear_msg();
   return;
 }
 
@@ -510,15 +518,15 @@ int main( void )
 
   /* Set requests for microdrive status running. Don't move the var anywhere it might get lost */
   repeating_timer_t repeating_status_timer;
-//  add_repeating_timer_ms( 500, add_work_request_status, NULL, &repeating_status_timer );
+  add_repeating_timer_ms( 500, add_work_request_status, NULL, &repeating_status_timer );
 
 #define TEST_SETUP 1
 #if TEST_SETUP
   /* Read named files from SD card and insert each one that exists */
   uint8_t *mdr_files[] = {"1.mdr", 
 			  "2.mdr", 
-			  "3.mdr", 
-			  "4.mdr", 
+			  "3x.mdr", 
+			  "4x.mdr", 
 			  "5.mdr", 
 			  "6.mdr", 
 			  "7.mdr", 
