@@ -67,16 +67,17 @@ void draw_status_screen( status_screen_t *status )
     oled_display_inserted_num_blocks( status->num_blocks );
     oled_display_inserted_write_protected( (status->filename == NULL) ? -1 : status->write_protected );
   }
+
+  oled_display_clear_msg();
+  if( status->requesting_data_from_microdrive != -1 )
+  {
+    oled_display_msg_saving_mdr_data( status->requesting_data_from_microdrive );
+  }
   
   if( status->requesting_status )
   {
     oled_display_msg_requesting_status();
   }
-  else
-  {
-    oled_display_clear_msg();
-  }
-
 
   oled_update();
 }

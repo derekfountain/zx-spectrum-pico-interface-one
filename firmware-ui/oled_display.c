@@ -181,7 +181,7 @@ void oled_display_msg_saving_mdr_data( microdrive_index_t microdrive_index )
 
 void oled_display_clear_msg( void )
 {
-  ssd1306_clear_square( &display, 0, 56, 127, 7 );  
+  ssd1306_clear_square( &display, 0, 56, 128, 8 );  
   ssd1306_show(&display);
 }
 

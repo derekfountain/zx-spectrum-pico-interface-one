@@ -26,6 +26,8 @@ FSM gui
     TRANSITIONS
       ST_REQUEST_STATUS                 STATE_GUI_REQUESTING_STATUS
       ST_REQUEST_STATUS_DONE            STATE_GUI_REQUESTING_STATUS_DONE
+      ST_REQUEST_DATA_TO_SAVE           STATE_GUI_REQUESTING_DATA_TO_SAVE
+      ST_DATA_SAVED                     STATE_GUI_DATA_SAVED
       ST_MDR_INSERTING                  STATE_GUI_INSERTING_MDR
       ST_MDR_INSERTED                   STATE_GUI_INSERTED_MDR
       ST_MDR_EJECTED                    STATE_GUI_EJECTING_MDR
@@ -48,6 +50,22 @@ FSM gui
   STATE STATE_GUI_REQUESTING_STATUS_DONE
     ENTRY
       gui_sm_requesting_status_done
+
+    TRANSITIONS
+      ST_YES                            STATE_GUI_SHOW_STATUS
+
+
+  STATE STATE_GUI_REQUESTING_DATA_TO_SAVE
+    ENTRY
+      gui_sm_requesting_data_to_save
+
+    TRANSITIONS
+      ST_YES                            STATE_GUI_SHOW_STATUS
+
+
+  STATE STATE_GUI_DATA_SAVED
+    ENTRY
+      gui_sm_data_saved
 
     TRANSITIONS
       ST_YES                            STATE_GUI_SHOW_STATUS

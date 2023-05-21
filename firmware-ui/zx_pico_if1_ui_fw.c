@@ -302,9 +302,6 @@ static void request_status( void )
   io_to_ui_status_response_t status_struct;
   uart_read_blocking(UI_PICO_UART_ID, (uint8_t*)&status_struct, sizeof(io_to_ui_status_response_t)); 	
 
-  /* I need to emit the values into the GUI somehow. For now, just print it */
-  oled_display_status_bytes( &status_struct );
-  
   /* Look for microdrives which need their cartridge saving */
   for( microdrive_index_t microdrive_index = 0; microdrive_index < NUM_MICRODRIVES; microdrive_index++ )
   {
@@ -323,7 +320,8 @@ static void request_status( void )
 
 static void request_mdr_data_to_save( microdrive_index_t microdrive_index )
 {
-//  oled_display_msg_saving_mdr_data( microdrive_index );
+  live_microdrive_data.microdrive_saving_to_sd = microdrive_index;
+  generate_stimulus( gui_fsm, ST_REQUEST_DATA_TO_SAVE );
 
   (void)send_cmd( UI_TO_IO_REQUEST_MDR_TO_SAVE );
 
@@ -361,7 +359,9 @@ static void request_mdr_data_to_save( microdrive_index_t microdrive_index )
   uint32_t bytes_written;
   write_mdr_file( filename, working_image_buffer, bytes_expected+1, &bytes_written );
 
-//  oled_display_clear_msg();
+  live_microdrive_data.microdrive_saving_to_sd = -1;
+  generate_stimulus( gui_fsm, ST_DATA_SAVED );
+
   return;
 }
 
@@ -492,6 +492,7 @@ int main( void )
   uart_set_translate_crlf(UI_PICO_UART_ID, false);
 
   /* Initialise the live data */
+  live_microdrive_data.microdrive_saving_to_sd = -1;
   for( microdrive_index_t microdrive_index = 0; microdrive_index < NUM_MICRODRIVES; microdrive_index++ )
   {
     live_microdrive_data.currently_inserted[microdrive_index].status                = LIVE_STATUS_NO_CARTRIDGE;

@@ -49,6 +49,20 @@ fsm_t *create_fsm( fsm_map_t *map, fsm_state_entry_fn_binding_t *binding, fsm_st
   
   num_active_fsms++;
 
+  /* Find and call the entry function for the intial state if there is one */
+  uint32_t binding_index = 0;
+  do
+  {
+    if( fsm->binding[binding_index].state == initial_state )
+    {
+      if( fsm->binding[binding_index].entry_fn != NULL )
+      {
+	(fsm->binding[binding_index].entry_fn)(fsm);
+      }
+      break;
+    }
+  } while( fsm->binding[++binding_index].state != FSM_STATE_NONE );
+
   return fsm;
 }
 

@@ -21,10 +21,12 @@
 #define __GUI_H
 
 #include "pico/stdlib.h"
+#include "microdrive.h"
 
 typedef struct _status_screen_t
 {
   bool     requesting_status;
+  microdrive_index_t requesting_data_from_microdrive;
 
   bool     md_inserted[8];
   int8_t   selected;
