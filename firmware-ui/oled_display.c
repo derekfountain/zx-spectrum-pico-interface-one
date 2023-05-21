@@ -117,6 +117,12 @@ void oled_draw_status_microdrive( microdrive_index_t microdrive_index, bool inse
 }
 
 
+void oled_display_clear_inserted_details_area( void )
+{
+  ssd1306_clear_square( &display, 0, 16, 127, 32+8 );  
+}
+
+
 void oled_display_inserted_filename( uint8_t *filename )
 {
   ssd1306_clear_square( &display, 0, 16, 127, 16+8 );  
@@ -174,15 +180,6 @@ void oled_display_done( void )
 #if 0
   ssd1306_clear(&display);
   ssd1306_draw_string(&display, 0, 0, 1, "Done");
-  ssd1306_show(&display);
-#endif
-}
-
-void oled_display_filename( uint8_t *filename )
-{
-#if 0
-  ssd1306_clear(&display);
-  ssd1306_draw_string(&display, 10, 10, 1, filename);
   ssd1306_show(&display);
 #endif
 }

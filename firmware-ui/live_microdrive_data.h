@@ -23,6 +23,14 @@
 #include "microdrive.h"
 #include "cartridge.h"
 
+typedef enum
+{
+  LIVE_STATUS_NO_CARTRIDGE,
+  LIVE_STATUS_INSERTING,
+  LIVE_STATUS_INSERTED,
+}
+live_microdrive_status_t;
+
 /*
  * This describes the data which has been loaded from the SD card and
  * sent to the IO pico for use by the Spectrum. I need to keep this in
@@ -30,9 +38,10 @@
  */
 typedef struct _microdrive_inserted_data_t
 {
-  char           *filename;                // Name of SD card file loaded
-  uint32_t        cartridge_data_length;   // Number of bytes in the cartridge image
-  write_protect_t write_protected;         // Whether the cartridge is write protected in the IO Pico
+  live_microdrive_status_t status;                  // Status
+  char                    *filename;                // Name of SD card file loaded
+  uint32_t                 cartridge_data_length;   // Number of bytes in the cartridge image
+  write_protect_t          write_protected;         // Whether the cartridge is write protected in the IO Pico
 }
 microdrive_inserted_data_t;
 

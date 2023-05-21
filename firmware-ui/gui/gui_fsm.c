@@ -56,23 +56,38 @@ void gui_sm_show_status( fsm_t *fsm )
 
   for( microdrive_index_t microdrive_index = 0; microdrive_index < NUM_MICRODRIVES; microdrive_index++ )
   {
-    status.md_inserted[microdrive_index] = (live_microdrive_data->currently_inserted[microdrive_index].filename != NULL);
+    status.md_inserted[microdrive_index] = (live_microdrive_data->currently_inserted[microdrive_index].status == LIVE_STATUS_INSERTED);
   }
 
-  if( live_microdrive_data->currently_inserted[status.selected].filename == NULL )
+  if( live_microdrive_data->currently_inserted[status.selected].status == LIVE_STATUS_NO_CARTRIDGE )
   {
     status.filename        = NULL;
     status.num_blocks      = 0;
     status.write_protected = false;
+    status.inserting       = false;
   }
-  else
+  else if( live_microdrive_data->currently_inserted[status.selected].status == LIVE_STATUS_INSERTING )
+  {
+    status.inserting       = true;
+  }
+  else if( live_microdrive_data->currently_inserted[status.selected].status == LIVE_STATUS_INSERTED )
   {
     status.filename        = live_microdrive_data->currently_inserted[status.selected].filename;
     status.num_blocks      = live_microdrive_data->currently_inserted[status.selected].cartridge_data_length / MICRODRIVE_BLOCK_LEN;
     status.write_protected = live_microdrive_data->currently_inserted[status.selected].write_protected;
+    status.inserting       = false;
   }
 
   draw_status_screen( &status );
+}
+
+
+/*
+ * Cartridge is being inserted. Data is being copied across to the IO Pico.
+ */
+void gui_sm_inserting_mdr( fsm_t *fsm )
+{
+  generate_stimulus( fsm, FSM_STIMULUS_YES );  
 }
 
 
@@ -81,7 +96,7 @@ void gui_sm_show_status( fsm_t *fsm )
  * anything at the moment, it can just drop through and the FSM will
  * arrive back at the show status state which will update the screen.
  */
-void gui_sm_insert_mdr( fsm_t *fsm )
+void gui_sm_inserted_mdr( fsm_t *fsm )
 {
   /* Insertion routine will have updated live microdrive data, just advance */
 
@@ -118,7 +133,8 @@ void gui_sm_selecting_previous_md( fsm_t *fsm )
 static fsm_state_entry_fn_binding_t binding[] = 
 {
   { STATE_GUI_SHOW_STATUS,           gui_sm_show_status },
-  { STATE_GUI_INSERTING_MDR,         gui_sm_insert_mdr  },
+  { STATE_GUI_INSERTING_MDR,         gui_sm_inserting_mdr  },
+  { STATE_GUI_INSERTED_MDR,          gui_sm_inserted_mdr  },
   { STATE_GUI_SELECTING_NEXT_MD,     gui_sm_selecting_next_md },
   { STATE_GUI_SELECTING_PREVIOUS_MD, gui_sm_selecting_previous_md },
 
@@ -130,8 +146,10 @@ static fsm_state_entry_fn_binding_t binding[] =
 static fsm_map_t gui_fsm_map[] =
 {
   {STATE_GUI_INIT,                  FSM_STIMULUS_YES,  STATE_GUI_SHOW_STATUS,           },
-  {STATE_GUI_SHOW_STATUS,           ST_MDR_INSERTED,   STATE_GUI_INSERTING_MDR,         },
+  {STATE_GUI_SHOW_STATUS,           ST_MDR_INSERTING,  STATE_GUI_INSERTING_MDR,         },
+  {STATE_GUI_SHOW_STATUS,           ST_MDR_INSERTED,   STATE_GUI_INSERTED_MDR,          },
   {STATE_GUI_INSERTING_MDR,         FSM_STIMULUS_YES,  STATE_GUI_SHOW_STATUS,           },
+  {STATE_GUI_INSERTED_MDR,          FSM_STIMULUS_YES,  STATE_GUI_SHOW_STATUS,           },
 
   {STATE_GUI_SHOW_STATUS,           ST_ROTATE_CCW,     STATE_GUI_SELECTING_NEXT_MD,     },
   {STATE_GUI_SHOW_STATUS,           ST_ROTATE_CW,      STATE_GUI_SELECTING_PREVIOUS_MD, },

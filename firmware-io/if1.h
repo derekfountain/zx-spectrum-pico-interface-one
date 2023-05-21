@@ -83,53 +83,6 @@ TRACE_TYPE;
 
 void trace( TRACE_CODE code, uint32_t data );
 
-/*
- * Microdrive structure, represents the drive ifself.
- */
-typedef struct _microdrive_t
-{
-  bool    motor_on;
-  int     head_pos;
-  int     transfered;
-  int     max_bytes;
-  uint8_t pream[512];   /* preamble/sync area written. 256 header blocks and 256 data blocks */
-  uint8_t last;
-  uint8_t gap;
-  uint8_t sync;
-
-  /*
-   * Offset in PSRAM to the byte array representing the tape, approx 97KB for a 180 sector
-   * tape. About 135KB for a 254 sector tape.
-   *
-   * The following is obsolete because the external RAM can't be examined
-   * directly using the debugger. Might be useful though:
-   *
-   * Copy and paste out to a text file with:
-   *
-   * (gdb) set print repeats 0
-   * (gdb) set print elements unlimited
-   * (gdb) set pagination off
-   * (gdb) p/x cartridge_data
-   * (gdb) set max-value-size unlimited
-   *
-   * Convert to MDR image with:
-   *
-   * > perl -ne 'map { print chr(hex($_)) } split(/, /, $_)' < mm_reformated_in_zx.txt > mm_reformated_in_zx.mdr
-   *
-   * mm_reformated_in_zx.mdr will then load into FUSE as a normal
-   * MDR file.
-   *
-   */
-  uint32_t cartridge_data_psram_offset;
-
-  bool     cartridge_inserted;
-  bool     cartridge_data_modified;  // FIXME Needs to be a 2 second last-write type timer
-  bool     cartridge_write_protect;
-  uint8_t  cartridge_len_in_blocks;
-
-} microdrive_t;
-
-
 /* Offset into external RAM device to find something */
 typedef uint32_t psram_offset_t;
 
@@ -146,5 +99,7 @@ void port_mdr_out( uint8_t val );
 bool is_cartridge_inserted( microdrive_index_t which );
 bool is_cartridge_modified( microdrive_index_t which );
 void set_cartridge_modified( microdrive_index_t which, bool modified );
+bool is_cartridge_ejected_pending_save( microdrive_index_t which );
+void set_cartridge_ejected_to_sd( microdrive_index_t which );
 
 #endif

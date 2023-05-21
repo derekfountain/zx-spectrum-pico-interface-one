@@ -41,6 +41,54 @@ enum
 };
 
 /*
+ * Microdrive structure, represents the drive ifself.
+ */
+typedef struct _microdrive_t
+{
+  bool    motor_on;
+  int     head_pos;
+  int     transfered;
+  int     max_bytes;
+  uint8_t pream[512];   /* preamble/sync area written. 256 header blocks and 256 data blocks */
+  uint8_t last;
+  uint8_t gap;
+  uint8_t sync;
+
+  /*
+   * Offset in PSRAM to the byte array representing the tape, approx 97KB for a 180 sector
+   * tape. About 135KB for a 254 sector tape.
+   *
+   * The following is obsolete because the external RAM can't be examined
+   * directly using the debugger. Might be useful though:
+   *
+   * Copy and paste out to a text file with:
+   *
+   * (gdb) set print repeats 0
+   * (gdb) set print elements unlimited
+   * (gdb) set pagination off
+   * (gdb) p/x cartridge_data
+   * (gdb) set max-value-size unlimited
+   *
+   * Convert to MDR image with:
+   *
+   * > perl -ne 'map { print chr(hex($_)) } split(/, /, $_)' < mm_reformated_in_zx.txt > mm_reformated_in_zx.mdr
+   *
+   * mm_reformated_in_zx.mdr will then load into FUSE as a normal
+   * MDR file.
+   *
+   */
+  uint32_t cartridge_data_psram_offset;
+  
+  bool     cartridge_inserted;
+  bool     cartridge_ejected_pending_save;
+  bool     cartridge_data_modified;  // FIXME Needs to be a 2 second last-write type timer
+  bool     cartridge_write_protect;
+  uint8_t  cartridge_len_in_blocks;
+
+} microdrive_t;
+
+
+/*
  * These are the microdrives, typically 8 of them. This structure
  * keeps track of the data (in external PSRAM), motor, the head
  * position, gaps, preambles, things like that.
@@ -80,18 +128,18 @@ void if1_init( void )
 
   for( microdrive_index_t m=0; m<NUM_MICRODRIVES; m++ )
   {
-    microdrive[m].cartridge_inserted          = false;
-    microdrive[m].cartridge_data_modified     = false;
-    microdrive[m].head_pos                    = 0;
-    microdrive[m].motor_on                    = false;
-    microdrive[m].gap                         = 15;
-    microdrive[m].sync                        = 15;
-    microdrive[m].transfered                  = 0;
+    microdrive[m].cartridge_inserted             = false;
+    microdrive[m].cartridge_ejected_pending_save = false;
+    microdrive[m].cartridge_data_modified        = false;
+    microdrive[m].head_pos                       = 0;
+    microdrive[m].motor_on                       = false;
+    microdrive[m].gap                            = 15;
+    microdrive[m].sync                           = 15;
+    microdrive[m].transfered                     = 0;
 
-    microdrive[m].cartridge_data_psram_offset = 0;
-    microdrive[m].cartridge_data_modified     = false;
-    microdrive[m].cartridge_write_protect     = false;
-    microdrive[m].cartridge_len_in_blocks     = 0;
+    microdrive[m].cartridge_data_psram_offset    = 0;
+    microdrive[m].cartridge_write_protect        = false;
+    microdrive[m].cartridge_len_in_blocks        = 0;
   }
 
   return;
@@ -101,12 +149,26 @@ void if1_init( void )
 /*
  * "Insert" one of the tape images into the PSRAM buffer. The PSRAM buffer
  * is where the image will be read from and written to.
- *
- * FIXME There's no eject routine as yet
  */
 void if1_mdr_insert( const microdrive_index_t which, const uint32_t psram_offset, const uint32_t length_in_bytes,
                      const write_protect_t write_protected )
 {
+  /*
+   * We can't insert a new image if there's already one there, or the ejected
+   * one hasn't yet been written out to SD card. In theory the UI won't request
+   * a new insert until those conditions are sorted out. I just return
+   * quietly.
+   */
+  if( microdrive[which].cartridge_inserted )
+  {
+    return;
+  }
+
+  if( microdrive[which].cartridge_ejected_pending_save )
+  {
+    return;
+  }
+
   microdrive[which].cartridge_data_psram_offset = psram_offset;
   microdrive[which].cartridge_len_in_blocks     = (length_in_bytes / MICRODRIVE_BLOCK_LEN);
   microdrive[which].cartridge_write_protect     = write_protected;
@@ -135,6 +197,26 @@ void if1_mdr_insert( const microdrive_index_t which, const uint32_t psram_offset
 }
 
 
+void if1_mdr_eject( const microdrive_index_t which )
+{
+  /* If no cartridge is inserted there's nothing to do */
+  if( microdrive[which].cartridge_inserted )
+  {
+    /* Immediately mark as not inserted, no further writes will take place */
+    microdrive[which].cartridge_inserted = false;
+
+    /*
+     * If the data has been modified the PSRAM image for this cartridge is currently
+     * unique. It needs to be sent back to the UI Pico for saving on the SD card
+     */
+    if( microdrive[which].cartridge_data_modified )
+    {
+      microdrive[which].cartridge_ejected_pending_save = true;
+    }
+  }
+}
+
+
 /* Answers true if the drive has a cartridge inserted */
 bool is_cartridge_inserted( microdrive_index_t which )
 {
@@ -142,16 +224,34 @@ bool is_cartridge_inserted( microdrive_index_t which )
 }
 
 
-/* Answers true if the drive has a cartridge inserted and modified */
+/* Answers true if the drive has a modified cartridge */
 bool is_cartridge_modified( microdrive_index_t which )
 {
   return microdrive[which].cartridge_data_modified;
 }
 
 
+/* Sets/resets the cartridge modification flag */
 void set_cartridge_modified( microdrive_index_t which, bool modified )
 {
   microdrive[which].cartridge_data_modified = modified;
+}
+
+
+/*
+ * Answers true if the cartridge has been ejected but the image in
+ * the PSRAM still needs to writing back to SD card
+ */
+bool is_cartridge_ejected_pending_save( microdrive_index_t which )
+{
+  return microdrive[which].cartridge_ejected_pending_save;
+}
+
+
+/* Resets the pending-save flag, called when the cartridge is safely saved to SD card */
+void set_cartridge_ejected_to_sd( microdrive_index_t which )
+{
+  microdrive[which].cartridge_ejected_pending_save = false;
 }
 
 

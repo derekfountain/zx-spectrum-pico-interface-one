@@ -24,7 +24,8 @@ FSM gui
       gui_sm_show_status
 
     TRANSITIONS
-      ST_MDR_INSERTED                   STATE_GUI_INSERTING_MDR
+      ST_MDR_INSERTING                  STATE_GUI_INSERTING_MDR
+      ST_MDR_INSERTED                   STATE_GUI_INSERTED_MDR
       ST_MDR_EJECTED                    STATE_GUI_EJECTING_MDR
       ST_SD_CARD_INSERTED               STATE_GUI_INSERTING_SD_CARD
       ST_SD_CARD_EJECTED                STATE_GUI_EJECTING_SD_CARD
@@ -34,13 +35,23 @@ FSM gui
       ST_BUTTON_PRESS                   STATE_GUI_SHOW_MD_MENU
 
 
+  // An MDR image is being inserted.
+  //
+  STATE STATE_GUI_INSERTING_MDR
+    ENTRY
+      gui_sm_inserting_mdr
+
+    TRANSITIONS
+      ST_YES                            STATE_GUI_SHOW_STATUS
+
+
   // An MDR image has been inserted. Deal with it, then drop back
   // to the status screen.
   // Needs error handling, file not found, file not valid, etc.
   //
-  STATE STATE_GUI_INSERTING_MDR
+  STATE STATE_GUI_INSERTED_MDR
     ENTRY
-      gui_sm_insert_mdr
+      gui_sm_inserted_mdr
 
     TRANSITIONS
       ST_YES                            STATE_GUI_SHOW_STATUS

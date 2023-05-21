@@ -681,12 +681,16 @@ int __time_critical_func(main)( void )
     break;
 
     case UI_TO_IO_TEST_LED_ON:
+    {
       gpio_put(LED_PIN, 1);
-      break;
+    }
+    break;
         
     case UI_TO_IO_TEST_LED_OFF:
+    {
       gpio_put(LED_PIN, 0);
-      break;
+    }
+    break;
 
     case UI_TO_IO_INSERT_MDR:
     {
@@ -786,7 +790,14 @@ int __time_critical_func(main)( void )
 	}
 	else
 	{
-	  status_response.status[i] = MD_STATUS_EMPTY;
+	  if( is_cartridge_ejected_pending_save( i ) )
+	  {
+	    status_response.status[i] = MD_STATUS_MDR_EJECTED_NEEDS_SAVING;
+	  }
+	  else
+	  {
+	    status_response.status[i] = MD_STATUS_EMPTY;
+	  }
 	}
       }
 
@@ -808,8 +819,15 @@ int __time_critical_func(main)( void )
        * because the ZX could write to the image during the transfer. If it were to be
        * marked as "not modified" after the transfer, any modifications the ZX writes
        * during the transfer won't be marked as needing to be saved.
+       *
+       * If the cartridge has been ejected, but still requires its modified data to be saved
+       * to SD card, it will have been marked as not inserted and no further writes can
+       * have happened, nor will happen. So that flag can be cleared, and it's assumed that
+       * when this data arrives back at the UI Pico the data will be safely stored on
+       * the SD card.
        */
       set_cartridge_modified( cmd_struct.microdrive_index, false );
+      set_cartridge_ejected_to_sd( cmd_struct.microdrive_index );
 
       /* Send it page by page over to the UI Pico */
       uint32_t pages = cmd_struct.bytes_expected / 256;

@@ -184,7 +184,12 @@ static void insert_mdr_file( uint8_t which, uint8_t *filename )
   if( (bytes_read-1) / MICRODRIVE_BLOCK_LEN < 10 )
     return;
 
-  oled_display_filename( filename );
+  mutex_enter_blocking( &live_microdrive_data_mutex );
+  live_microdrive_data.currently_inserted[which].status   = LIVE_STATUS_INSERTING;
+  live_microdrive_data.currently_inserted[which].filename = filename;
+  mutex_exit( &live_microdrive_data_mutex );
+
+  generate_stimulus( gui_fsm, ST_MDR_INSERTING );
 
   (void)send_cmd( UI_TO_IO_INSERT_MDR );
 
@@ -225,6 +230,7 @@ static void insert_mdr_file( uint8_t which, uint8_t *filename )
    * this structure so mutex is required
    */
   mutex_enter_blocking( &live_microdrive_data_mutex );
+  live_microdrive_data.currently_inserted[which].status                = LIVE_STATUS_INSERTED;
   live_microdrive_data.currently_inserted[which].filename              = filename;
   live_microdrive_data.currently_inserted[which].cartridge_data_length = bytes_read-1;
   live_microdrive_data.currently_inserted[which].write_protected       = write_protected;
@@ -300,7 +306,9 @@ static void request_status( void )
   /* Look for microdrives which need their cartridge saving */
   for( microdrive_index_t microdrive_index = 0; microdrive_index < NUM_MICRODRIVES; microdrive_index++ )
   {
-    if( status_struct.status[microdrive_index] == MD_STATUS_MDR_LOADED_NEEDS_SAVING )
+    if( (status_struct.status[microdrive_index] == MD_STATUS_MDR_LOADED_NEEDS_SAVING)
+	||
+        (status_struct.status[microdrive_index] == MD_STATUS_MDR_EJECTED_NEEDS_SAVING) )
     {
       add_work_request_mdr_data( microdrive_index );
     } 
@@ -315,6 +323,7 @@ static void request_mdr_data_to_save( microdrive_index_t microdrive_index )
   /*
    * Take a copy of what's currently in the live data. I'm not sure if this mutex is
    * required, but until the GUI is finished I'll keep it in to be safe
+   * FIXME Need to predicate this on the live data status, I think?
    */
   mutex_enter_blocking( &live_microdrive_data_mutex );
 
@@ -477,6 +486,7 @@ int main( void )
   /* Initialise the live data */
   for( microdrive_index_t microdrive_index = 0; microdrive_index < NUM_MICRODRIVES; microdrive_index++ )
   {
+    live_microdrive_data.currently_inserted[microdrive_index].status                = LIVE_STATUS_NO_CARTRIDGE;
     live_microdrive_data.currently_inserted[microdrive_index].filename              = NULL;
     live_microdrive_data.currently_inserted[microdrive_index].cartridge_data_length = 0;
     live_microdrive_data.currently_inserted[microdrive_index].write_protected       = WRITE_PROTECT_OFF;
