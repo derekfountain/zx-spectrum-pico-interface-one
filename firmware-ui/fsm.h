@@ -21,6 +21,7 @@
 #define __FSM_H
 
 #include <stdint.h>
+#include "pico/sync.h"
 
 struct _fsm;
 typedef void (*fsm_state_entry_fn_t)( struct _fsm * );
@@ -71,6 +72,8 @@ typedef struct _fsm_map
 fsm_map_t;
 
 
+#define STIMULUS_QUEUE_EMPTY -1
+#define STIMULUS_QUEUE_DEPTH 10
 typedef struct _fsm
 {
   uint16_t                      id;
@@ -79,8 +82,9 @@ typedef struct _fsm
   fsm_state_entry_fn_binding_t *binding;
   void                         *fsm_data;
 
-  // FIXME This needs to be a queue, I don't want to drop stims
-  fsm_stimulus_t pending_stimulus;
+  critical_section_t           *stimulus_critical_section;
+  int8_t                        stimulus_queue_head;
+  fsm_stimulus_t                pending_stimulus[STIMULUS_QUEUE_DEPTH];
 }
 fsm_t;
 

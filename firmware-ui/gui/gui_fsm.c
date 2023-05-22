@@ -227,3 +227,4 @@ fsm_state_entry_fn_binding_t *query_gui_fsm_binding( void )
 {
   return binding;
 }
+

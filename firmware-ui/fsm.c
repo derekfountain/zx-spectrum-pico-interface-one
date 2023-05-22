@@ -20,6 +20,7 @@
 #include <stdint.h>
 #include <malloc.h>
 #include "pico/platform.h"
+#include "pico/sync.h"
 #include "fsm.h"
 
 /* I only need one so far.. */
@@ -36,16 +37,27 @@ fsm_t *create_fsm( fsm_map_t *map, fsm_state_entry_fn_binding_t *binding, fsm_st
     panic("Out of FSMs");
 
   fsm_t *fsm = malloc( sizeof(fsm_t) );
+  if( fsm == NULL )
+    panic("Out of memory for FSM");    
 
-  fsm->id               = next_fsm_id;
-  fsm->current_state    = initial_state;
-  fsm->map              = map;
-  fsm->binding          = binding;
-  fsm->fsm_data         = fsm_data;
-  fsm->pending_stimulus = FSM_STIMULUS_NONE;
+  fsm->id                        = next_fsm_id;
+  fsm->current_state             = initial_state;
+  fsm->map                       = map;
+  fsm->binding                   = binding;
+  fsm->fsm_data                  = fsm_data;
+  fsm->stimulus_critical_section = malloc( sizeof(critical_section_t) );
+  fsm->stimulus_queue_head       = STIMULUS_QUEUE_EMPTY;
 
-  /* Use ID as index, ewww */
+  /* Use ID as index */
   fsm_list[next_fsm_id++] = fsm;
+
+  /*
+   * Critical section protects the FSM from incoming stimulus clashing with
+   * processing of existing stimulus
+   */
+  if( fsm->stimulus_critical_section == NULL )
+    panic("Out of memory for FSM critical section");    
+  critical_section_init( fsm->stimulus_critical_section );
   
   num_active_fsms++;
 
@@ -73,15 +85,30 @@ void process_fsms( void )
   {
     fsm_t *fsm = fsm_list[fsm_index];
 
-    if( fsm->pending_stimulus != FSM_STIMULUS_NONE )
+    if( fsm->stimulus_queue_head != STIMULUS_QUEUE_EMPTY )
     {
       fsm_map_t *map = fsm->map;
       while( map && map->state != FSM_STATE_NONE )
       {
-	if( (fsm->current_state == map->state) && (fsm->pending_stimulus == map->stimulus) )
+	/*
+	 * Is this map entry describing the required transition? i.e. it describes the
+	 * state we're in, and the stimulus received? If so, remove the stimulus from the
+	 * queue because we're about to act on it.
+	 *
+	 * Critical section is to protect against in ISR adding a new stimulus at exactly
+	 * and interfering with the queue head counter.
+	 */
+	critical_section_enter_blocking( fsm->stimulus_critical_section );
+	bool required_transition = (fsm->current_state == map->state) && (fsm->pending_stimulus[fsm->stimulus_queue_head] == map->stimulus);
+	if( required_transition )
+	{
+	  fsm->stimulus_queue_head--;
+	}
+	critical_section_exit( fsm->stimulus_critical_section );
+
+	if( required_transition )
 	{
 	  /* This map entry represents the transition we want to make */
-	  fsm->pending_stimulus = FSM_STIMULUS_NONE;
 
 	  /* Find and call the entry function for the destination state if there is one */
 	  uint32_t binding_index = 0;
@@ -93,6 +120,13 @@ void process_fsms( void )
 	      {
 		(fsm->binding[binding_index].entry_fn)(fsm);
 	      }
+	      
+	      /*
+	       * Break? Or not? With a large number of FSMs, not breaking here
+	       * would cause this FSM to hog the processor if a sequence of
+	       * stimuli come in. Unlikely, and breaking here adds overhead in
+	       * the path of just getting back to this point. But break I do.
+	       */
 	      break;
 	    }
 	  } while( fsm->binding[++binding_index].state != FSM_STATE_NONE );
@@ -109,11 +143,19 @@ void process_fsms( void )
 
 void generate_stimulus( fsm_t *fsm, fsm_stimulus_t stim )
 {
-  if( fsm->pending_stimulus != FSM_STIMULUS_NONE )
+  if( fsm->stimulus_queue_head == STIMULUS_QUEUE_DEPTH )
   {
-    /* I think this is OK, stimulus will get lost, not sure what else I can do */
+    /* Stimulus will get lost, not sure what else I can do? */
   }
-
-// Going to need to lock something here? What if a new stim comes in from interrupt?
-  fsm->pending_stimulus = stim;
+  else
+  {
+    /*
+     * This routine can be called by either core or an ISR. I
+     * need to protect the stimulus queue from concurrent
+     * modification
+     */
+    critical_section_enter_blocking( fsm->stimulus_critical_section );
+    fsm->pending_stimulus[++fsm->stimulus_queue_head] = stim;
+    critical_section_exit( fsm->stimulus_critical_section );
+  }
 }

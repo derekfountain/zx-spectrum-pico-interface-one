@@ -26,8 +26,6 @@
 /*
 FIXME:
 
-Make the FSM queue up stimulus, if currently drops them
-
 Instead of the hardcoded list of MDR images to load, have an optional
 file of mdr filenames. If the file exists, load each file named in it
 into a MD at startup.
