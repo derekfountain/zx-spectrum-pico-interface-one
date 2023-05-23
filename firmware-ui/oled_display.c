@@ -20,7 +20,6 @@
 #include "ssd1306.h"
 
 #include "oled_display.h"
-#include "ui_io_comms.h"     // Temp
 #include <stdio.h>
 
 ssd1306_t display;
@@ -139,7 +138,6 @@ void oled_display_msg_requesting_status( void )
   oled_display_clear_msg();
 
   ssd1306_draw_filled_square(&display, 125, 61, 2, 2 );
-  ssd1306_show(&display);
 }
 
 

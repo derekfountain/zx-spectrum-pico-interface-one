@@ -47,12 +47,11 @@ void draw_status_screen( status_screen_t *status )
     oled_draw_status_microdrive( microdrive_index, status->md_inserted[microdrive_index], (microdrive_index == status->selected) );
   }
 
-  /* Not sure about this, it's going to flicker when the timer is up and running */
   oled_display_clear_inserted_details_area();
 
   if( status->inserting )
   {
-    oled_display_inserted_filename( "Inserting..." );
+    oled_display_inserted_filename( "<Inserting...>" );
   }
   else
   {

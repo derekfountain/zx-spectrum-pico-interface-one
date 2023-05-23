@@ -253,7 +253,6 @@ static void work_insert_mdr_file( uint8_t which, uint8_t *filename )
     if( (i % 16384) == 0 )
     {
       // FIXME Do i need feedback here?
-//      oled_display_show_progress( which, i );
     }
 
     uart_putc_raw( UI_PICO_UART_ID, working_image_buffer[i] );

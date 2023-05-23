@@ -17,6 +17,12 @@
 # along with this program; if not, write to the Free Software
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 
+# Rather crude script to parse the fsm.def file it's given to pick out
+# the states, stimuli and transitions so defined. The output are *.c and
+# *.h files for adding into the build.
+#
+# See the resultant gen.h and gen.c files for, er, more info. :)
+
 use strict;
 
 use File::Basename;

@@ -178,7 +178,7 @@ void gui_sm_eject_sd_card( fsm_t *fsm )
 void gui_sm_scroll_inserted_filename( fsm_t *fsm )
 {
 }
-void gui_sm_choose_eject_or_insert( fsm_t *fsm )
+void gui_sm_md_selected( fsm_t *fsm )
 {
 }
 void gui_sm_show_eject_screen( fsm_t *fsm )
@@ -187,10 +187,10 @@ void gui_sm_show_eject_screen( fsm_t *fsm )
 void gui_sm_action_eject( fsm_t *fsm )
 {
 }
-void gui_sm_action_eject_next_option( fsm_t *fsm )
+void gui_sm_eject_select_eject_option( fsm_t *fsm )
 {
 }
-void gui_sm_action_eject_previous_option( fsm_t *fsm )
+void gui_sm_eject_select_cancel_option( fsm_t *fsm )
 {
 }
 

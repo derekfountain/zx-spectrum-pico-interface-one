@@ -17,13 +17,26 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  */
 
+/*
+ * The work queue is a structure representing work which has to be done.
+ * This means large work items, not button presses and stuff like that.
+ * Examples include inserting a cartridge, saving a microdrive image
+ * out to SD card, things like that. These things take time so core1's
+ * sole function is to deal with them. It gets its work from this queue.
+ */
+
 #include "pico/util/queue.h"
 #include "work_queue.h"
 
-#define QUEUE_DEPTH     250
+#define QUEUE_DEPTH     25
 
 static queue_t q;
 
+/*
+ * Command pattern, a work queue entry is a type of work and a
+ * pointer to a structure which holds the data which describes
+ * the work to do.
+ */
 typedef struct _work_queue_entry
 {
   work_queue_type_t work_type;
@@ -32,7 +45,10 @@ typedef struct _work_queue_entry
 work_queue_entry_t;
 
 
-
+/*
+ * This implementation uses the Pico SDK's queue structure,
+ * which is multi-core safe.
+ */
 void work_queue_init( void )
 {
   queue_init( &q, sizeof(work_queue_entry_t), QUEUE_DEPTH );
@@ -45,41 +61,25 @@ bool work_queue_is_empty( void )
 }
 
 
-/*
- * I'm not quite sure how to handle this... If a piece of work takes
- * a long time, such as sending an MDR image, a number of request
- * status items will be added via the timer - 2 per second. There's
- * no point collecting all these up and running them all at once
- * when the MDR send completes. So I'm specifically checking here
- * to see if the last work item was a request status and if it was
- * I'm not adding the new one to the queue if that's also a request
- * status. I need to watch for the queue emptying. If it does, and
- * the last item was a request status, no more request statuses will
- * be added. To guard against that the last added type is reset when
- * the queue empties.
- *
- * This seems like a hack, but I'm not sure how else to handle it.
- */
-static work_queue_type_t last_added_type = WORK_NULL;
-
 void insert_work( work_queue_type_t type, void *data )
 {
   work_queue_entry_t entry;
-
-  if( (type == WORK_REQUEST_STATUS) && (last_added_type == WORK_REQUEST_STATUS) )
-    return;
 
   entry.work_type = type;
   entry.work_data = data;
 
   queue_add_blocking( &q, &entry );
 
-  last_added_type = type;
-
   return;
 }
 
 
+/*
+ * Remove work, returns true if there was work on the queue.
+ * Details will be at the pointers provided, and the work
+ * will have been removed from the queue. Quietly returns
+ * false if there's nothing to do.
+ */
 bool remove_work( work_queue_type_t *type, void **data  )
 {
   work_queue_entry_t entry;
@@ -93,7 +93,6 @@ bool remove_work( work_queue_type_t *type, void **data  )
   }
   else
   {
-    last_added_type = WORK_NULL;
     return false;
   }
 }

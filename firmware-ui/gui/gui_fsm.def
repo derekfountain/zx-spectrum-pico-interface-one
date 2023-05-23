@@ -37,7 +37,7 @@ FSM gui
       ST_BUILTIN_TIMEOUT_1              STATE_GUI_SCROLLING_FILENAME
       ST_ROTATE_CW                      STATE_GUI_SELECTING_PREVIOUS_MD
       ST_ROTATE_CCW                     STATE_GUI_SELECTING_NEXT_MD
-      ST_BUTTON_PRESS                   STATE_GUI_DROP_TO_EJECT_OR_INSERT
+      ST_BUTTON_PRESS                   STATE_GUI_MD_SELECTED
     END_TRANSITIONS
 
 
@@ -177,9 +177,9 @@ FSM gui
 
   // Click on 1-8, come here, drop through to either the "Eject"
   // screen, or the "Insert" screen
-  STATE STATE_GUI_DROP_TO_EJECT_OR_INSERT
+  STATE STATE_GUI_MD_SELECTED
     ENTRY
-      gui_sm_choose_eject_or_insert
+      gui_sm_md_selected
 
     TRANSITIONS
       ST_ACTION_EJECT                   STATE_GUI_SHOW_EJECT_SCREEN
@@ -193,24 +193,24 @@ FSM gui
       gui_sm_show_eject_screen
 
     TRANSITIONS
-      ST_ROTATE_CW                      STATE_GUI_SHOW_EJECT_NEXT_OPTION
-      ST_ROTATE_CCW                     STATE_GUI_SHOW_EJECT_PREVIOUS_OPTION
+      ST_ROTATE_CW                      STATE_GUI_SELECT_EJECT_OPTION
+      ST_ROTATE_CCW                     STATE_GUI_SELECT_CANCEL_OPTION
       ST_BUTTON_PRESS                   STATE_GUI_ACTION_EJECT
     END_TRANSITIONS
 
 
-  STATE STATE_GUI_SHOW_EJECT_NEXT_OPTION
+  STATE STATE_GUI_SELECT_EJECT_OPTION
     ENTRY
-      gui_sm_action_eject_next_option
+      gui_sm_eject_select_eject_option
 
     TRANSITIONS
-      ST_BUILTIN_YES                    STATE_GUI_SHOW_STATUS
+      ST_BUILTIN_YES                    STATE_GUI_ACTION_EJECT
     END_TRANSITIONS
 
 
-  STATE STATE_GUI_SHOW_EJECT_PREVIOUS_OPTION
+  STATE STATE_GUI_SELECT_CANCEL_OPTION
     ENTRY
-      gui_sm_action_eject_previous_option
+      gui_sm_eject_select_cancel_option
 
     TRANSITIONS
       ST_BUILTIN_YES                    STATE_GUI_SHOW_STATUS

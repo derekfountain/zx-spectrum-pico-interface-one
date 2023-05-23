@@ -72,7 +72,10 @@ typedef struct _fsm_map
 fsm_map_t;
 
 
-/* Empirical test of FORMATingshowed max depth of 1. */
+/*
+ * Empirical test of FORMATing showed max depth of 1. There must be work flows
+ * which stress it more than that!
+ */
 #define STIMULUS_QUEUE_EMPTY -1
 #define STIMULUS_QUEUE_DEPTH 10
 typedef struct _fsm
