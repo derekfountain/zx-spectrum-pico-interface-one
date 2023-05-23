@@ -32,13 +32,12 @@ void oled_display_clear_inserted_details_area( void );
 void oled_draw_status_microdrive( microdrive_index_t microdrive_index, bool inserted, bool selected );
 
 void oled_display_status_bytes( io_to_ui_status_response_t *status_struct );
-void oled_display_done( void );
-void oled_display_show_progress( uint8_t which, uint32_t i );
 void oled_display_inserted_filename( uint8_t *filename );
 void oled_display_inserted_num_blocks( uint8_t num_blocks );
 void oled_display_inserted_write_protected( int8_t write_protected );
 void oled_display_msg_requesting_status( void );
 void oled_display_msg_saving_mdr_data( microdrive_index_t microdrive_index );
 void oled_display_clear_msg( void );
+void oled_display_value( uint32_t val );
 
 #endif

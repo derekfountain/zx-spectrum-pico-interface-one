@@ -1,3 +1,5 @@
 *.o
 TAGS
 *~
+gui_fsm.gen.c
+gui_fsm.gen.h

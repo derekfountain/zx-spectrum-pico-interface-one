@@ -46,35 +46,10 @@ void oled_display_init( void )
   return;
 }
 
-
 void oled_update( void )
 {
   ssd1306_show(&display);
 }
-
-
-void oled_draw_status_menu( uint8_t selected )
-{
-#if 0
-/*
- * Not sure about this, the screen is too small to have a menu
- * Particularly one which happens to need long words!
- */
-  /* Plan is to underline one of these and have the screen toggle when it's selected */
-  uint8_t *entries[2] = { "Microdrives", "Cartridges" };
-
-  const uint8_t menu_y_pos = 0;
-
-  ssd1306_draw_string(&display, 0,      menu_y_pos, 1, entries[0], 0);
-  ssd1306_draw_string(&display, 11*6+3, menu_y_pos, 1, entries[1], 0);
-
-  // Test
-  uint8_t buffer[20];
-  snprintf(buffer,20,"%d",selected);
-  ssd1306_draw_string(&display, 0, 50, 1, buffer, 0);
-#endif  
-}
-
 
 /*
  * This draws a box with a number in it, that being the current
@@ -175,50 +150,19 @@ void oled_display_msg_saving_mdr_data( microdrive_index_t microdrive_index )
   uint8_t saving_msg[32];
   snprintf( saving_msg, 32, "Saving MD%d to SD card", microdrive_index+1 );
   ssd1306_draw_string( &display, 0, 56, 1, saving_msg, 0 );
-  ssd1306_show(&display);
 }
 
 
 void oled_display_clear_msg( void )
 {
   ssd1306_clear_square( &display, 0, 56, 128, 8 );  
-  ssd1306_show(&display);
 }
 
 
-/* Hardcoded nonense to print some values which are currently useful */
-void oled_display_status_bytes( io_to_ui_status_response_t *status_struct )
+void oled_display_value( uint32_t val )
 {
-#if 0
-  uint8_t line = 16;
-  for( uint8_t i=0; i<8; i+=2 )
-  {
-    uint8_t value_str[32];
-    snprintf( value_str, 16, "0x%02X 0x%02X", status_struct->status[i], status_struct->status[i+1] );
-
-    ssd1306_draw_string(&display, 0, line+=8, 1, value_str);
-    ssd1306_show(&display);
-  }
-#endif
-  return;
-}
-
-void oled_display_done( void )
-{
-#if 0
-  ssd1306_clear(&display);
-  ssd1306_draw_string(&display, 0, 0, 1, "Done");
-  ssd1306_show(&display);
-#endif
-}
-
-void oled_display_show_progress( uint8_t which, uint32_t i )
-{
-#if 0
-  uint8_t msg[32];
-  snprintf( msg, 16, "Drive %d, %d", which, i );
-  ssd1306_clear(&display);
-  ssd1306_draw_string(&display, 0, 0, 1, msg);
-  ssd1306_show(&display);
-#endif
+  uint8_t value_str[32];
+  snprintf( value_str, 32, "%d", val );
+  ssd1306_clear_square( &display, 0, 48, 128, 8 );  
+  ssd1306_draw_string( &display, 0, 48, 1, value_str, 0 );
 }

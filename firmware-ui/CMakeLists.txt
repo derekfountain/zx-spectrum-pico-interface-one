@@ -22,6 +22,10 @@ if (TARGET tinyusb_device)
     gui/gui_fsm.c
   )
 
+  # Run the script which generates the FSM code based on the FSM definition
+  #
+  execute_process( WORKING_DIRECTORY ../../tools/ COMMAND ./process_fsm.pl ../firmware-ui/gui/gui_fsm.def )
+
   target_include_directories(zx_pico_if1_ui_fw PRIVATE ../firmware-common)
   target_include_directories(zx_pico_if1_ui_fw PRIVATE ./ gui/)
 

@@ -7,7 +7,8 @@ FSM gui
       gui_sm_init
 
     TRANSITIONS
-      ST_YES                            STATE_GUI_SHOW_STATUS
+      ST_BUILTIN_YES                    STATE_GUI_SHOW_STATUS
+    END_TRANSITIONS
 
 
   // Show status, this is the state the GUI tends to sit in while
@@ -33,10 +34,11 @@ FSM gui
       ST_MDR_EJECTED                    STATE_GUI_EJECTING_MDR
       ST_SD_CARD_INSERTED               STATE_GUI_INSERTING_SD_CARD
       ST_SD_CARD_EJECTED                STATE_GUI_EJECTING_SD_CARD
-      ST_TIMEOUT_1                      STATE_GUI_SCROLLING_FILENAME
+      ST_BUILTIN_TIMEOUT_1              STATE_GUI_SCROLLING_FILENAME
       ST_ROTATE_CW                      STATE_GUI_SELECTING_PREVIOUS_MD
       ST_ROTATE_CCW                     STATE_GUI_SELECTING_NEXT_MD
-      ST_BUTTON_PRESS                   STATE_GUI_SHOW_MD_MENU
+      ST_BUTTON_PRESS                   STATE_GUI_DROP_TO_EJECT_OR_INSERT
+    END_TRANSITIONS
 
 
   STATE STATE_GUI_REQUESTING_STATUS
@@ -44,7 +46,8 @@ FSM gui
       gui_sm_requesting_status
 
     TRANSITIONS
-      ST_YES                            STATE_GUI_SHOW_STATUS
+      ST_BUILTIN_YES                    STATE_GUI_SHOW_STATUS
+    END_TRANSITIONS
 
 
   STATE STATE_GUI_REQUESTING_STATUS_DONE
@@ -52,7 +55,8 @@ FSM gui
       gui_sm_requesting_status_done
 
     TRANSITIONS
-      ST_YES                            STATE_GUI_SHOW_STATUS
+      ST_BUILTIN_YES                    STATE_GUI_SHOW_STATUS
+    END_TRANSITIONS
 
 
   STATE STATE_GUI_REQUESTING_DATA_TO_SAVE
@@ -60,7 +64,8 @@ FSM gui
       gui_sm_requesting_data_to_save
 
     TRANSITIONS
-      ST_YES                            STATE_GUI_SHOW_STATUS
+      ST_BUILTIN_YES                    STATE_GUI_SHOW_STATUS
+    END_TRANSITIONS
 
 
   STATE STATE_GUI_DATA_SAVED
@@ -68,7 +73,8 @@ FSM gui
       gui_sm_data_saved
 
     TRANSITIONS
-      ST_YES                            STATE_GUI_SHOW_STATUS
+      ST_BUILTIN_YES                    STATE_GUI_SHOW_STATUS
+    END_TRANSITIONS
 
 
   // An MDR image is being inserted.
@@ -78,7 +84,8 @@ FSM gui
       gui_sm_inserting_mdr
 
     TRANSITIONS
-      ST_YES                            STATE_GUI_SHOW_STATUS
+      ST_BUILTIN_YES                    STATE_GUI_SHOW_STATUS
+    END_TRANSITIONS
 
 
   // An MDR image has been inserted. Deal with it, then drop back
@@ -90,7 +97,8 @@ FSM gui
       gui_sm_inserted_mdr
 
     TRANSITIONS
-      ST_YES                            STATE_GUI_SHOW_STATUS
+      ST_BUILTIN_YES                    STATE_GUI_SHOW_STATUS
+    END_TRANSITIONS
 
 
   // An MDR image has been ejected. Deal with it, then drop back
@@ -102,7 +110,8 @@ FSM gui
       gui_sm_eject_mdr
 
     TRANSITIONS
-      ST_YES                            STATE_GUI_SHOW_STATUS
+      ST_BUILTIN_YES                    STATE_GUI_SHOW_STATUS
+    END_TRANSITIONS
 
 
   // An SD card has been inserted. Deal with it, then drop back
@@ -114,7 +123,8 @@ FSM gui
       gui_sm_insert_sd_card
 
     TRANSITIONS
-      ST_YES                            STATE_GUI_SHOW_STATUS
+      ST_BUILTIN_YES                    STATE_GUI_SHOW_STATUS
+    END_TRANSITIONS
 
 
   // The SD card has been ejected. Deal with it, then drop back
@@ -126,7 +136,8 @@ FSM gui
       gui_sm_eject_sd_card
 
     TRANSITIONS
-      ST_YES                            STATE_GUI_SHOW_STATUS
+      ST_BUILTIN_YES                    STATE_GUI_SHOW_STATUS
+    END_TRANSITIONS
 
 
   // Timeout one status screen, scroll the inserted MDR filename
@@ -136,7 +147,8 @@ FSM gui
       gui_sm_scroll_inserted_filename
 
     TRANSITIONS
-      ST_YES                            STATE_GUI_SHOW_STATUS
+      ST_BUILTIN_YES                    STATE_GUI_SHOW_STATUS
+    END_TRANSITIONS
 
 
   // Select next MD, so the one to the left of the current one.
@@ -147,7 +159,8 @@ FSM gui
       gui_sm_selecting_next_md
 
     TRANSITIONS
-      ST_YES                            STATE_GUI_SHOW_STATUS
+      ST_BUILTIN_YES                    STATE_GUI_SHOW_STATUS
+    END_TRANSITIONS
 
 
   // Select previous MD, so the one to the right of the current one.
@@ -158,19 +171,56 @@ FSM gui
       gui_sm_selecting_previous_md
 
     TRANSITIONS
-      ST_YES                            STATE_GUI_SHOW_STATUS
+      ST_BUILTIN_YES                    STATE_GUI_SHOW_STATUS
+    END_TRANSITIONS
 
 
-  // Microdrive menu screen. If the MD has no cartridge inserted this
-  // will be the "insert" button. If the MD has a cartridge inserted
-  // this will be "eject".
-  //
-  STATE STATE_SHOW_MD_MENU
+  // Click on 1-8, come here, drop through to either the "Eject"
+  // screen, or the "Insert" screen
+  STATE STATE_GUI_DROP_TO_EJECT_OR_INSERT
     ENTRY
-      gui_sm_show_md_menu
+      gui_sm_choose_eject_or_insert
 
-    // Not much clue yet
     TRANSITIONS
-      ST_BUTTON_PRESS                   STATE_GUI_SHOW_STATUS
+      ST_ACTION_EJECT                   STATE_GUI_SHOW_EJECT_SCREEN
+      ST_ACTION_INSERT                  STATE_GUI_SHOW_STATUS
+    END_TRANSITIONS
 
 
+  // Eject screen carries Eject or Cancel buttons
+  STATE STATE_GUI_SHOW_EJECT_SCREEN
+    ENTRY
+      gui_sm_show_eject_screen
+
+    TRANSITIONS
+      ST_ROTATE_CW                      STATE_GUI_SHOW_EJECT_NEXT_OPTION
+      ST_ROTATE_CCW                     STATE_GUI_SHOW_EJECT_PREVIOUS_OPTION
+      ST_BUTTON_PRESS                   STATE_GUI_ACTION_EJECT
+    END_TRANSITIONS
+
+
+  STATE STATE_GUI_SHOW_EJECT_NEXT_OPTION
+    ENTRY
+      gui_sm_action_eject_next_option
+
+    TRANSITIONS
+      ST_BUILTIN_YES                    STATE_GUI_SHOW_STATUS
+    END_TRANSITIONS
+
+
+  STATE STATE_GUI_SHOW_EJECT_PREVIOUS_OPTION
+    ENTRY
+      gui_sm_action_eject_previous_option
+
+    TRANSITIONS
+      ST_BUILTIN_YES                    STATE_GUI_SHOW_STATUS
+    END_TRANSITIONS
+
+
+  STATE STATE_GUI_ACTION_EJECT
+    ENTRY
+      gui_sm_action_eject
+
+    TRANSITIONS
+      ST_BUILTIN_YES                    STATE_GUI_SHOW_STATUS
+    END_TRANSITIONS

@@ -30,9 +30,6 @@ Instead of the hardcoded list of MDR images to load, have an optional
 file of mdr filenames. If the file exists, load each file named in it
 into a MD at startup.
 
-GUI needs indication of MDR saving back to SD card. Cue not to eject
-the SD card.
-
 When selection cursor is on an empty microdrive, clicking needs to
 bring up a file selector.
 
@@ -45,8 +42,6 @@ SD card is ejected.
 
 void draw_status_screen( status_screen_t *status )
 {
-  oled_draw_status_menu( status->selected );
-
   for( uint8_t microdrive_index=0; microdrive_index< NUM_MICRODRIVES; microdrive_index++ )
   {
     oled_draw_status_microdrive( microdrive_index, status->md_inserted[microdrive_index], (microdrive_index == status->selected) );
@@ -77,12 +72,8 @@ void draw_status_screen( status_screen_t *status )
     oled_display_msg_requesting_status();
   }
 
+  // Sometimes useful for printing a debug value
+  //oled_display_value( 0 );
+
   oled_update();
 }
-
-
-
-
-#if 0
-#include "gui.fsm.c"
-#endif

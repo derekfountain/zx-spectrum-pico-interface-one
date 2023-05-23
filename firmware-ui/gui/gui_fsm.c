@@ -17,12 +17,12 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  */
 
+#include "fsm.h"
 #include "gui_fsm.h"
 #include "gui.h"
 #include "microdrive.h"
 #include "cartridge.h"
 #include "live_microdrive_data.h"
-#include "oled_display.h"
 
 status_screen_t status;
 
@@ -36,7 +36,7 @@ void gui_sm_init( fsm_t *fsm )
   status.selected = 0;
   status.requesting_data_from_microdrive = -1;
 
-  generate_stimulus( fsm, FSM_STIMULUS_YES );
+  generate_stimulus( fsm, ST_BUILTIN_YES );
 }
 
 
@@ -88,7 +88,7 @@ void gui_sm_show_status( fsm_t *fsm )
  */
 void gui_sm_inserting_mdr( fsm_t *fsm )
 {
-  generate_stimulus( fsm, FSM_STIMULUS_YES );  
+  generate_stimulus( fsm, ST_BUILTIN_YES );  
 }
 
 
@@ -101,7 +101,7 @@ void gui_sm_inserted_mdr( fsm_t *fsm )
 {
   /* Insertion routine will have updated live microdrive data, just advance */
 
-  generate_stimulus( fsm, FSM_STIMULUS_YES );  
+  generate_stimulus( fsm, ST_BUILTIN_YES );  
 }
 
 
@@ -113,7 +113,7 @@ void gui_sm_selecting_next_md( fsm_t *fsm )
   if( ++status.selected == NUM_MICRODRIVES )
     status.selected = 0;
 
-  generate_stimulus( fsm, FSM_STIMULUS_YES );  
+  generate_stimulus( fsm, ST_BUILTIN_YES );  
 }
 
 
@@ -125,21 +125,21 @@ void gui_sm_selecting_previous_md( fsm_t *fsm )
   if( status.selected-- == 0 )
     status.selected = NUM_MICRODRIVES-1;
 
-  generate_stimulus( fsm, FSM_STIMULUS_YES );  
+  generate_stimulus( fsm, ST_BUILTIN_YES );  
 }
 
 
 void gui_sm_requesting_status( fsm_t *fsm )
 {
   status.requesting_status = true;
-  generate_stimulus( fsm, FSM_STIMULUS_YES );  
+  generate_stimulus( fsm, ST_BUILTIN_YES );  
 }
 
 
 void gui_sm_requesting_status_done( fsm_t *fsm )
 {
   status.requesting_status = false;
-  generate_stimulus( fsm, FSM_STIMULUS_YES );  
+  generate_stimulus( fsm, ST_BUILTIN_YES );  
 }
 
 
@@ -148,7 +148,7 @@ void gui_sm_requesting_data_to_save( fsm_t *fsm )
   live_microdrive_data_t *live_microdrive_data = (live_microdrive_data_t*)fsm->fsm_data;
 
   status.requesting_data_from_microdrive = live_microdrive_data->microdrive_saving_to_sd;
-  generate_stimulus( fsm, FSM_STIMULUS_YES );  
+  generate_stimulus( fsm, ST_BUILTIN_YES );  
 }
 
 
@@ -156,60 +156,53 @@ void gui_sm_data_saved( fsm_t *fsm )
 {
   live_microdrive_data_t *live_microdrive_data = (live_microdrive_data_t*)fsm->fsm_data;
 
-  /* This would be expected to assign -1 */
-  status.requesting_data_from_microdrive = live_microdrive_data->microdrive_saving_to_sd;
+  /*
+   * This would be expected to assign -1 since the live data should show that
+   * nothing is being saved to SD card now
+   */
+  status.requesting_data_from_microdrive = -1;
 
-  generate_stimulus( fsm, FSM_STIMULUS_YES );  
+  generate_stimulus( fsm, ST_BUILTIN_YES );  
 }
 
 
-/* State to entry function bindings */
-static fsm_state_entry_fn_binding_t binding[] = 
+void gui_sm_eject_mdr( fsm_t *fsm )
 {
-  { STATE_GUI_INIT,                    gui_sm_init },
-  { STATE_GUI_SHOW_STATUS,             gui_sm_show_status },
-  { STATE_GUI_REQUESTING_STATUS,       gui_sm_requesting_status },
-  { STATE_GUI_REQUESTING_STATUS_DONE,  gui_sm_requesting_status_done },
-  { STATE_GUI_REQUESTING_DATA_TO_SAVE, gui_sm_requesting_data_to_save },
-  { STATE_GUI_DATA_SAVED,              gui_sm_data_saved },
-  { STATE_GUI_INSERTING_MDR,           gui_sm_inserting_mdr  },
-  { STATE_GUI_INSERTED_MDR,            gui_sm_inserted_mdr  },
-  { STATE_GUI_SELECTING_NEXT_MD,       gui_sm_selecting_next_md },
-  { STATE_GUI_SELECTING_PREVIOUS_MD,   gui_sm_selecting_previous_md },
-
-  { FSM_STATE_NONE,                    NULL },
-};
-
-
-/* Map of states, stimulus, and destination */
-static fsm_map_t gui_fsm_map[] =
+}
+void gui_sm_insert_sd_card( fsm_t *fsm )
 {
-  {STATE_GUI_INIT,                     FSM_STIMULUS_YES,         STATE_GUI_SHOW_STATUS,           },
-  {STATE_GUI_SHOW_STATUS,              ST_MDR_INSERTING,         STATE_GUI_INSERTING_MDR,         },
-  {STATE_GUI_SHOW_STATUS,              ST_MDR_INSERTED,          STATE_GUI_INSERTED_MDR,          },
-  {STATE_GUI_INSERTING_MDR,            FSM_STIMULUS_YES,         STATE_GUI_SHOW_STATUS,           },
-  {STATE_GUI_INSERTED_MDR,             FSM_STIMULUS_YES,         STATE_GUI_SHOW_STATUS,           },
+}
+void gui_sm_eject_sd_card( fsm_t *fsm )
+{
+}
+void gui_sm_scroll_inserted_filename( fsm_t *fsm )
+{
+}
+void gui_sm_choose_eject_or_insert( fsm_t *fsm )
+{
+}
+void gui_sm_show_eject_screen( fsm_t *fsm )
+{
+}
+void gui_sm_action_eject( fsm_t *fsm )
+{
+}
+void gui_sm_action_eject_next_option( fsm_t *fsm )
+{
+}
+void gui_sm_action_eject_previous_option( fsm_t *fsm )
+{
+}
 
-  {STATE_GUI_SHOW_STATUS,              ST_ROTATE_CCW,            STATE_GUI_SELECTING_NEXT_MD,     },
-  {STATE_GUI_SHOW_STATUS,              ST_ROTATE_CW,             STATE_GUI_SELECTING_PREVIOUS_MD, },
+      
 
-  {STATE_GUI_SHOW_STATUS,              ST_REQUEST_STATUS,        STATE_GUI_REQUESTING_STATUS,         },
-  {STATE_GUI_SHOW_STATUS,              ST_REQUEST_STATUS_DONE,   STATE_GUI_REQUESTING_STATUS_DONE,         },
-  {STATE_GUI_REQUESTING_STATUS,        FSM_STIMULUS_YES,         STATE_GUI_SHOW_STATUS,           },
-  {STATE_GUI_REQUESTING_STATUS_DONE,   FSM_STIMULUS_YES,         STATE_GUI_SHOW_STATUS,           },
-
-  {STATE_GUI_SHOW_STATUS,              ST_REQUEST_DATA_TO_SAVE,  STATE_GUI_REQUESTING_DATA_TO_SAVE,         },
-  {STATE_GUI_SHOW_STATUS,              ST_DATA_SAVED,            STATE_GUI_DATA_SAVED,         },
-  {STATE_GUI_REQUESTING_DATA_TO_SAVE,  FSM_STIMULUS_YES,         STATE_GUI_SHOW_STATUS,           },
-  {STATE_GUI_DATA_SAVED,               FSM_STIMULUS_YES,         STATE_GUI_SHOW_STATUS,           },
-
-  {STATE_GUI_SELECTING_NEXT_MD,        FSM_STIMULUS_YES,         STATE_GUI_SHOW_STATUS,           },
-  {STATE_GUI_SELECTING_PREVIOUS_MD,    FSM_STIMULUS_YES,         STATE_GUI_SHOW_STATUS,           },
+#include "gui_fsm.gen.c"
 
 
-  {FSM_STATE_NONE,                     FSM_STIMULUS_NONE,        FSM_STATE_NONE,                  }
-};
-
+fsm_state_entry_fn_binding_t *query_gui_fsm_binding( void )
+{
+  return binding;
+}
 
 fsm_map_t *query_gui_fsm_map( void )
 {
@@ -223,8 +216,4 @@ gui_fsm_state_t query_gui_fsm_initial_state( void )
 }
 
 
-fsm_state_entry_fn_binding_t *query_gui_fsm_binding( void )
-{
-  return binding;
-}
 

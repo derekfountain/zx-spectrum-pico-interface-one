@@ -84,6 +84,10 @@ static fsm_t *gui_fsm;
 static live_microdrive_data_t live_microdrive_data;
 auto_init_mutex( live_microdrive_data_mutex );
 
+/* Timer used to fetch status from IO Pico every so often */
+#define STATUS_TIMER_PERIOD_MS 500
+static repeating_timer_t repeating_status_timer;
+
 /* Room for one full MDR image to work with. Includes w/p byte */
 static uint8_t working_image_buffer[MICRODRIVE_MDR_MAX_LENGTH];
 
@@ -165,7 +169,33 @@ static bool send_cmd( UI_TO_IO_CMD cmd )
 }
 
 
-static void insert_mdr_file( uint8_t which, uint8_t *filename )
+/* Timer function, called repeatedly to set up a request of status from the IO Pico */
+static bool add_work_request_status( repeating_timer_t *rt )
+{
+  work_request_status_t *request_status_ptr = malloc( sizeof(work_request_status_t) );
+  request_status_ptr->dummy = 0;
+  insert_work( WORK_REQUEST_STATUS, request_status_ptr );
+
+  return true;
+}
+
+
+/*
+ * When status indicates the IO Pico has a microdrive with a cartridge
+ * which has changed data, add a work item to request the data so it
+ * can be saved back to SD card
+ */
+static bool add_work_request_mdr_data( microdrive_index_t microdrive_index )
+{
+  work_request_mdr_data_t *request_data_ptr = malloc( sizeof(work_request_mdr_data_t) );
+  request_data_ptr->microdrive_index = microdrive_index;
+  insert_work( WORK_REQUEST_MDR_DATA, request_data_ptr );
+
+  return true;
+}
+
+
+static void work_insert_mdr_file( uint8_t which, uint8_t *filename )
 {
   /* Load full image, inc w/p byte, into the working buffer */
   uint32_t bytes_read;
@@ -188,6 +218,9 @@ static void insert_mdr_file( uint8_t which, uint8_t *filename )
   live_microdrive_data.currently_inserted[which].status   = LIVE_STATUS_INSERTING;
   live_microdrive_data.currently_inserted[which].filename = filename;
   mutex_exit( &live_microdrive_data_mutex );
+
+  /* Turn off the timer which sets up a status fetch, this routine takes a while */
+  cancel_repeating_timer( &repeating_status_timer );
 
   generate_stimulus( gui_fsm, ST_MDR_INSERTING );
 
@@ -219,7 +252,8 @@ static void insert_mdr_file( uint8_t which, uint8_t *filename )
     /* Feedback on screen, probably redundant when I get a proper GUI */
     if( (i % 16384) == 0 )
     {
-      oled_display_show_progress( which, i );
+      // FIXME Do i need feedback here?
+//      oled_display_show_progress( which, i );
     }
 
     uart_putc_raw( UI_PICO_UART_ID, working_image_buffer[i] );
@@ -236,42 +270,17 @@ static void insert_mdr_file( uint8_t which, uint8_t *filename )
   live_microdrive_data.currently_inserted[which].write_protected       = write_protected;
   mutex_exit( &live_microdrive_data_mutex );
 
-  oled_display_done();
-
   /* Poke state machine to update GUI */
   generate_stimulus( gui_fsm, ST_MDR_INSERTED );
+
+  /* Restart the status timer */
+  add_repeating_timer_ms( STATUS_TIMER_PERIOD_MS, add_work_request_status, NULL, &repeating_status_timer );
 
   return;
 }
 
 
-/* Timer function, called repeatedly to set up a request of status from the IO Pico */
-static bool add_work_request_status( repeating_timer_t *rt )
-{
-  work_request_status_t *request_status_ptr = malloc( sizeof(work_request_status_t) );
-  request_status_ptr->dummy = 0;
-  insert_work( WORK_REQUEST_STATUS, request_status_ptr );
-
-  return true;
-}
-
-
-/*
- * When status indicates the IO Pico has a microdrive with a cartridge
- * which has changed data, add a work item to request the data so it
- * can be saved back to SD card
- */
-static bool add_work_request_mdr_data( microdrive_index_t microdrive_index )
-{
-  work_request_mdr_data_t *request_data_ptr = malloc( sizeof(work_request_mdr_data_t) );
-  request_data_ptr->microdrive_index = microdrive_index;
-  insert_work( WORK_REQUEST_MDR_DATA, request_data_ptr );
-
-  return true;
-}
-
-
-static void init_io_link( void )
+static void work_init_io_link( void )
 {
   /*
    * All this does is repeatedly try to get a preamble/cmd/ack sequence
@@ -286,7 +295,7 @@ static void init_io_link( void )
 }
 
 
-static void request_status( void )
+static void work_request_status( void )
 {
   generate_stimulus( gui_fsm, ST_REQUEST_STATUS );
   
@@ -318,17 +327,19 @@ static void request_status( void )
 }
 
 
-static void request_mdr_data_to_save( microdrive_index_t microdrive_index )
+static void work_request_mdr_data_to_save( microdrive_index_t microdrive_index )
 {
   live_microdrive_data.microdrive_saving_to_sd = microdrive_index;
   generate_stimulus( gui_fsm, ST_REQUEST_DATA_TO_SAVE );
+
+  /* Turn off the timer which sets up a status fetch, this routine takes a while */
+  cancel_repeating_timer( &repeating_status_timer );
 
   (void)send_cmd( UI_TO_IO_REQUEST_MDR_TO_SAVE );
 
   /*
    * Take a copy of what's currently in the live data. I'm not sure if this mutex is
    * required, but until the GUI is finished I'll keep it in to be safe
-   * FIXME Need to predicate this on the live data status, I think?
    */
   mutex_enter_blocking( &live_microdrive_data_mutex );
 
@@ -362,6 +373,9 @@ static void request_mdr_data_to_save( microdrive_index_t microdrive_index )
   live_microdrive_data.microdrive_saving_to_sd = -1;
   generate_stimulus( gui_fsm, ST_DATA_SAVED );
 
+  /* Restart the status timer */
+  add_repeating_timer_ms( STATUS_TIMER_PERIOD_MS, add_work_request_status, NULL, &repeating_status_timer );
+
   return;
 }
 
@@ -389,7 +403,7 @@ static void __time_critical_func(core1_main)( void )
 	/* Work required is to link to the IO Pico, can't proceed without this */
 	work_init_io_link_t *init_io_link_data = (work_init_io_link_t*)data;
 
-	init_io_link();
+	work_init_io_link();
 	free(init_io_link_data);
       }
       break;
@@ -399,7 +413,7 @@ static void __time_critical_func(core1_main)( void )
 	/* Work required is the insertion of a cartridge. The mdr/filename is in the data structure */
 	work_insert_mdr_t *insert_mdr_data = (work_insert_mdr_t*)data;
 
-	insert_mdr_file( insert_mdr_data->microdrive_index, insert_mdr_data->filename );
+	work_insert_mdr_file( insert_mdr_data->microdrive_index, insert_mdr_data->filename );
 	free(insert_mdr_data);
       }
       break;
@@ -409,7 +423,7 @@ static void __time_critical_func(core1_main)( void )
 	/* Work required is to ask the IO Pico to send its status */
 	work_request_status_t *request_status_data = (work_request_status_t*)data;
 
-	request_status();
+	work_request_status();
 	free(request_status_data);
       }
       break;
@@ -419,7 +433,7 @@ static void __time_critical_func(core1_main)( void )
 	/* Work required is to ask the IO Pico to send the data for one of the drives */
 	work_request_mdr_data_t *request_mdr_data = (work_request_mdr_data_t*)data;
 
-	request_mdr_data_to_save( request_mdr_data->microdrive_index );
+	work_request_mdr_data_to_save( request_mdr_data->microdrive_index );
 	free(request_mdr_data);
       }
       break;
@@ -517,16 +531,15 @@ int main( void )
   work_init_io_link_t *init_io_work_ptr = malloc( sizeof(work_init_io_link_t) );
   insert_work( WORK_INIT_IO_LINK, init_io_work_ptr );
 
-  /* Set requests for microdrive status running. Don't move the var anywhere it might get lost */
-  repeating_timer_t repeating_status_timer;
-  add_repeating_timer_ms( 500, add_work_request_status, NULL, &repeating_status_timer );
+  /* Set requests for microdrive status running */
+  add_repeating_timer_ms( STATUS_TIMER_PERIOD_MS, add_work_request_status, NULL, &repeating_status_timer );
 
 #define TEST_SETUP 1
 #if TEST_SETUP
   /* Read named files from SD card and insert each one that exists */
   uint8_t *mdr_files[] = {"1.mdr", 
 			  "2.mdr", 
-			  "3x.mdr", 
+			  "3.mdr", 
 			  "4x.mdr", 
 			  "5.mdr", 
 			  "6.mdr", 
@@ -561,26 +574,11 @@ int main( void )
    *
    * Start by kicking the state machine.
    */
-  generate_stimulus( gui_fsm, FSM_STIMULUS_YES );
+  generate_stimulus( gui_fsm, ST_BUILTIN_YES );
   while( 1 )
   {
     process_fsms();
-
-#if 0
-    if( value != previous_value )
-    {
-      uint8_t value_str[4];
-      snprintf( value_str, 4, "%d", value );
-
-      ssd1306_clear(&display);
-      ssd1306_draw_string(&display, 10, 10, 2, value_str);
-      ssd1306_show(&display);
-
-      previous_value = value;
-    }
-#endif
-  } /* Infinite loop */
-
+  }
 
 }
 

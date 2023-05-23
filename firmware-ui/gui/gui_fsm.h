@@ -21,37 +21,7 @@
 #define __GUI_FSM_H
 
 #include "fsm.h"
-
-
-typedef enum
-{
-  STATE_GUI_INIT            = FSM_STATE_LAST,
-  STATE_GUI_SHOW_STATUS,
-  STATE_GUI_REQUESTING_STATUS,
-  STATE_GUI_REQUESTING_STATUS_DONE,
-  STATE_GUI_REQUESTING_DATA_TO_SAVE,
-  STATE_GUI_DATA_SAVED,
-  STATE_GUI_INSERTING_MDR,
-  STATE_GUI_INSERTED_MDR,
-  STATE_GUI_SELECTING_NEXT_MD,
-  STATE_GUI_SELECTING_PREVIOUS_MD,
-}
-gui_fsm_state_t;
-
-
-typedef enum
-{
-  ST_MDR_INSERTING          = FSM_STIMULUS_LAST,
-  ST_MDR_INSERTED,
-  ST_ROTATE_CCW,
-  ST_ROTATE_CW,
-  ST_REQUEST_STATUS,
-  ST_REQUEST_STATUS_DONE,
-  ST_REQUEST_DATA_TO_SAVE,
-  ST_DATA_SAVED,
-}
-gui_fsm_stimulus_t;
-
+#include "gui_fsm.gen.h"
 
 fsm_map_t                    *query_gui_fsm_map( void );
 gui_fsm_state_t               query_gui_fsm_initial_state( void );

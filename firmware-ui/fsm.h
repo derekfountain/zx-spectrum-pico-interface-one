@@ -38,11 +38,11 @@ fsm_state_t;
 
 typedef enum _fsm_stimulus
 {
-  FSM_STIMULUS_NONE,
-  FSM_STIMULUS_YES,
-  FSM_STIMULUS_TIMEOUT,
+  ST_BUILTIN_NONE,
+  ST_BUILTIN_YES,
+  ST_BUILTIN_TIMEOUT_1,
 
-  FSM_STIMULUS_LAST
+  ST_BUILTIN_LAST
 }
 fsm_stimulus_t;
 
@@ -72,6 +72,7 @@ typedef struct _fsm_map
 fsm_map_t;
 
 
+/* Empirical test of FORMATingshowed max depth of 1. */
 #define STIMULUS_QUEUE_EMPTY -1
 #define STIMULUS_QUEUE_DEPTH 10
 typedef struct _fsm
@@ -83,7 +84,8 @@ typedef struct _fsm
   void                         *fsm_data;
 
   critical_section_t           *stimulus_critical_section;
-  int8_t                        stimulus_queue_head;
+  int32_t                       stimulus_queue_head;
+  int32_t                       stimulus_queue_high_water;              // Inspect in debugger
   fsm_stimulus_t                pending_stimulus[STIMULUS_QUEUE_DEPTH];
 }
 fsm_t;
