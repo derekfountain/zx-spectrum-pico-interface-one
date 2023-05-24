@@ -35,6 +35,8 @@ typedef struct _status_screen_t
   uint8_t           *filename;
   uint8_t            num_blocks;
   bool               write_protected;
+
+  uint8_t            test_value;
 }
 status_screen_t;
 

@@ -3812,11 +3812,20 @@
     (path "/acda4c69-0a65-473b-ab4f-e765252d7da2/159d8721-ab56-4986-8892-33c49d319fb6"
       (reference "#PWR0301") (unit 1) (value "GND") (footprint "")
     )
+    (path "/acda4c69-0a65-473b-ab4f-e765252d7da2/ba34bb4a-eafa-41e4-a0ab-7334ba4edabe"
+      (reference "#PWR0302") (unit 1) (value "GND") (footprint "")
+    )
     (path "/acda4c69-0a65-473b-ab4f-e765252d7da2/9111f657-cc15-4eeb-9b4d-78f61ca6b08c"
       (reference "#PWR0303") (unit 1) (value "GND") (footprint "")
     )
-    (path "/acda4c69-0a65-473b-ab4f-e765252d7da2/8f0497fa-64cb-4c20-aca7-39d0be7ffa72"
+    (path "/acda4c69-0a65-473b-ab4f-e765252d7da2/15cfbe23-377c-4969-ad37-1096d7e4c15a"
       (reference "#PWR0304") (unit 1) (value "GND") (footprint "")
+    )
+    (path "/acda4c69-0a65-473b-ab4f-e765252d7da2/ff245775-0305-430e-bd46-67e73abfc678"
+      (reference "#PWR0305") (unit 1) (value "GND") (footprint "")
+    )
+    (path "/acda4c69-0a65-473b-ab4f-e765252d7da2/8b8721ba-6a83-408a-8bb7-b7a216eb7d4a"
+      (reference "#PWR0306") (unit 1) (value "GND") (footprint "")
     )
     (path "/acda4c69-0a65-473b-ab4f-e765252d7da2/a58c7f3b-6519-4b5a-8453-2d4882e5998e"
       (reference "#PWR0307") (unit 1) (value "GND") (footprint "")
@@ -3859,9 +3868,6 @@
     )
     (path "/95a6eb69-d4c1-4a7e-a8e8-144430faf0e2/ab3bf034-469b-4932-acf6-7702bff9ed96"
       (reference "J202") (unit 1) (value "Conn_01x06_Female") (footprint "Connector_PinHeader_2.54mm:PinHeader_1x06_P2.54mm_Vertical")
-    )
-    (path "/acda4c69-0a65-473b-ab4f-e765252d7da2/d6d0c58d-8e9e-45da-ac9c-b6edecaf4587"
-      (reference "J301") (unit 1) (value "Conn_01x05_Female") (footprint "Connector_PinHeader_2.54mm:PinHeader_1x05_P2.54mm_Vertical")
     )
     (path "/acda4c69-0a65-473b-ab4f-e765252d7da2/cb841d88-a75c-4f80-ba44-02c4407c29e0"
       (reference "J302") (unit 1) (value "Conn_01x04_Female") (footprint "Connector_PinHeader_2.54mm:PinHeader_1x04_P2.54mm_Vertical")
@@ -3907,6 +3913,15 @@
     )
     (path "/acda4c69-0a65-473b-ab4f-e765252d7da2/5f547c99-2361-4fd1-92a4-8ab5051cabbd"
       (reference "R301") (unit 1) (value "R330") (footprint "Resistor_SMD:R_1206_3216Metric_Pad1.30x1.75mm_HandSolder")
+    )
+    (path "/acda4c69-0a65-473b-ab4f-e765252d7da2/08ba02a4-e0bf-4061-acae-1741db9c8a7c"
+      (reference "SW301") (unit 1) (value "SW_MEC_5E") (footprint "Button_Switch_THT:SW_PUSH_6mm_H4.3mm")
+    )
+    (path "/acda4c69-0a65-473b-ab4f-e765252d7da2/638a7863-4492-4017-868c-35057f4f521d"
+      (reference "SW302") (unit 1) (value "RotaryEncoder_Switch") (footprint "Rotary_Encoder:RotaryEncoder_Bourns_Vertical_PEC12R-3xxxF-Sxxxx")
+    )
+    (path "/acda4c69-0a65-473b-ab4f-e765252d7da2/4dfaf842-7afe-4241-b04b-bf557cae6b52"
+      (reference "SW303") (unit 1) (value "SW_MEC_5E") (footprint "Button_Switch_THT:SW_PUSH_6mm_H4.3mm")
     )
     (path "/43a7bd42-380d-437f-8b75-117d267c89f1"
       (reference "U1") (unit 1) (value "4075") (footprint "Package_SO:SOIC-14_3.9x8.7mm_P1.27mm")

@@ -157,7 +157,7 @@ void oled_display_clear_msg( void )
 }
 
 
-void oled_display_value( uint32_t val )
+void oled_display_test_value( uint32_t val )
 {
   uint8_t value_str[32];
   snprintf( value_str, 32, "%d", val );

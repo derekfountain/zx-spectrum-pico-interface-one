@@ -194,6 +194,18 @@ void gui_sm_eject_select_cancel_option( fsm_t *fsm )
 {
 }
 
+void gui_sm_action_test( fsm_t *fsm )
+{
+  status.test_value = 100;
+  generate_stimulus( fsm, ST_BUILTIN_YES );  
+}
+
+void gui_sm_cancel_test( fsm_t *fsm )
+{
+  status.test_value = 200;
+  generate_stimulus( fsm, ST_BUILTIN_YES );  
+}
+
       
 
 #include "gui_fsm.gen.c"

@@ -72,7 +72,7 @@ void draw_status_screen( status_screen_t *status )
   }
 
   // Sometimes useful for printing a debug value
-  //oled_display_value( 0 );
+  oled_display_test_value( status->test_value );
 
   oled_update();
 }
