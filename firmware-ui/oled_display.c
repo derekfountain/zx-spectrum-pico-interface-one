@@ -63,6 +63,7 @@ void oled_draw_status_microdrive( microdrive_index_t microdrive_index, bool inse
 
   /* Draw the square */
   uint8_t x_offset = 125 - ((microdrive_index+1)*15);
+  ssd1306_clear_square( &display, x_offset, md_y_pos, 13, 11 );  
   if( inserted )
     ssd1306_draw_filled_square(&display, x_offset, md_y_pos, 13, 11 );
   else
@@ -94,7 +95,14 @@ void oled_draw_status_microdrive( microdrive_index_t microdrive_index, bool inse
 
 void oled_display_clear_inserted_details_area( void )
 {
-  ssd1306_clear_square( &display, 0, 16, 127, 32+8 );  
+  ssd1306_clear_square( &display, 0, 16, 128, 32+8 );  
+}
+
+
+void oled_display_eject_option( void )
+{
+  ssd1306_draw_string( &display, 28, 24, 2, "Eject?", 0 );
+  ssd1306_draw_line(&display, 28, 24+16, 28+72, 24+16, 0);
 }
 
 

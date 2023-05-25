@@ -30,6 +30,7 @@ typedef enum
   WORK_INSERT_MDR,
   WORK_REQUEST_STATUS,
   WORK_REQUEST_MDR_DATA,
+  WORK_EJECT_MDR,
 } work_queue_type_t;
 
 
@@ -57,6 +58,12 @@ typedef struct _work_request_mdr_data_t
   microdrive_index_t microdrive_index;
 }
 work_request_mdr_data_t;
+
+typedef struct _work_eject_mdr_data_t
+{
+  microdrive_index_t microdrive_index;
+}
+work_eject_mdr_data_t;
 
 
 void work_queue_init( void );

@@ -17,12 +17,15 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  */
 
+#include <stdlib.h>
+
 #include "fsm.h"
 #include "gui_fsm.h"
 #include "gui.h"
 #include "microdrive.h"
 #include "cartridge.h"
 #include "live_microdrive_data.h"
+#include "work_queue.h"
 
 status_screen_t status;
 
@@ -81,6 +84,15 @@ void gui_sm_show_status( fsm_t *fsm )
 
   draw_status_screen( &status );
 }
+
+
+void gui_sm_show_eject_screen( fsm_t *fsm )
+{
+  draw_eject_screen( &status );
+  
+  /* No transition from here, we wait until the user clicks a button */
+}
+
 
 
 /*
@@ -178,20 +190,45 @@ void gui_sm_eject_sd_card( fsm_t *fsm )
 void gui_sm_scroll_inserted_filename( fsm_t *fsm )
 {
 }
+
+/*
+ * One of the microdrives has been selected. i.e. button pressed when the
+ * active microdrive cursor is on one of the icons.
+ */
 void gui_sm_md_selected( fsm_t *fsm )
 {
+  live_microdrive_data_t *live_microdrive_data = (live_microdrive_data_t*)fsm->fsm_data;
+
+  if( live_microdrive_data->currently_inserted[status.selected].status == LIVE_STATUS_NO_CARTRIDGE )
+  {
+    /* No cartridge inserted, let's offer to insert one */
+    generate_stimulus( fsm, ST_ACTION_INSERT );  
+  }
+  else if( live_microdrive_data->currently_inserted[status.selected].status == LIVE_STATUS_INSERTED )
+  {
+    /* Cartridge is inserted, let's offer to eject it */
+    generate_stimulus( fsm, ST_ACTION_EJECT );  
+  }
+  else
+  {
+    /* Cartridge is currently inserting, nothing makes much sense so ignore */
+    generate_stimulus( fsm, ST_BUILTIN_INVALID );  
+  }
 }
-void gui_sm_show_eject_screen( fsm_t *fsm )
-{
-}
+
+
+/*
+ * User has confirmed they want to eject
+ */
 void gui_sm_action_eject( fsm_t *fsm )
 {
-}
-void gui_sm_eject_select_eject_option( fsm_t *fsm )
-{
-}
-void gui_sm_eject_select_cancel_option( fsm_t *fsm )
-{
+  live_microdrive_data_t *live_microdrive_data = (live_microdrive_data_t*)fsm->fsm_data;
+
+  work_eject_mdr_data_t *eject_data_ptr = malloc( sizeof(work_eject_mdr_data_t) );
+  eject_data_ptr->microdrive_index = status.selected;
+  insert_work( WORK_EJECT_MDR, eject_data_ptr );
+  
+  generate_stimulus( fsm, ST_BUILTIN_YES );  
 }
 
 void gui_sm_action_test( fsm_t *fsm )

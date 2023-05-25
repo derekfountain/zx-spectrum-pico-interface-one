@@ -76,3 +76,18 @@ void draw_status_screen( status_screen_t *status )
 
   oled_update();
 }
+
+
+void draw_eject_screen( status_screen_t *status )
+{
+  for( uint8_t microdrive_index=0; microdrive_index< NUM_MICRODRIVES; microdrive_index++ )
+  {
+    oled_draw_status_microdrive( microdrive_index, status->md_inserted[microdrive_index], (microdrive_index == status->selected) );
+  }
+
+  oled_display_clear_inserted_details_area();
+
+  oled_display_eject_option();
+
+  oled_update();  
+}

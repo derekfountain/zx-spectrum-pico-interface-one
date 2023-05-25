@@ -212,4 +212,8 @@ the GUI if deemed required.
 : All needs doing after test on breadboard
 
 
+Input switches. The GUI is too messy with just the rotary encoder. I need a couple
+of switches as extra inputs, maybe like "Action" and "Cancel".
+: Schematic updated
+: Tested and working on breadboard. I used UI GPIOs 26 and 22.
 

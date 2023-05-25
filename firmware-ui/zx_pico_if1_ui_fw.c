@@ -403,6 +403,17 @@ static void work_request_mdr_data_to_save( microdrive_index_t microdrive_index )
 }
 
 
+static void work_eject_mdr( microdrive_index_t microdrive_index )
+{
+// Hack to see if it works
+live_microdrive_data.currently_inserted[microdrive_index].status = LIVE_STATUS_NO_CARTRIDGE;
+
+  generate_stimulus( gui_fsm, ST_BUILTIN_YES );
+
+  /* Status will be fetched again very shortly, no need to force anything */
+}
+
+
 /*
  * Core1 does what is termed "the work". This is the meaty stuff - comms with the IO Pico,
  * copying cartridge image data around, updating status, etc. The work here can block for
@@ -458,6 +469,16 @@ static void __time_critical_func(core1_main)( void )
 
 	work_request_mdr_data_to_save( request_mdr_data->microdrive_index );
 	free(request_mdr_data);
+      }
+      break;
+
+      case WORK_EJECT_MDR:
+      {
+	/* Work required is to eject the cartridge in the microdrive given in the data */
+	work_eject_mdr_data_t *eject_mdr_data = (work_eject_mdr_data_t*)data;
+
+	work_eject_mdr( eject_mdr_data->microdrive_index );
+	free(eject_mdr_data);
       }
       break;
 
@@ -568,7 +589,7 @@ int main( void )
   /* Read named files from SD card and insert each one that exists */
   uint8_t *mdr_files[] = {"1.mdr", 
 			  "2.mdr", 
-			  "3.mdr", 
+			  "3x.mdr", 
 			  "4x.mdr", 
 			  "5.mdr", 
 			  "6.mdr", 
