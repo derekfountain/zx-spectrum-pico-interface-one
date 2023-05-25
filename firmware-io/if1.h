@@ -97,6 +97,7 @@ uint8_t port_mdr_in( void );
 void port_mdr_out( uint8_t val );
 
 bool is_cartridge_inserted( microdrive_index_t which );
+void if1_mdr_eject( const microdrive_index_t which );
 bool is_cartridge_modified( microdrive_index_t which );
 void set_cartridge_modified( microdrive_index_t which, bool modified );
 bool is_cartridge_ejected_pending_save( microdrive_index_t which );

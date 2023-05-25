@@ -857,6 +857,18 @@ int __time_critical_func(main)( void )
     }
     break;
 
+    case UI_TO_IO_REQUEST_EJECT_MDR:
+    {
+      /* UI Pico wants a cartridge ejected */
+      ui_to_io_request_eject_mdr_t cmd_struct;
+      uart_read_blocking(IO_PICO_UART_ID, (uint8_t*)&cmd_struct, sizeof(ui_to_io_request_eject_mdr_t) );
+
+blip_test_pin();      
+      if1_mdr_eject( cmd_struct.microdrive_index );
+blip_test_pin();      
+    }
+    break;
+
     default:
       blip_test_pin();      
       break;

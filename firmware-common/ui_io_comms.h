@@ -58,12 +58,14 @@ typedef enum
 }
 microdrive_status_t;
 
+
 /* Not sure where this is going yet */
 typedef struct _io_status_t
 {
   uint8_t error;
 }
 io_status_t;
+
 
 /* Data structure for MDR insert command */
 typedef struct _ui_to_io_insert_mdr_t
@@ -75,6 +77,7 @@ typedef struct _ui_to_io_insert_mdr_t
 }
 ui_to_io_insert_mdr_t;
 
+
 /* Data structure to request IO Pico reports status of the microdrives */
 typedef struct _ui_to_io_request_status_t
 {
@@ -82,12 +85,14 @@ typedef struct _ui_to_io_request_status_t
 }
 ui_to_io_request_status_t;
 
+
 /* Response from IO Pico informing status of each microdrive */
 typedef struct _io_to_ui_status_response_t
 {
   microdrive_status_t status[NUM_MICRODRIVES];
 }
 io_to_ui_status_response_t;
+
 
 /* Data structure to request IO Pico reports returns cartridge data from one of the microdrives */
 typedef struct _ui_to_io_request_mdr_data_t
@@ -97,6 +102,13 @@ typedef struct _ui_to_io_request_mdr_data_t
 }
 ui_to_io_request_mdr_data_t;
 
+
+/* Data structure to request IO Pico ejects a cartridge */
+typedef struct _ui_to_io_request_eject_mdr_t
+{
+  microdrive_index_t microdrive_index;
+}
+ui_to_io_request_eject_mdr_t;
 
 #endif
 

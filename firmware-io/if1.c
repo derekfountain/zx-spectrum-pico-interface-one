@@ -81,7 +81,7 @@ typedef struct _microdrive_t
   
   bool     cartridge_inserted;
   bool     cartridge_ejected_pending_save;
-  bool     cartridge_data_modified;  // FIXME Needs to be a 2 second last-write type timer
+  bool     cartridge_data_modified;
   bool     cartridge_write_protect;
   uint8_t  cartridge_len_in_blocks;
 

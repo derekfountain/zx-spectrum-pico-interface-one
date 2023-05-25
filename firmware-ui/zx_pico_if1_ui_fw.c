@@ -344,6 +344,32 @@ static void work_request_status( void )
       /* If this one needs its data saving back to SD card, request the data for the IO Pico */
       add_work_request_mdr_data( microdrive_index );
     } 
+
+    /*
+     * The eject works by this UI Pico sending an eject request message to
+     * the IO Pico, which will result in a status of NO_CARTRIDGE once the
+     * IO Pico has completed it. So this is the point to update the live
+     * status once the cartridge is reported as not there.
+     * Otherwise the cartridge is either inserted or being inserted, and
+     * the insertion code will update the live status as required.
+     */
+    switch( status_struct.status[microdrive_index] )
+    {
+    case MD_STATUS_EMPTY:
+      /* If there's been an eject, update the live status here... */
+      if( live_microdrive_data.currently_inserted[microdrive_index].status != LIVE_STATUS_NO_CARTRIDGE )
+      {
+	mutex_enter_blocking( &live_microdrive_data_mutex );
+	live_microdrive_data.currently_inserted[microdrive_index].status = LIVE_STATUS_NO_CARTRIDGE;
+	mutex_exit( &live_microdrive_data_mutex );
+      }
+      break;
+
+    default:
+      /* ...otherwise just leave things as they are */
+      break;
+    }
+
   }
 
   generate_stimulus( gui_fsm, ST_REQUEST_STATUS_DONE );
@@ -405,10 +431,14 @@ static void work_request_mdr_data_to_save( microdrive_index_t microdrive_index )
 
 static void work_eject_mdr( microdrive_index_t microdrive_index )
 {
-// Hack to see if it works
-live_microdrive_data.currently_inserted[microdrive_index].status = LIVE_STATUS_NO_CARTRIDGE;
+  (void)send_cmd( UI_TO_IO_REQUEST_EJECT_MDR );
 
-  generate_stimulus( gui_fsm, ST_BUILTIN_YES );
+  /* Write the data which describes the command */
+  ui_to_io_request_eject_mdr_t cmd_struct =
+    {
+      .microdrive_index   = microdrive_index,
+    };
+  uart_write_blocking(UI_PICO_UART_ID, (uint8_t*)&cmd_struct, sizeof(cmd_struct)); 	
 
   /* Status will be fetched again very shortly, no need to force anything */
 }
