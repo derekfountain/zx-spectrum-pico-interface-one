@@ -31,7 +31,6 @@ FSM gui
       ST_DATA_SAVED                     STATE_GUI_DATA_SAVED
       ST_MDR_INSERTING                  STATE_GUI_INSERTING_MDR
       ST_MDR_INSERTED                   STATE_GUI_INSERTED_MDR
-      ST_MDR_EJECTED                    STATE_GUI_EJECTING_MDR
       ST_SD_CARD_INSERTED               STATE_GUI_INSERTING_SD_CARD
       ST_SD_CARD_EJECTED                STATE_GUI_EJECTING_SD_CARD
       ST_BUILTIN_TIMEOUT_1              STATE_GUI_SCROLLING_FILENAME
@@ -96,19 +95,6 @@ FSM gui
   STATE STATE_GUI_INSERTED_MDR
     ENTRY
       gui_sm_inserted_mdr
-
-    TRANSITIONS
-      ST_BUILTIN_YES                    STATE_GUI_SHOW_STATUS
-    END_TRANSITIONS
-
-
-  // An MDR image has been ejected. Deal with it, then drop back
-  // to the status screen
-  // Needs error handling, no MDR in that drive, etc.
-  //
-  STATE STATE_GUI_EJECTING_MDR
-    ENTRY
-      gui_sm_eject_mdr
 
     TRANSITIONS
       ST_BUILTIN_YES                    STATE_GUI_SHOW_STATUS
@@ -184,7 +170,7 @@ FSM gui
 
     TRANSITIONS
       ST_ACTION_EJECT                   STATE_GUI_SHOW_EJECT_SCREEN
-      ST_ACTION_INSERT                  STATE_GUI_SHOW_STATUS
+      ST_ACTION_INSERT                  STATE_GUI_SHOW_INSERT_SCREEN
       ST_BUILTIN_INVALID                STATE_GUI_SHOW_STATUS
     END_TRANSITIONS
 
@@ -210,19 +196,44 @@ FSM gui
     END_TRANSITIONS
 
 
-  STATE STATE_GUI_ACTION_TEST
+  // FIXME need frees out of here
+  STATE STATE_GUI_SHOW_INSERT_SCREEN
     ENTRY
-      gui_sm_action_test
+      gui_sm_show_insert_screen
+
+    TRANSITIONS
+      ST_ROTATE_CW                      STATE_GUI_SELECTING_NEXT_FILE
+      ST_ROTATE_CCW                     STATE_GUI_SELECTING_PREVIOUS_FILE
+      ST_ACTION_BUTTON_PRESS            STATE_GUI_ACTION_INSERT
+      ST_ENCODER_BUTTON_PRESS           STATE_GUI_ACTION_INSERT
+      ST_CANCEL_BUTTON_PRESS            STATE_GUI_SHOW_STATUS
+    END_TRANSITIONS
+
+
+  STATE STATE_GUI_SELECTING_NEXT_FILE
+    ENTRY
+      gui_sm_selecting_next_file
+
+    TRANSITIONS
+      ST_BUILTIN_YES                    STATE_GUI_SHOW_INSERT_SCREEN
+    END_TRANSITIONS
+
+
+  STATE STATE_GUI_SELECTING_PREVIOUS_FILE
+    ENTRY
+      gui_sm_selecting_previous_file
+
+    TRANSITIONS
+      ST_BUILTIN_YES                    STATE_GUI_SHOW_INSERT_SCREEN
+    END_TRANSITIONS
+
+
+  STATE STATE_GUI_ACTION_INSERT
+    ENTRY
+      gui_sm_action_insert
 
     TRANSITIONS
       ST_BUILTIN_YES                    STATE_GUI_SHOW_STATUS
     END_TRANSITIONS
 
 
-  STATE STATE_GUI_CANCEL_TEST
-    ENTRY
-      gui_sm_cancel_test
-
-    TRANSITIONS
-      ST_BUILTIN_YES                    STATE_GUI_SHOW_STATUS
-    END_TRANSITIONS

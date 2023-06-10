@@ -50,6 +50,11 @@ void oled_update( void )
   ssd1306_show(&display);
 }
 
+void oled_clear( void )
+{
+  ssd1306_clear( &display );
+}
+
 /*
  * This draws a box with a number in it, that being the current
  * depiction of a microdrive. There's 8 of them across the 
@@ -171,4 +176,13 @@ void oled_display_test_value( uint32_t val )
   snprintf( value_str, 32, "%d", val );
   ssd1306_clear_square( &display, 0, 48, 128, 8 );  
   ssd1306_draw_string( &display, 0, 48, 1, value_str, 0 );
+}
+
+
+void oled_display_selectable_filename( uint8_t *filename, uint32_t ypos )
+{
+  if( filename != NULL )
+  {
+    ssd1306_draw_string( &display, 0, ypos, 1, filename, 0 );
+  }
 }

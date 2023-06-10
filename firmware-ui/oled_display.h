@@ -26,6 +26,7 @@
 #include "microdrive.h"
 
 void oled_display_init( void );
+void oled_clear( void );
 void oled_update( void );
 void oled_draw_status_menu( uint8_t selected );
 void oled_display_clear_inserted_details_area( void );
@@ -40,5 +41,6 @@ void oled_display_msg_saving_mdr_data( microdrive_index_t microdrive_index );
 void oled_display_clear_msg( void );
 void oled_display_test_value( uint32_t val );
 void oled_display_eject_option( void );
+void oled_display_selectable_filename( uint8_t *filename, uint32_t ypos );
 
 #endif

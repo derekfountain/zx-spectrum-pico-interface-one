@@ -91,3 +91,22 @@ void draw_eject_screen( status_screen_t *status )
 
   oled_update();  
 }
+
+
+void draw_insert_screen( uint8_t **filename_ptr )
+{
+  oled_clear();
+
+  uint8_t line = 0;
+  for( uint8_t i = 0; i < 7; i++ )
+  {
+    if( *filename_ptr != NULL )
+    {
+      oled_display_selectable_filename( *filename_ptr, line );
+      line += 9;
+    }
+    *filename_ptr++;
+  }
+
+  oled_update();  
+}

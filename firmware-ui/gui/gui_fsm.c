@@ -26,6 +26,7 @@
 #include "cartridge.h"
 #include "live_microdrive_data.h"
 #include "work_queue.h"
+#include "sd_card.h"
 
 status_screen_t status;
 
@@ -93,6 +94,27 @@ void gui_sm_show_eject_screen( fsm_t *fsm )
   /* No transition from here, we wait until the user clicks a button */
 }
 
+
+#define MAX_NUM_FILENAMES 200
+static uint8_t *filenames[MAX_NUM_FILENAMES+7];
+static uint32_t selected_filename_index;
+void gui_sm_show_insert_screen( fsm_t *fsm )
+{
+  filenames[0] = NULL;
+  filenames[1] = NULL;
+  filenames[2] = NULL;
+  selected_filename_index = 3;
+
+  uint32_t num_filenames_read = read_directory_files( &filenames[selected_filename_index],
+						      10/*MAX_NUM_FILENAMES*/ );
+
+  filenames[3+num_filenames_read] = NULL;
+  filenames[4+num_filenames_read] = NULL;
+  filenames[5+num_filenames_read] = NULL;
+  filenames[6+num_filenames_read] = NULL;
+
+  draw_insert_screen( &filenames[selected_filename_index-3] );
+}
 
 
 /*
@@ -178,9 +200,21 @@ void gui_sm_data_saved( fsm_t *fsm )
 }
 
 
-void gui_sm_eject_mdr( fsm_t *fsm )
+void gui_sm_selecting_next_file( fsm_t *fsm )
 {
 }
+
+
+void gui_sm_selecting_previous_file( fsm_t *fsm )
+{
+}
+
+
+void gui_sm_action_insert( fsm_t *fsm )
+{
+}
+
+
 void gui_sm_insert_sd_card( fsm_t *fsm )
 {
 }

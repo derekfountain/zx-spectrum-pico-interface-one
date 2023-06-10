@@ -210,6 +210,10 @@ the GUI if deemed required.
 : Schematic updated, nothing tested
 :: Confirm R value and footprint for suitable LEDs
 : All needs doing after test on breadboard
+** Undecided. A 74HS595 is serial in, 8-output, I have the GPIOs for that.
+
+
+Buzzer required
 
 
 Input switches. The GUI is too messy with just the rotary encoder. I need a couple
@@ -217,3 +221,25 @@ of switches as extra inputs, maybe like "Action" and "Cancel".
 : Schematic updated
 : Tested and working on breadboard. I used UI GPIOs 26 and 22.
 
+
+Case. 3D printed case required. I'm thinking of a tray to sit the lie-flat PCB in,
+edge connectors front and back. It'll need screw point to hold the board, so the
+board needs screw holes at the corners.
+
+
+Daughterboard. The screen, rotary and 2 input switches need to be on a separate
+daughterboard. This will be screw-mounted on mountpoints on the 3D printed case
+and connected to the main PCB via a ribbon cable. I need
+
+3V3
+GND
+OLED CLK
+OLED DAT
+Rotary DT
+Rotary CLK
+Rotary Switch
+Action switch signal
+Cancel switch signal
+
+which is 9 signals. Short length of ribbon cable with crimped connectors should do
+the job.

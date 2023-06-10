@@ -25,6 +25,9 @@
 #include "hw_config.h"
 
 #include <stdint.h>
+#include <string.h>
+#include <stdlib.h>
+#include <stdio.h>
 #include "sd_card.h"
 
 /* There's only one SD card reader on the device, and this is it's file object */
@@ -60,6 +63,22 @@ uint8_t unmount_sd_card( void )
 
   sd_card_mounted = 0;
   return 0;
+}
+
+
+uint32_t read_directory_files( uint8_t **addr_ptr, uint32_t max_num_filenames )
+{
+  for( uint32_t filename_index = 0; filename_index < max_num_filenames; filename_index++ )
+  {
+    uint8_t name[9];
+    snprintf( name, 9, "abc%d.mdr", filename_index );
+    *addr_ptr = malloc( 9 );
+    strncpy( *addr_ptr, name, 9 );
+
+    *addr_ptr++;
+  }
+
+  return max_num_filenames;
 }
 
 
