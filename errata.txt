@@ -187,6 +187,10 @@ UART0 (GPIOs 0 to 3) on UI Pico to UART0 (GPIOs 12 to 15) on IO Pico.
 : Fixed in code
 : Fixed on schematic
 :: Needs fixing on PCB
+---
+: UARTs were too slow, I've switched again to the TP PIO link
+:: This freed up the CTS/RTS pair so I have 2 GPIOs free again
+:: Schematic and board updated, code working
 
 
 SD Card reader card detect pin needs connecting up.
@@ -211,10 +215,12 @@ the GUI if deemed required.
 :: Confirm R value and footprint for suitable LEDs
 : All needs doing after test on breadboard
 ** Undecided. A 74HS595 is serial in, 8-output, I have the GPIOs for that.
+** Still undecided. I do now have 8 GPIOs free, I could do it the easy way
 
 
 Buzzer required
-
+: Or not. It'll sound crap.
+: I could use a motor, which will at least sound a bit more realistic
 
 Input switches. The GUI is too messy with just the rotary encoder. I need a couple
 of switches as extra inputs, maybe like "Action" and "Cancel".
