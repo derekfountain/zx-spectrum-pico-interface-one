@@ -41,12 +41,10 @@
 #include "pico/platform.h"
 #include "hardware/timer.h"
 #include "hardware/spi.h"
-#include "hardware/uart.h"
 
 #include "fsm.h"
 #include "gui_fsm.h"
 
-#include "uart.h"
 #include "microdrive.h"
 #include "ui_io_comms.h"
 #include "work_queue.h"
@@ -57,6 +55,16 @@
 #include "oled_display.h"
 #include "ssd1306.h"
 #include "gui.h"
+
+/* Link to IO Pico is done with transputer based PIO code */
+#include "picoputer.pio.h"
+#include "link_common.h"
+
+const uint8_t LINKOUT_PIN     = 0;
+const uint8_t LINKIN_PIN      = 1;
+
+static int linkout_sm;
+static int linkin_sm;
 
 /* 1 instruction on the 133MHz microprocessor is 7.5ns */
 /* 1 instruction on the 140MHz microprocessor is 7.1ns */
@@ -176,13 +184,14 @@ static bool send_cmd( UI_TO_IO_CMD cmd )
 
   /* Send the preamble */
   for( uint8_t preamble_index=0; preamble_index < sizeof(preamble); preamble_index++ )
-    uart_putc_raw(UI_PICO_UART_ID, preamble[preamble_index]);
+    send_byte( pio0, linkout_sm, linkin_sm, preamble[preamble_index] );
 
   /* Send the command, this is just one byte */
-  uart_putc_raw(UI_PICO_UART_ID, cmd);
+  send_byte( pio0, linkout_sm, linkin_sm, cmd );
 
   /* Read the ACK from the IO Pico */
-  UI_TO_IO_CMD ack = uart_getc(UI_PICO_UART_ID);
+  UI_TO_IO_CMD ack;
+  while( receive_acked_byte( pio0, linkin_sm, linkout_sm, &ack ) != LINK_BYTE_DATA );
 
   if( ack != UI_TO_IO_ACK )
   {
@@ -266,8 +275,11 @@ static void work_insert_mdr_file( uint8_t which, uint8_t *filename )
       .write_protected    = write_protected,
       .checksum           = checksum
     };
-  uart_write_blocking(UI_PICO_UART_ID, (uint8_t*)&cmd_struct, sizeof(cmd_struct)); 	
-  UI_TO_IO_CMD ack = uart_getc(UI_PICO_UART_ID);
+  send_buffer( pio0, linkout_sm, linkin_sm, (uint8_t*)&cmd_struct, sizeof(cmd_struct) );
+
+  UI_TO_IO_CMD ack;
+  while( receive_acked_byte( pio0, linkin_sm, linkout_sm, &ack ) != LINK_BYTE_DATA );
+
   if( ack != UI_TO_IO_ACK )
     gpio_put( LED_PIN, 1 );
 
@@ -279,7 +291,7 @@ static void work_insert_mdr_file( uint8_t which, uint8_t *filename )
       // FIXME Do i need feedback here?
     }
 
-    uart_putc_raw( UI_PICO_UART_ID, working_image_buffer[i] );
+    send_byte( pio0, linkout_sm, linkin_sm, working_image_buffer[i] );
   }
 
   /*
@@ -329,10 +341,10 @@ static void work_request_status( void )
     {
       .dummy              = 0xFF,        // Eyecatcher, nothing actually required here as yet
     };
-  uart_write_blocking(UI_PICO_UART_ID, (uint8_t*)&cmd_struct, sizeof(ui_to_io_request_status_t)); 	
+  send_buffer( pio0, linkout_sm, linkin_sm, (uint8_t*)&cmd_struct, sizeof(ui_to_io_request_status_t) );
 
   io_to_ui_status_response_t status_struct;
-  uart_read_blocking(UI_PICO_UART_ID, (uint8_t*)&status_struct, sizeof(io_to_ui_status_response_t)); 	
+  receive_buffer( pio0, linkin_sm, linkout_sm, (uint8_t*)&status_struct, sizeof(io_to_ui_status_response_t) );
 
   /* Look for microdrives which need their cartridge saving */
   for( microdrive_index_t microdrive_index = 0; microdrive_index < NUM_MICRODRIVES; microdrive_index++ )
@@ -408,10 +420,10 @@ static void work_request_mdr_data_to_save( microdrive_index_t microdrive_index )
       .microdrive_index = microdrive_index,
       .bytes_expected   = bytes_expected,
     };
-  uart_write_blocking(UI_PICO_UART_ID, (uint8_t*)&cmd_struct, sizeof(ui_to_io_request_mdr_data_t)); 
+  send_buffer( pio0, linkout_sm, linkin_sm, (uint8_t*)&cmd_struct, sizeof(ui_to_io_request_mdr_data_t) );
 
   /* Read the cartridge contents back. This is sent by the IO Pico in pages, but arrives all in one go */
-  uart_read_blocking(UI_PICO_UART_ID, working_image_buffer, bytes_expected);
+  receive_buffer( pio0, linkin_sm, linkout_sm, working_image_buffer, bytes_expected );
 
   working_image_buffer[bytes_expected] = write_protected;
   
@@ -438,7 +450,7 @@ static void work_eject_mdr( microdrive_index_t microdrive_index )
     {
       .microdrive_index   = microdrive_index,
     };
-  uart_write_blocking(UI_PICO_UART_ID, (uint8_t*)&cmd_struct, sizeof(cmd_struct)); 	
+  send_buffer( pio0, linkout_sm, linkin_sm, (uint8_t*)&cmd_struct, sizeof(cmd_struct) );
 
   /* Status will be fetched again very shortly, no need to force anything */
 }
@@ -559,10 +571,6 @@ int main( void )
   mount_sd_card();
 
   /*
-   * Set up our UART to talk to the IO Pico
-   */
-
-  /*
    * I've soldered this Pico's UART0 to the IO Pico. The link was
    * originally SPI, so the IO Pico's UART pins are connected to
    * this Pico's SPI1 device pins. I'll cut the tracks when I've
@@ -573,17 +581,25 @@ int main( void )
   gpio_init(13); gpio_set_dir(13, GPIO_IN);
   gpio_init(14); gpio_set_dir(14, GPIO_IN);
   gpio_init(15); gpio_set_dir(15, GPIO_IN);
-  
-  uart_init(UI_PICO_UART_ID, PICOS_BAUD_RATE);
-  gpio_set_function(UI_PICO_UART_TX_PIN, GPIO_FUNC_UART);
-  gpio_set_function(UI_PICO_UART_RX_PIN, GPIO_FUNC_UART);
 
-  /* Set UART flow control CTS/RTS */
-  uart_set_hw_flow(UI_PICO_UART_ID, true, true);
+  /* Set up the link to the other Pico */
+  gpio_init(LINKOUT_PIN); gpio_set_dir(LINKOUT_PIN,GPIO_OUT); gpio_put(LINKOUT_PIN, 1);
+  gpio_set_function(LINKOUT_PIN, GPIO_FUNC_PIO0);
 
-  /* Set our data format, 8N1 */
-  uart_set_format(UI_PICO_UART_ID, PICOS_DATA_BITS, PICOS_STOP_BITS, PICOS_PARITY);
-  uart_set_translate_crlf(UI_PICO_UART_ID, false);
+  gpio_init(LINKIN_PIN); gpio_set_dir(LINKIN_PIN,GPIO_IN);
+  gpio_set_function(LINKIN_PIN, GPIO_FUNC_PIO0);
+    
+  /* Outgoing side of the link */
+  linkout_sm      = pio_claim_unused_sm(pio0, true);
+  uint offset     = pio_add_program(pio0, &picoputerlinkout_program);
+  picoputerlinkout_program_init(pio0, linkout_sm, offset, LINKOUT_PIN);
+
+  /* Incoming side of the link */
+  linkin_sm       = pio_claim_unused_sm(pio0, true);
+  offset          = pio_add_program(pio0, &picoputerlinkin_program);
+  picoputerlinkin_program_init(pio0, linkin_sm, offset, LINKIN_PIN);
+
+  send_init_sequence( pio0, linkout_sm, linkin_sm );
 
   /* Initialise the live data */
   live_microdrive_data.microdrive_saving_to_sd = -1;

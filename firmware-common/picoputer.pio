@@ -1,0 +1,126 @@
+;--------------------------------------------------------------------------------
+; Link Out
+;--------------------------------------------------------------------------------
+;
+; Packets are:
+;
+; ACK:   10
+; Data:  11XXXXXXXX0
+;
+; Clock is nominally 10MHz, 20Mhz for faster links
+;
+
+.program picoputerlinkout
+
+.side_set 1 opt
+
+; Data is inverted by level shifter
+; We shift out 10 bits (start bit is hard coded, this allows the sending code to send
+; either a data packet, or an ACK packet
+	
+    nop        side 1      ; Start bit
+stopidle:
+
+    pull       side 1 [7]  ; Assert stop bit, or stall with line in idle state
+    set x, 9   side 0 [7]  ; Assert first start bit for 8 clocks
+
+bitloop:                   ; This loop will run 8 times (8n1 UART)
+    out pins, 1            ; Shift 1 bit from OSR to the first OUT pin
+    jmp x-- bitloop   [6]  ; Each loop iteration is 8 cycles.
+    jmp stopidle      [7]	   ; Send stop bit and/or idle state
+
+% c-sdk {
+#include "hardware/clocks.h"
+
+static inline void picoputerlinkout_program_init(PIO pio, uint sm, uint offset, uint pin_linkout)
+{
+    // Tell PIO to initially drive output-high on the selected pin, then map PIO
+    // onto that pin with the IO muxes.
+    pio_sm_set_pins_with_mask(pio, sm, 0u << pin_linkout, 0u << pin_linkout);
+    pio_sm_set_pindirs_with_mask(pio, sm, 1u << pin_linkout, 1u << pin_linkout);
+    pio_gpio_init(pio, pin_linkout);
+
+    pio_sm_config c = picoputerlinkout_program_get_default_config(offset);
+
+    // OUT shifts to right, no autopull
+    sm_config_set_out_shift(&c, true, false, 32);
+
+    // We are mapping both OUT and side-set to the same pin, because sometimes
+    // we need to assert user data onto the pin (with OUT) and sometimes
+    // assert constant values (start/stop bit)
+    sm_config_set_out_pins(&c, pin_linkout, 1);
+    sm_config_set_sideset_pins(&c, pin_linkout);
+
+    // SM transmits 1 bit per 8 execution cycles. We therefore use a
+    // clock of 80MHz
+    float div = (float)clock_get_hz(clk_sys) / 80000000;
+    sm_config_set_clkdiv(&c, div);
+
+    pio_sm_init(pio, sm, offset, &c);
+    pio_sm_set_enabled(pio, sm, true);
+}
+
+
+%}
+
+
+////////////////////////////////////////////////////////////////////////////////
+//
+// LinkIn
+//
+////////////////////////////////////////////////////////////////////////////////
+
+.program picoputerlinkin
+
+; IN pin 0 and JMP pin are both mapped to the GPIO used as linkin.
+
+.wrap_target
+start:
+    wait 0 pin 0        ; Stall until start bit is asserted
+    set x, 9    [10]    ; Preload bit counter, then delay until halfway through the second bit
+
+; Shift the next 10 bits in, the client can work out what sort of packet this is
+
+bitloop:                ; the first data bit (12 cycles incl wait, set).
+    in pins, 1          ; Shift data bit into ISR
+    jmp x-- bitloop [6] ; Loop 8 times, each loop iteration is 8 cycles
+good_stop:              ; No delay before returning to start; a little slack is
+    push                ; important in case the TX clock is slightly too fast.
+.wrap
+
+% c-sdk {
+static inline void picoputerlinkin_program_init(PIO pio, uint sm, uint offset, uint pin) {
+    pio_sm_set_consecutive_pindirs(pio, sm, pin, 1, false);
+    pio_gpio_init(pio, pin);
+    gpio_pull_up(pin);
+
+    pio_sm_config c = picoputerlinkin_program_get_default_config(offset);
+    sm_config_set_in_pins(&c, pin); // for WAIT, IN
+    sm_config_set_jmp_pin(&c, pin); // for JMP
+
+    // Shift to right, autopush disabled
+    sm_config_set_in_shift(&c, true, false, 32);
+
+    // SM transmits 1 bit per 8 execution cycles.
+    float div = (float)clock_get_hz(clk_sys) / 80000000;
+    sm_config_set_clkdiv(&c, div);
+    
+    pio_sm_init(pio, sm, offset, &c);
+    pio_sm_set_enabled(pio, sm, true);
+}
+
+bool picoputerlinkin_get( PIO pio, uint sm, uint32_t *value )
+{
+  io_rw_32 *rxfifo_shift = (io_rw_32*)&pio->rxf[sm];
+  if( pio_sm_is_rx_fifo_empty(pio, sm) )
+  {	
+    return false;
+  }
+
+  /* rfx is a shift register, reading from it shifts the contents out */	
+  *value = ((uint32_t)*rxfifo_shift);
+
+  return true;
+}
+
+%}

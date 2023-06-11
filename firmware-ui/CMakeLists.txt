@@ -8,9 +8,7 @@ set(CMAKE_CXX_STANDARD 17)
 
 pico_sdk_init()
 
-if (TARGET tinyusb_device)
-
-  add_executable(zx_pico_if1_ui_fw
+add_executable(zx_pico_if1_ui_fw
     zx_pico_if1_ui_fw.c
     ssd1306.c
     sd_card.c
@@ -18,40 +16,43 @@ if (TARGET tinyusb_device)
     hw_config.c
     work_queue.c
     fsm.c
+    ../firmware-common/link_common.c
     gui/gui.c
     gui/gui_fsm.c
-  )
+)
 
-  # Add the FSM generated files as a dependency
-  #
-  add_custom_command(OUTPUT ../gui/gui_fsm.gen.h ../gui/gui_fsm.gen.c
-                     COMMAND ../../tools/process_fsm.pl ../gui/gui_fsm.def
-	             DEPENDS ../gui/gui_fsm.def)
+pico_generate_pio_header(zx_pico_if1_ui_fw ../../firmware-common/picoputer.pio)
 
-  add_custom_target(generate_fsm ALL
-                    DEPENDS  ../gui/gui_fsm.gen.h ../gui/gui_fsm.gen.c)
+# Add the FSM generated files as a dependency.
+#
+# The custom command adds my FSM processor Perl script with a dependency on
+# the FSM definition file. I then create a new target, "generate_fsm", which
+# is added to the main project build.
+#
+add_custom_command(OUTPUT ../gui/gui_fsm.gen.h ../gui/gui_fsm.gen.c
+                   COMMAND ../../tools/process_fsm.pl ../gui/gui_fsm.def
+		   DEPENDS ../gui/gui_fsm.def)
 
-  add_dependencies(zx_pico_if1_ui_fw generate_fsm)
+add_custom_target(generate_fsm ALL
+                  DEPENDS  ../gui/gui_fsm.gen.h ../gui/gui_fsm.gen.c)
 
+add_dependencies(zx_pico_if1_ui_fw generate_fsm)
 
-  target_include_directories(zx_pico_if1_ui_fw PRIVATE ../firmware-common)
-  target_include_directories(zx_pico_if1_ui_fw PRIVATE ./ gui/)
+target_include_directories(zx_pico_if1_ui_fw PRIVATE ../firmware-common)
+target_include_directories(zx_pico_if1_ui_fw PRIVATE ./ gui/)
 
-  add_subdirectory(no-OS-FatFS-SD-SPI-RPi-Pico/FatFs_SPI)
+add_subdirectory(no-OS-FatFS-SD-SPI-RPi-Pico/FatFs_SPI)
 
-  target_link_libraries(zx_pico_if1_ui_fw pico_stdlib
-                                          pico_mem_ops	
-                                          pico_multicore
-                                          hardware_spi
-                                          hardware_i2c
-					  hardware_uart
-                                          FatFs_SPI)
+target_link_libraries(zx_pico_if1_ui_fw pico_stdlib
+                                        pico_mem_ops	
+                                        pico_multicore
+					hardware_pio
+					hardware_clocks
+                                        hardware_spi
+                                        hardware_i2c
+                                        FatFs_SPI)
 
-  pico_enable_stdio_usb(zx_pico_if1_ui_fw 0)
-  pico_enable_stdio_uart(zx_pico_if1_ui_fw 0)
+pico_enable_stdio_usb(zx_pico_if1_ui_fw 0)
+pico_enable_stdio_uart(zx_pico_if1_ui_fw 0)
 
-  pico_add_extra_outputs(zx_pico_if1_ui_fw)
-
-elseif(PICO_ON_DEVICE)
-   message(WARNING "not building because TinyUSB submodule is not initialized in the SDK")
-endif()
+pico_add_extra_outputs(zx_pico_if1_ui_fw)

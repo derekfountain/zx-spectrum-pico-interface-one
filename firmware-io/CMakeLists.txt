@@ -17,33 +17,28 @@ set(CMAKE_CXX_STANDARD 17)
 
 pico_sdk_init()
 
-if (TARGET tinyusb_device)
-
-  add_executable(zx_pico_if1_io_fw
+add_executable(zx_pico_if1_io_fw
     zx_pico_if1_io_fw.c
     if1.c
-  )
+    ../firmware-common/link_common.c
+)
 
-  target_include_directories(zx_pico_if1_io_fw PRIVATE ../firmware-common)
+target_include_directories(zx_pico_if1_io_fw PRIVATE ../firmware-common)
 
-  # I prefer to catch my own OOM conditions
-  # 
-  target_compile_definitions(zx_pico_if1_io_fw PUBLIC -D PICO_MALLOC_PANIC=0)
+# I prefer to catch my own OOM conditions
+# 
+target_compile_definitions(zx_pico_if1_io_fw PUBLIC -D PICO_MALLOC_PANIC=0)
 
-  pico_generate_pio_header(zx_pico_if1_io_fw ${CMAKE_CURRENT_LIST_DIR}/mreq_dir.pio)
+pico_generate_pio_header(zx_pico_if1_io_fw ${CMAKE_CURRENT_LIST_DIR}/mreq_dir.pio)
+pico_generate_pio_header(zx_pico_if1_io_fw ../../firmware-common/picoputer.pio)
 
-  target_link_libraries(zx_pico_if1_io_fw pico_stdlib
-                                          pico_mem_ops
-                                          pico_multicore
-                                          hardware_pio
-                                          hardware_spi
-					  hardware_uart)
+target_link_libraries(zx_pico_if1_io_fw pico_stdlib
+                                        pico_mem_ops
+                                        pico_multicore
+                                        hardware_pio
+                                        hardware_spi)
 
-  pico_enable_stdio_usb(zx_pico_if1_io_fw 0)
-  pico_enable_stdio_uart(zx_pico_if1_io_fw 0)
+pico_enable_stdio_usb(zx_pico_if1_io_fw 0)
+pico_enable_stdio_uart(zx_pico_if1_io_fw 0)
 
-  pico_add_extra_outputs(zx_pico_if1_io_fw)
-
-elseif(PICO_ON_DEVICE)
-   message(WARNING "not building because TinyUSB submodule is not initialized in the SDK")
-endif()
+pico_add_extra_outputs(zx_pico_if1_io_fw)
