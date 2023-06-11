@@ -28,18 +28,19 @@ typedef enum
 }
 link_received_t;
 
-/* This is in the PIO source code */
+/* This is in the PIO source code, it's based on AM's transputer link */
 bool picoputerlinkin_get( PIO pio, uint sm, uint32_t *value );
 
-link_received_t receive_acked_byte( PIO pio, int linkin_sm, int linkout_sm, uint8_t *received_value );
-void receive_buffer( PIO pio, int linkin_sm, int linkout_sm, uint8_t *data, uint32_t count );
-void send_ack_to_link( PIO pio, int linkout_sm );
-void send_byte( PIO pio, int linkout_sm, int linkin_sm, uint8_t data );
-void send_buffer( PIO pio, int linkout_sm, int linkin_sm, const uint8_t *data, uint32_t count );
+link_received_t ui_link_receive_acked_byte( PIO pio, int linkin_sm, int linkout_sm, uint8_t *received_value );
+void            ui_link_receive_buffer( PIO pio, int linkin_sm, int linkout_sm, uint8_t *data, uint32_t count );
+void            ui_link_send_ack_to_link( PIO pio, int linkout_sm );
+void            ui_link_send_byte( PIO pio, int linkout_sm, int linkin_sm, uint8_t data );
+void            ui_link_send_buffer( PIO pio, int linkout_sm, int linkin_sm, const uint8_t *data, uint32_t count );
 
-void send_init_sequence( PIO pio, int linkout_sm, int linkin_sm );
-void wait_for_init_sequence( PIO pio, int linkin_sm, int linkout_sm );
+void            ui_link_send_init_sequence( PIO pio, int linkout_sm, int linkin_sm );
+void            ui_link_wait_for_init_sequence( PIO pio, int linkin_sm, int linkout_sm );
 
+/* 16 bit checksum, might be useful */
 uint16_t fletcher16( uint8_t *data, int count );
 
 #endif

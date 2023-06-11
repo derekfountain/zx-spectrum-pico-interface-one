@@ -50,12 +50,14 @@
 #include "hardware/clocks.h"
 #include "mreq_dir.pio.h"
 
+/* Link to IO Pico is done with transputer based PIO code */
 #include "picoputer.pio.h"
 #include "link_common.h"
 
 const uint8_t LINKOUT_PIN     = 12;
 const uint8_t LINKIN_PIN      = 13;
 
+/* UI to IO Pico link state machines */
 static int linkout_sm;
 static int linkin_sm;
 
@@ -462,7 +464,7 @@ static UI_TO_IO_CMD get_ui_to_io_cmd( void )
   while( ! preamble_received )
   {
     uint8_t received_byte;
-    while( receive_acked_byte( pio1, linkin_sm, linkout_sm, &received_byte ) != LINK_BYTE_DATA );
+    while( ui_link_receive_acked_byte( pio1, linkin_sm, linkout_sm, &received_byte ) != LINK_BYTE_DATA );
 
     if( received_byte != preamble[preamble_index] )
     {
@@ -494,7 +496,7 @@ static UI_TO_IO_CMD get_ui_to_io_cmd( void )
   }
 
   uint8_t received_byte;
-  while( receive_acked_byte( pio1, linkin_sm, linkout_sm, &received_byte ) != LINK_BYTE_DATA );
+  while( ui_link_receive_acked_byte( pio1, linkin_sm, linkout_sm, &received_byte ) != LINK_BYTE_DATA );
   return received_byte;
 }
 
@@ -504,7 +506,7 @@ static UI_TO_IO_CMD get_ui_to_io_cmd( void )
  */
 void send_ack_to_ui( void )
 {
-  send_byte( pio1, linkout_sm, linkin_sm, UI_TO_IO_ACK );
+  ui_link_send_byte( pio1, linkout_sm, linkin_sm, UI_TO_IO_ACK );
 
   return;
 }
@@ -629,27 +631,34 @@ int __time_critical_func(main)( void )
 
   trace(TRC_SPI_INIT, 0);
 
-  /* Set up the link to the other Pico */
+  /*
+   * Set up the link to the UI Pico. This uses a pair of PIO programs to send and receive
+   * over an asynchronous, 2 wire link. See https://github.com/derekfountain/pico-pio-connect
+   */
+
+  /* Outbound link, to UI Pico */
   gpio_init(LINKOUT_PIN); gpio_set_dir(LINKOUT_PIN,GPIO_OUT); gpio_put(LINKOUT_PIN, 1);
   gpio_set_function(LINKOUT_PIN, GPIO_FUNC_PIO1);
 
-  gpio_init(LINKIN_PIN); gpio_set_dir(LINKIN_PIN,GPIO_IN);
-  gpio_set_function(LINKIN_PIN, GPIO_FUNC_PIO1);
-    
-  /* Outgoing side of the link */
   linkout_sm      = pio_claim_unused_sm(pio1, true);
   uint offset     = pio_add_program(pio1, &picoputerlinkout_program);
   picoputerlinkout_program_init(pio1, linkout_sm, offset, LINKOUT_PIN);
 
-  /* Incoming side of the link */
+  /* Inbound link, from IO Pico */
+  gpio_init(LINKIN_PIN); gpio_set_dir(LINKIN_PIN,GPIO_IN);
+  gpio_set_function(LINKIN_PIN, GPIO_FUNC_PIO1);
+    
   linkin_sm       = pio_claim_unused_sm(pio1, true);
   offset          = pio_add_program(pio1, &picoputerlinkin_program);
   picoputerlinkin_program_init(pio1, linkin_sm, offset, LINKIN_PIN);
 
-  wait_for_init_sequence( pio1, linkin_sm, linkout_sm );
+  /*
+   * This Pico comes up second, the IO Pico will be waiting for the response
+   * to its initialisation sequence. Send it immediately.
+   */
+  ui_link_wait_for_init_sequence( pio1, linkin_sm, linkout_sm );
 
-  trace(TRC_UART_INIT, 0);
-
+  trace(TRC_LINK_INIT, 0);
 
   /* Test pin, blips the scope */
   gpio_init(TEST_OUTPUT_GP); gpio_set_dir(TEST_OUTPUT_GP, GPIO_OUT);
@@ -708,7 +717,7 @@ int __time_critical_func(main)( void )
       ui_to_io_insert_mdr_t cmd_struct;
 
       /* UI will respond with a structure describing the incoming MDR data */
-      receive_buffer( pio1, linkin_sm, linkout_sm, (uint8_t*)&cmd_struct, sizeof(cmd_struct) );
+      ui_link_receive_buffer( pio1, linkin_sm, linkout_sm, (uint8_t*)&cmd_struct, sizeof(cmd_struct) );
       send_ack_to_ui();
 
       // trace(TRC_RCV_INSERT_MDR_STRUCT, cmd_struct.microdrive_index);
@@ -723,7 +732,7 @@ int __time_critical_func(main)( void )
       {
         /* Load a page from the UI Pico into a local buffer */
         uint8_t page_buffer[ 256 ];
-	receive_buffer( pio1, linkin_sm, linkout_sm, page_buffer, sizeof(page_buffer) );
+	ui_link_receive_buffer( pio1, linkin_sm, linkout_sm, page_buffer, sizeof(page_buffer) );
 
 	for( uint32_t checksum_index=0; checksum_index < 256; checksum_index++ )
 	{
@@ -742,7 +751,7 @@ int __time_critical_func(main)( void )
       if( final_page_size != 0 )
       {
         uint8_t page_buffer[ final_page_size ];
-	receive_buffer( pio1, linkin_sm, linkout_sm, page_buffer, sizeof(page_buffer) );
+	ui_link_receive_buffer( pio1, linkin_sm, linkout_sm, page_buffer, sizeof(page_buffer) );
 
 	for( uint32_t checksum_index=0; checksum_index < final_page_size; checksum_index++ )
 	{
@@ -782,7 +791,7 @@ int __time_critical_func(main)( void )
     {
       /* Command structure is currently a dummy, nothing is required */
       ui_to_io_request_status_t cmd_struct;
-      receive_buffer( pio1, linkin_sm, linkout_sm, (uint8_t*)&cmd_struct, sizeof(ui_to_io_request_status_t) );
+      ui_link_receive_buffer( pio1, linkin_sm, linkout_sm, (uint8_t*)&cmd_struct, sizeof(ui_to_io_request_status_t) );
 
       /* Loop over drives, tell the UI if each is inserted, needs saving, etc */
       io_to_ui_status_response_t status_response;
@@ -812,7 +821,7 @@ int __time_critical_func(main)( void )
 	}
       }
 
-      send_buffer( pio1, linkout_sm, linkin_sm, (uint8_t*)&status_response, sizeof(io_to_ui_status_response_t) );
+      ui_link_send_buffer( pio1, linkout_sm, linkin_sm, (uint8_t*)&status_response, sizeof(io_to_ui_status_response_t) );
     }
     break;
 
@@ -820,7 +829,7 @@ int __time_critical_func(main)( void )
     {
       /* UI Pico wants the contents of an inserted cartridge so it can save it back to SD card */
       ui_to_io_request_mdr_data_t cmd_struct;
-      receive_buffer( pio1, linkin_sm, linkout_sm, (uint8_t*)&cmd_struct, sizeof(ui_to_io_request_mdr_data_t) );
+      ui_link_receive_buffer( pio1, linkin_sm, linkout_sm, (uint8_t*)&cmd_struct, sizeof(ui_to_io_request_mdr_data_t) );
       
       /* Work out where in the psuedo RAM the microdrive's data is held */
       uint32_t psram_offset = (MICRODRIVE_CARTRIDGE_LENGTH * cmd_struct.microdrive_index);
@@ -850,7 +859,7 @@ int __time_critical_func(main)( void )
 	read_psram_block( psram_offset, page_buffer, 256 );
 
 	/* Send it over to the UI Pico for saving to SD card */
-	send_buffer( pio1, linkout_sm, linkin_sm, page_buffer, sizeof(page_buffer) );
+	ui_link_send_buffer( pio1, linkout_sm, linkin_sm, page_buffer, sizeof(page_buffer) );
 
         /* Work out where the start of the next page is */
         psram_offset += 256;
@@ -860,7 +869,7 @@ int __time_critical_func(main)( void )
       {
 	uint8_t page_buffer[final_page_size];
 	read_psram_block( psram_offset, page_buffer, final_page_size );
-	send_buffer( pio1, linkout_sm, linkin_sm, page_buffer, sizeof(page_buffer) );
+	ui_link_send_buffer( pio1, linkout_sm, linkin_sm, page_buffer, sizeof(page_buffer) );
       }
 
       /* I don't send back the w/p flag, the UI Pico already has that */
@@ -872,7 +881,7 @@ int __time_critical_func(main)( void )
     {
       /* UI Pico wants a cartridge ejected */
       ui_to_io_request_eject_mdr_t cmd_struct;
-      receive_buffer( pio1, linkin_sm, linkout_sm, (uint8_t*)&cmd_struct, sizeof(ui_to_io_request_eject_mdr_t) );
+      ui_link_receive_buffer( pio1, linkin_sm, linkout_sm, (uint8_t*)&cmd_struct, sizeof(ui_to_io_request_eject_mdr_t) );
 
 blip_test_pin();      
       if1_mdr_eject( cmd_struct.microdrive_index );

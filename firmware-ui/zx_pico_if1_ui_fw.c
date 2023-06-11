@@ -63,6 +63,7 @@
 const uint8_t LINKOUT_PIN     = 0;
 const uint8_t LINKIN_PIN      = 1;
 
+/* UI to IO Pico link state machines */
 static int linkout_sm;
 static int linkin_sm;
 
@@ -184,14 +185,14 @@ static bool send_cmd( UI_TO_IO_CMD cmd )
 
   /* Send the preamble */
   for( uint8_t preamble_index=0; preamble_index < sizeof(preamble); preamble_index++ )
-    send_byte( pio0, linkout_sm, linkin_sm, preamble[preamble_index] );
+    ui_link_send_byte( pio0, linkout_sm, linkin_sm, preamble[preamble_index] );
 
   /* Send the command, this is just one byte */
-  send_byte( pio0, linkout_sm, linkin_sm, cmd );
+  ui_link_send_byte( pio0, linkout_sm, linkin_sm, cmd );
 
   /* Read the ACK from the IO Pico */
   UI_TO_IO_CMD ack;
-  while( receive_acked_byte( pio0, linkin_sm, linkout_sm, &ack ) != LINK_BYTE_DATA );
+  while( ui_link_receive_acked_byte( pio0, linkin_sm, linkout_sm, &ack ) != LINK_BYTE_DATA );
 
   if( ack != UI_TO_IO_ACK )
   {
@@ -275,10 +276,10 @@ static void work_insert_mdr_file( uint8_t which, uint8_t *filename )
       .write_protected    = write_protected,
       .checksum           = checksum
     };
-  send_buffer( pio0, linkout_sm, linkin_sm, (uint8_t*)&cmd_struct, sizeof(cmd_struct) );
+  ui_link_send_buffer( pio0, linkout_sm, linkin_sm, (uint8_t*)&cmd_struct, sizeof(cmd_struct) );
 
   UI_TO_IO_CMD ack;
-  while( receive_acked_byte( pio0, linkin_sm, linkout_sm, &ack ) != LINK_BYTE_DATA );
+  while( ui_link_receive_acked_byte( pio0, linkin_sm, linkout_sm, &ack ) != LINK_BYTE_DATA );
 
   if( ack != UI_TO_IO_ACK )
     gpio_put( LED_PIN, 1 );
@@ -291,7 +292,7 @@ static void work_insert_mdr_file( uint8_t which, uint8_t *filename )
       // FIXME Do i need feedback here?
     }
 
-    send_byte( pio0, linkout_sm, linkin_sm, working_image_buffer[i] );
+    ui_link_send_byte( pio0, linkout_sm, linkin_sm, working_image_buffer[i] );
   }
 
   /*
@@ -341,10 +342,10 @@ static void work_request_status( void )
     {
       .dummy              = 0xFF,        // Eyecatcher, nothing actually required here as yet
     };
-  send_buffer( pio0, linkout_sm, linkin_sm, (uint8_t*)&cmd_struct, sizeof(ui_to_io_request_status_t) );
+  ui_link_send_buffer( pio0, linkout_sm, linkin_sm, (uint8_t*)&cmd_struct, sizeof(ui_to_io_request_status_t) );
 
   io_to_ui_status_response_t status_struct;
-  receive_buffer( pio0, linkin_sm, linkout_sm, (uint8_t*)&status_struct, sizeof(io_to_ui_status_response_t) );
+  ui_link_receive_buffer( pio0, linkin_sm, linkout_sm, (uint8_t*)&status_struct, sizeof(io_to_ui_status_response_t) );
 
   /* Look for microdrives which need their cartridge saving */
   for( microdrive_index_t microdrive_index = 0; microdrive_index < NUM_MICRODRIVES; microdrive_index++ )
@@ -420,10 +421,10 @@ static void work_request_mdr_data_to_save( microdrive_index_t microdrive_index )
       .microdrive_index = microdrive_index,
       .bytes_expected   = bytes_expected,
     };
-  send_buffer( pio0, linkout_sm, linkin_sm, (uint8_t*)&cmd_struct, sizeof(ui_to_io_request_mdr_data_t) );
+  ui_link_send_buffer( pio0, linkout_sm, linkin_sm, (uint8_t*)&cmd_struct, sizeof(ui_to_io_request_mdr_data_t) );
 
   /* Read the cartridge contents back. This is sent by the IO Pico in pages, but arrives all in one go */
-  receive_buffer( pio0, linkin_sm, linkout_sm, working_image_buffer, bytes_expected );
+  ui_link_receive_buffer( pio0, linkin_sm, linkout_sm, working_image_buffer, bytes_expected );
 
   working_image_buffer[bytes_expected] = write_protected;
   
@@ -450,7 +451,7 @@ static void work_eject_mdr( microdrive_index_t microdrive_index )
     {
       .microdrive_index   = microdrive_index,
     };
-  send_buffer( pio0, linkout_sm, linkin_sm, (uint8_t*)&cmd_struct, sizeof(cmd_struct) );
+  ui_link_send_buffer( pio0, linkout_sm, linkin_sm, (uint8_t*)&cmd_struct, sizeof(cmd_struct) );
 
   /* Status will be fetched again very shortly, no need to force anything */
 }
@@ -571,6 +572,11 @@ int main( void )
   mount_sd_card();
 
   /*
+   * Set up the link to the IO Pico. This uses a pair of PIO programs to send and receive
+   * over an asynchronous, 2 wire link. See https://github.com/derekfountain/pico-pio-connect
+   */
+
+  /*
    * I've soldered this Pico's UART0 to the IO Pico. The link was
    * originally SPI, so the IO Pico's UART pins are connected to
    * this Pico's SPI1 device pins. I'll cut the tracks when I've
@@ -582,24 +588,27 @@ int main( void )
   gpio_init(14); gpio_set_dir(14, GPIO_IN);
   gpio_init(15); gpio_set_dir(15, GPIO_IN);
 
-  /* Set up the link to the other Pico */
+  /* Outbound link, to IO Pico */
   gpio_init(LINKOUT_PIN); gpio_set_dir(LINKOUT_PIN,GPIO_OUT); gpio_put(LINKOUT_PIN, 1);
   gpio_set_function(LINKOUT_PIN, GPIO_FUNC_PIO0);
 
-  gpio_init(LINKIN_PIN); gpio_set_dir(LINKIN_PIN,GPIO_IN);
-  gpio_set_function(LINKIN_PIN, GPIO_FUNC_PIO0);
-    
-  /* Outgoing side of the link */
   linkout_sm      = pio_claim_unused_sm(pio0, true);
   uint offset     = pio_add_program(pio0, &picoputerlinkout_program);
   picoputerlinkout_program_init(pio0, linkout_sm, offset, LINKOUT_PIN);
 
-  /* Incoming side of the link */
+  /* Inbound link, from IO Pico */
+  gpio_init(LINKIN_PIN); gpio_set_dir(LINKIN_PIN,GPIO_IN);
+  gpio_set_function(LINKIN_PIN, GPIO_FUNC_PIO0);
+    
   linkin_sm       = pio_claim_unused_sm(pio0, true);
   offset          = pio_add_program(pio0, &picoputerlinkin_program);
   picoputerlinkin_program_init(pio0, linkin_sm, offset, LINKIN_PIN);
 
-  send_init_sequence( pio0, linkout_sm, linkin_sm );
+  /*
+   * This Pico comes up first, wait for the IO Pico to come up. It'll
+   * respond to this sequence when it's got going
+   */
+  ui_link_send_init_sequence( pio0, linkout_sm, linkin_sm );
 
   /* Initialise the live data */
   live_microdrive_data.microdrive_saving_to_sd = -1;
@@ -635,8 +644,8 @@ int main( void )
   /* Read named files from SD card and insert each one that exists */
   uint8_t *mdr_files[] = {"1.mdr", 
 			  "2.mdr", 
-			  "3x.mdr", 
-			  "4x.mdr", 
+			  "3.mdr", 
+			  "4.mdr", 
 			  "5.mdr", 
 			  "6.mdr", 
 			  "7.mdr", 

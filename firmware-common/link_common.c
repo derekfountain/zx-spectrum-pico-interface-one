@@ -17,6 +17,18 @@
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
+/*
+ * This is a reasonably generic, high speed Pico to Pico link application
+ * discussed here:
+ *
+ * https://github.com/derekfountain/pico-pio-connect
+ *
+ * It's used here to link the UI Pico to the IO Pico. I renamed the functions
+ * so it's a little more obvious from the UI source code what the functons do.
+ *
+ * This code is compiled and linked into both the UI and IO Pico applications.
+ */
+
 #include "pico/stdlib.h"
 #include "hardware/pio.h"
 #include "hardware/clocks.h"
@@ -71,12 +83,12 @@ static link_received_t receive_byte( PIO pio, int linkin_sm, uint8_t *received_v
 /*
  * Receive a byte and ACK it back to the sender
  */
-link_received_t receive_acked_byte( PIO pio, int linkin_sm, int linkout_sm, uint8_t *received_value )
+link_received_t ui_link_receive_acked_byte( PIO pio, int linkin_sm, int linkout_sm, uint8_t *received_value )
 {
   if( receive_byte( pio, linkin_sm, received_value ) == LINK_BYTE_NONE )
     return LINK_BYTE_NONE;
 
-  send_ack_to_link( pio, linkout_sm );
+  ui_link_send_ack_to_link( pio, linkout_sm );
 
   return LINK_BYTE_DATA;
 }
@@ -85,11 +97,11 @@ link_received_t receive_acked_byte( PIO pio, int linkin_sm, int linkout_sm, uint
 /*
  * Receive a number of bytes into the given buffer. Bytes are acknowledged.
  */
-void receive_buffer( PIO pio, int linkin_sm, int linkout_sm, uint8_t *data, uint32_t count )
+void ui_link_receive_buffer( PIO pio, int linkin_sm, int linkout_sm, uint8_t *data, uint32_t count )
 {
   while( count )
   {
-    while( receive_acked_byte( pio, linkin_sm, linkout_sm, data ) == LINK_BYTE_NONE );
+    while( ui_link_receive_acked_byte( pio, linkin_sm, linkout_sm, data ) == LINK_BYTE_NONE );
     data++;
     count--;
   }
@@ -99,7 +111,7 @@ void receive_buffer( PIO pio, int linkin_sm, int linkout_sm, uint8_t *data, uint
 /*
  * Send an ACK.
  */
-void send_ack_to_link( PIO pio, int linkout_sm )
+void ui_link_send_ack_to_link( PIO pio, int linkout_sm )
 {
   /* Sends the magic value */
   pio_sm_put_blocking( pio, linkout_sm, (uint32_t)0x2ff );
@@ -109,7 +121,7 @@ void send_ack_to_link( PIO pio, int linkout_sm )
 /*
  * Send a byte and wait for the receiver to acknowledge it.
  */
-void send_byte( PIO pio, int linkout_sm, int linkin_sm, uint8_t data )
+void ui_link_send_byte( PIO pio, int linkout_sm, int linkin_sm, uint8_t data )
 {
   pio_sm_put_blocking(pio, linkout_sm, 0x200 | (((uint32_t)data ^ 0xff)<<1));
 
@@ -120,11 +132,11 @@ void send_byte( PIO pio, int linkout_sm, int linkin_sm, uint8_t data )
 /*
  * Send a buffer of bytes. All bytes are acknowledged.
  */
-void send_buffer( PIO pio, int linkout_sm, int linkin_sm, const uint8_t *data, uint32_t count )
+void ui_link_send_buffer( PIO pio, int linkout_sm, int linkin_sm, const uint8_t *data, uint32_t count )
 {
   while( count )
   {
-    send_byte( pio, linkout_sm, linkin_sm, *data );
+    ui_link_send_byte( pio, linkout_sm, linkin_sm, *data );
     data++;
     count--;
   }
@@ -136,10 +148,10 @@ void send_buffer( PIO pio, int linkout_sm, int linkin_sm, const uint8_t *data, u
  * wait_for_init_sequence() function and is used to initialise the
  * link. It gets the two sides in sync.
  */
-void send_init_sequence( PIO pio, int linkout_sm, int linkin_sm )
+void ui_link_send_init_sequence( PIO pio, int linkout_sm, int linkin_sm )
 {
   const uint8_t init_msg[] = { 0x02, 0x04, 0x08, 0 };
-  send_buffer( pio, linkout_sm, linkin_sm, init_msg, sizeof(init_msg) );
+  ui_link_send_buffer( pio, linkout_sm, linkin_sm, init_msg, sizeof(init_msg) );
 
   while( receive_byte( pio, linkin_sm, NULL ) != LINK_BYTE_ACK );
 }
@@ -149,14 +161,14 @@ void send_init_sequence( PIO pio, int linkout_sm, int linkin_sm )
  * Wait for the initialisation sequence sent by the send_init_sequence()
  * function.
  */
-void wait_for_init_sequence( PIO pio, int linkin_sm, int linkout_sm )
+void ui_link_wait_for_init_sequence( PIO pio, int linkin_sm, int linkout_sm )
 {
   uint8_t init_msg[] = { 0x02, 0x04, 0x08, 0 };
   uint8_t *init_msg_ptr = init_msg;
   while(1)
   {
     uint8_t chr;
-    while( receive_acked_byte( pio, linkin_sm, linkout_sm, &chr ) == LINK_BYTE_NONE );
+    while( ui_link_receive_acked_byte( pio, linkin_sm, linkout_sm, &chr ) == LINK_BYTE_NONE );
     if( chr == *init_msg_ptr )
     {
       init_msg_ptr++;
@@ -168,7 +180,7 @@ void wait_for_init_sequence( PIO pio, int linkin_sm, int linkout_sm )
       init_msg_ptr = init_msg;
     }
   }
-  send_ack_to_link( pio, linkout_sm );
+  ui_link_send_ack_to_link( pio, linkout_sm );
 }
 
 
