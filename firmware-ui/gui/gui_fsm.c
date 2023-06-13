@@ -117,6 +117,13 @@ void gui_sm_show_insert_screen( fsm_t *fsm )
 }
 
 
+void gui_sm_cancel_insert( fsm_t *fsm )
+{
+  clear_insert_screen();  
+  generate_stimulus( fsm, ST_BUILTIN_YES );  
+}
+
+
 /*
  * Cartridge is being inserted. Data is being copied across to the IO Pico.
  */

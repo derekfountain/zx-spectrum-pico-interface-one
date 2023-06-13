@@ -110,3 +110,10 @@ void draw_insert_screen( uint8_t **filename_ptr )
 
   oled_update();  
 }
+
+
+void clear_insert_screen( void )
+{
+  oled_clear();
+  oled_update();  
+}
