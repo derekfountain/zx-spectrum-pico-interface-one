@@ -86,6 +86,9 @@ const uint8_t LED_PIN = PICO_DEFAULT_LED_PIN;
 #define ACTION_SW_GP  26
 #define CANCEL_SW_GP  22
 
+/* Test pin */
+const uint8_t  TEST_OUTPUT_GP = 10;
+
 static fsm_t *gui_fsm;
 
 /* Keep tabs on what's happening so the GUI can offer the correct options */
@@ -139,35 +142,67 @@ static void encoder_callback( uint gpio, uint32_t events )
       generate_stimulus( gui_fsm, ST_ROTATE_CW );  
     }    
   }
-  else if( gpio == ENCODER_SW_GP )
-  {
-    /*
-     * Switch event, set to interrupt on falling edge, so this is a click down.
-     * Debounce is left as an exercise for the reader :)
-     */
-  }
 }
 
 
 /*
- * Handler for GPIOs. At present this marshalls the user interface input switches.
+ * Handler for GPIOs. At present this marshalls the user interface input switches
+ * and the encoder swipes
  */
+/* From the timer_lowlevel.c example */
+static uint64_t get_time_us( void )
+{
+  uint32_t lo = timer_hw->timelr;
+  uint32_t hi = timer_hw->timehr;
+  return ((uint64_t)hi << 32u) | lo;
+}
+static uint64_t debounce_timestamp_us = 0;
 void gpios_callback( uint gpio, uint32_t events ) 
 {
-  if( gpio == ENCODER_A_GP || gpio == ENCODER_B_GP || gpio == ENCODER_SW_GP )
+  if( gpio == ENCODER_A_GP || gpio == ENCODER_B_GP )
   {
     /* Rotary encoder has its own handler */
     return encoder_callback( gpio, events );
   }
   else
   {
-    if( gpio == ACTION_SW_GP )
+    /*
+     * Switch event, set to interrupt on falling edge, so this is a click down.
+     * Encoder switch, if it's enabled, equates to the action switch.
+     */
+    if( (gpio == ACTION_SW_GP) || (gpio == CANCEL_SW_GP) || (gpio == ENCODER_SW_GP) )
     {
-      generate_stimulus( gui_fsm, ST_ACTION_BUTTON_PRESS );
-    }
-    else if( gpio == CANCEL_SW_GP )
-    {
-      generate_stimulus( gui_fsm, ST_CANCEL_BUTTON_PRESS );
+#define DEBOUNCE_USECS 100000
+      /* Debounce pause, the switch is a bit noisy */
+      if( (get_time_us() - debounce_timestamp_us) < DEBOUNCE_USECS )
+      {
+	/* If last switch action was very recently, assume it's a bounce and ignore it */
+	debounce_timestamp_us = get_time_us();
+      }
+      else
+      {
+	/* Wait for the switch to come back up, then let it settle */
+	while( gpio_get( gpio ) );
+	busy_wait_us_32( DEBOUNCE_USECS );
+
+	/* Debounced, take action */
+        if( (gpio == ACTION_SW_GP) || (gpio == ENCODER_SW_GP) )
+	{
+	  generate_stimulus( gui_fsm, ST_ACTION_BUTTON_PRESS );
+	}
+	else if( gpio == CANCEL_SW_GP )
+	{
+	  generate_stimulus( gui_fsm, ST_CANCEL_BUTTON_PRESS );
+	}
+
+	/* Note this point as when we last actioned a switch */
+	debounce_timestamp_us = get_time_us();
+
+	/*
+	 * Note, this debounce isn't perfect, I've seen it double-click but it's very rare
+	 * and I've never managed to catch it on the scope. I might need to revisit it
+	 */
+      }
     }
   }
 }
@@ -545,6 +580,10 @@ int main( void )
   gpio_init(LED_PIN); gpio_set_dir(LED_PIN, GPIO_OUT);
   gpio_put( LED_PIN, 0 );
 
+  /* Test pin, blips the scope */
+  gpio_init(TEST_OUTPUT_GP); gpio_set_dir(TEST_OUTPUT_GP, GPIO_OUT);
+  gpio_put(TEST_OUTPUT_GP, 0);
+
   /*
    * First, set up the screen. It's an I2C device.
    */
@@ -553,16 +592,17 @@ int main( void )
   /*
    * Rotary encoder, 3 GPIOs
    */
-  gpio_init( ENCODER_SW_GP ); gpio_set_dir( ENCODER_SW_GP, GPIO_IN ); // gpio_disable_pulls(ENCODER_SW_GP);
-  gpio_init( ENCODER_A_GP );  gpio_set_dir( ENCODER_A_GP, GPIO_IN );  // gpio_disable_pulls(ENCODER_A_GP);
-  gpio_init( ENCODER_B_GP );  gpio_set_dir( ENCODER_B_GP, GPIO_IN );  // gpio_disable_pulls(ENCODER_B_GP);
+  gpio_init( ENCODER_A_GP );  gpio_set_dir( ENCODER_A_GP, GPIO_IN );  gpio_disable_pulls(ENCODER_A_GP);
+  gpio_init( ENCODER_B_GP );  gpio_set_dir( ENCODER_B_GP, GPIO_IN );  gpio_disable_pulls(ENCODER_B_GP);
 
+  /* For now I'm disabling the encoder switch. It seems erratic, and it's hard to use anyway */
+  //gpio_init( ENCODER_SW_GP ); gpio_set_dir( ENCODER_SW_GP, GPIO_IN ); gpio_pull_up( ACTION_SW_GP );
   gpio_init( ACTION_SW_GP ); gpio_set_dir( ACTION_SW_GP, GPIO_IN ); gpio_pull_up( ACTION_SW_GP );
   gpio_init( CANCEL_SW_GP ); gpio_set_dir( CANCEL_SW_GP, GPIO_IN ); gpio_pull_up( CANCEL_SW_GP );
 
   /* Set the handler for all 3 GPIOs */
-  gpio_set_irq_enabled_with_callback( ENCODER_SW_GP, GPIO_IRQ_EDGE_FALL, true, &gpios_callback );
-  gpio_set_irq_enabled( ENCODER_A_GP, GPIO_IRQ_EDGE_FALL, true );
+  //gpio_set_irq_enabled_with_callback( ENCODER_SW_GP, GPIO_IRQ_EDGE_FALL, true, &gpios_callback );
+  gpio_set_irq_enabled_with_callback( ENCODER_A_GP, GPIO_IRQ_EDGE_FALL, true, &gpios_callback );
   gpio_set_irq_enabled( ENCODER_B_GP, GPIO_IRQ_EDGE_FALL, true );
 
   gpio_set_irq_enabled( ACTION_SW_GP, GPIO_IRQ_EDGE_FALL, true );
