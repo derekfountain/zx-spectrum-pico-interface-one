@@ -41,6 +41,6 @@ void oled_display_msg_saving_mdr_data( microdrive_index_t microdrive_index );
 void oled_display_clear_msg( void );
 void oled_display_test_value( uint32_t val );
 void oled_display_eject_option( void );
-void oled_display_selectable_filename( uint8_t *filename, uint32_t ypos );
+void oled_display_selectable_filename( uint8_t *filename, uint32_t ypos, bool invert );
 
 #endif

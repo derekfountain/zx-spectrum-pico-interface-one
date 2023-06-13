@@ -237,7 +237,6 @@ FSM gui
     END_TRANSITIONS
 
 
-
   STATE STATE_GUI_ACTION_INSERT
     ENTRY
       gui_sm_action_insert

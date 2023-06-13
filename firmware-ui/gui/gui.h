@@ -41,7 +41,7 @@ typedef struct _status_screen_t
 status_screen_t;
 
 void draw_status_screen( status_screen_t *status );
-void draw_insert_screen( uint8_t **filename_ptr );
+void draw_insert_screen( uint32_t index, uint8_t *filename_ptr[] );
 void draw_eject_screen( status_screen_t *status );
 void clear_insert_screen( void );
 

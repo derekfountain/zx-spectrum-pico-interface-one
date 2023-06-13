@@ -95,25 +95,63 @@ void gui_sm_show_eject_screen( fsm_t *fsm )
 }
 
 
-#define MAX_NUM_FILENAMES 200
-static uint8_t *filenames[MAX_NUM_FILENAMES+7];
-static uint32_t selected_filename_index;
+#define MAX_NUM_FILENAMES 25
+static uint8_t *filenames[MAX_NUM_FILENAMES+1] = { "0.mdr", 
+						   "1.mdr", 
+						   "2.mdr", 
+						   "3.mdr", 
+						   "4.mdr", 
+						   "5.mdr", 
+						   "6.mdr", 
+						   "7.mdr", 
+						   "8.mdr", 
+						   "9.mdr", 
+						   "10.mdr", 
+						   "11.mdr", 
+						   "12.mdr", 
+						   "13.mdr", 
+						   "14.mdr",
+						   NULL};
+
+static uint32_t selected_filename_index = 0;
+static uint32_t num_filenames_read;
 void gui_sm_show_insert_screen( fsm_t *fsm )
 {
-  filenames[0] = NULL;
-  filenames[1] = NULL;
-  filenames[2] = NULL;
-  selected_filename_index = 3;
+  num_filenames_read = 15; //read_directory_files( &filenames[selected_filename_index],
+  //		      MAX_NUM_FILENAMES );
 
-  uint32_t num_filenames_read = read_directory_files( &filenames[selected_filename_index],
-						      10/*MAX_NUM_FILENAMES*/ );
+  /* Fill in bottom of the array so it doesn't print rubbish off the bottom of the list */
+//  filenames[num_filenames_read] = NULL;
 
-  filenames[3+num_filenames_read] = NULL;
-  filenames[4+num_filenames_read] = NULL;
-  filenames[5+num_filenames_read] = NULL;
-  filenames[6+num_filenames_read] = NULL;
+  draw_insert_screen( selected_filename_index, &filenames[0] );
+}
 
-  draw_insert_screen( &filenames[selected_filename_index-3] );
+
+void gui_sm_selecting_next_file( fsm_t *fsm )
+{
+  if( selected_filename_index < num_filenames_read-1 )
+  {
+    selected_filename_index++;
+    draw_insert_screen( selected_filename_index, &filenames[0] );
+  }
+  generate_stimulus( fsm, ST_BUILTIN_YES );  
+}
+
+
+void gui_sm_selecting_previous_file( fsm_t *fsm )
+{
+  if( selected_filename_index > 0 )
+  {
+    selected_filename_index--;
+    draw_insert_screen( selected_filename_index, &filenames[0] );
+  }
+  generate_stimulus( fsm, ST_BUILTIN_YES );  
+}
+
+
+void gui_sm_action_insert( fsm_t *fsm )
+{
+  
 }
 
 
@@ -204,21 +242,6 @@ void gui_sm_data_saved( fsm_t *fsm )
   status.requesting_data_from_microdrive = -1;
 
   generate_stimulus( fsm, ST_BUILTIN_YES );  
-}
-
-
-void gui_sm_selecting_next_file( fsm_t *fsm )
-{
-}
-
-
-void gui_sm_selecting_previous_file( fsm_t *fsm )
-{
-}
-
-
-void gui_sm_action_insert( fsm_t *fsm )
-{
 }
 
 

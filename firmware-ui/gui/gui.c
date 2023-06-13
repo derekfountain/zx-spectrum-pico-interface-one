@@ -93,19 +93,30 @@ void draw_eject_screen( status_screen_t *status )
 }
 
 
-void draw_insert_screen( uint8_t **filename_ptr )
+void draw_insert_screen( uint32_t index, uint8_t *filename_ptr[] )
 {
   oled_clear();
+
+  int32_t display_index = index - 3;
 
   uint8_t line = 0;
   for( uint8_t i = 0; i < 7; i++ )
   {
-    if( *filename_ptr != NULL )
+    if( display_index < 0 )
     {
-      oled_display_selectable_filename( *filename_ptr, line );
       line += 9;
+      display_index++;
     }
-    *filename_ptr++;
+    else
+    {
+      if( filename_ptr[display_index] != NULL )
+      {
+	oled_display_selectable_filename( filename_ptr[display_index], line, (line == 27) );
+      }
+      line += 9;
+
+      display_index++;
+    }
   }
 
   oled_update();  

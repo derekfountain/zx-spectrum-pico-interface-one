@@ -179,10 +179,20 @@ void oled_display_test_value( uint32_t val )
 }
 
 
-void oled_display_selectable_filename( uint8_t *filename, uint32_t ypos )
+void oled_display_selectable_filename( uint8_t *filename, uint32_t ypos, bool invert )
 {
   if( filename != NULL )
   {
-    ssd1306_draw_string( &display, 0, ypos, 1, filename, 0 );
+    // FIXME I want this displayed in inverse, but there's a bug in the display routine
+    // which stops that working. Need to fix that, but in the meantime I highlight with
+    // a different > display < 
+    if( invert )
+    {
+      uint8_t line[32];
+      snprintf( line, 32, ">%s<", filename );
+      ssd1306_draw_string( &display, 0, ypos, 1, line, 0 );
+    }
+    else
+      ssd1306_draw_string( &display, 6, ypos, 1, filename, 0 );
   }
 }
