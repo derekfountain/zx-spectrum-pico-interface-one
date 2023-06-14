@@ -683,9 +683,9 @@ int main( void )
 #if TEST_SETUP
   /* Read named files from SD card and insert each one that exists */
   uint8_t *mdr_files[] = {"1.mdr", 
-			  "2.mdr", 
-			  "3.mdr", 
-			  "4.mdr", 
+			  "2x.mdr", 
+			  "3x.mdr", 
+			  "4x.mdr", 
 			  "5.mdr", 
 			  "6.mdr", 
 			  "7.mdr", 

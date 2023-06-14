@@ -218,6 +218,11 @@ the GUI if deemed required.
 ** Still undecided. I do now have 8 GPIOs free, I could do it the easy way
 
 
+3-way RUN switch. I'm now having to power cycle the whole machine in order to
+reset the UI Pico. A push to make switch which grounds all the RUN pins would
+be very handy now.
+
+
 Buzzer required
 : Or not. It'll sound crap.
 : I could use a motor, which will at least sound a bit more realistic

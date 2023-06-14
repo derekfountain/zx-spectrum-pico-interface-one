@@ -151,7 +151,16 @@ void gui_sm_selecting_previous_file( fsm_t *fsm )
 
 void gui_sm_action_insert( fsm_t *fsm )
 {
-  
+  /* Insert MDR files into some drives. This is test code, to be removed */
+  work_insert_mdr_t *work_ptr = malloc( sizeof(work_insert_mdr_t) );
+
+  work_ptr->microdrive_index = status.selected;
+  work_ptr->filename         = filenames[selected_filename_index];
+
+  insert_work( WORK_INSERT_MDR, work_ptr );
+
+  clear_insert_screen();  
+  generate_stimulus( fsm, ST_BUILTIN_YES );    
 }
 
 
