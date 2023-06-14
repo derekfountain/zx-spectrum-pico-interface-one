@@ -679,13 +679,13 @@ int main( void )
   /* Set requests for microdrive status running */
   add_repeating_timer_ms( STATUS_TIMER_PERIOD_MS, add_work_request_status, NULL, &repeating_status_timer );
 
-#define TEST_SETUP 1
+#define TEST_SETUP 0
 #if TEST_SETUP
   /* Read named files from SD card and insert each one that exists */
   uint8_t *mdr_files[] = {"1.mdr", 
-			  "2x.mdr", 
-			  "3x.mdr", 
-			  "4x.mdr", 
+			  "2.mdr", 
+			  "3.mdr", 
+			  "4.mdr", 
 			  "5.mdr", 
 			  "6.mdr", 
 			  "7.mdr", 
@@ -702,6 +702,25 @@ int main( void )
     insert_work( WORK_INSERT_MDR, work_ptr );
   }
 #endif
+
+  /* Loop over contents of config file on the SD card, load each image into a drive */
+  uint8_t *mdr_filename;
+  if( (mdr_filename = open_config_file()) != NULL )
+  {
+    uint8_t mdr_index = 0;
+    do
+    {
+      /* Insert MDR file from config into drive */
+      work_insert_mdr_t *work_ptr = malloc( sizeof(work_insert_mdr_t) );
+
+      work_ptr->microdrive_index = mdr_index;
+      work_ptr->filename         = malloc( strlen( mdr_filename )+1 );
+      strcpy( work_ptr->filename, mdr_filename );
+
+      insert_work( WORK_INSERT_MDR, work_ptr );
+    }
+    while( (++mdr_index != NUM_MICRODRIVES) && ((mdr_filename = next_config_entry()) != NULL ) );
+  }
 
   /* Create the finite state machine which operates the GUI */
   if( (gui_fsm=create_fsm( query_gui_fsm_map(),

@@ -66,6 +66,55 @@ uint8_t unmount_sd_card( void )
 }
 
 
+#define MAX_MDR_FILENAME_LENGTH 32
+static uint8_t config_mdr_filename[MAX_MDR_FILENAME_LENGTH+1];
+static FIL     config_file_handle;
+static bool    config_file_open;
+uint8_t *open_config_file( void )
+{
+  config_file_open = false;
+
+  FRESULT fr = f_open( &config_file_handle, "zxes_config.txt", FA_READ );
+  if( fr )
+    return NULL;
+  
+  if( f_gets( config_mdr_filename, MAX_MDR_FILENAME_LENGTH, &config_file_handle ) == NULL )
+  {
+    f_close( &config_file_handle );
+    return NULL;
+  }
+
+  if( config_mdr_filename[ strlen(config_mdr_filename)-1 ] == '\n' )
+    config_mdr_filename[ strlen(config_mdr_filename)-1 ] = 0;
+
+  config_file_open = true;
+
+  return config_mdr_filename;
+}
+
+
+uint8_t *next_config_entry( void )
+{
+  if( config_file_open )
+  {
+    if( f_gets( config_mdr_filename, MAX_MDR_FILENAME_LENGTH, &config_file_handle ) == NULL )
+    {
+      f_close( &config_file_handle );
+      config_file_open = false;
+      return NULL;
+    }
+    else
+    {
+      return config_mdr_filename;
+    }
+  }
+  else
+  {
+    return NULL;
+  }
+}
+
+
 uint32_t read_directory_files( uint8_t **addr_ptr, uint32_t max_num_filenames )
 {
   for( uint32_t filename_index = 0; filename_index < max_num_filenames; filename_index++ )

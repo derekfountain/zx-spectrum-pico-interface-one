@@ -31,4 +31,7 @@ uint8_t read_mdr_file( uint8_t *filename, uint8_t *buffer, uint32_t max_length, 
 uint8_t write_mdr_file( uint8_t *filename, uint8_t *buffer, uint32_t length, uint32_t *bytes_written_ptr );
 uint32_t read_directory_files( uint8_t **addr_ptr, uint32_t max_num_filenames );
 
+uint8_t *open_config_file( void );
+uint8_t *next_config_entry( void );
+
 #endif
