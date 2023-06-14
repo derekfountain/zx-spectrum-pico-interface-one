@@ -96,32 +96,17 @@ void gui_sm_show_eject_screen( fsm_t *fsm )
 
 
 #define MAX_NUM_FILENAMES 25
-static uint8_t *filenames[MAX_NUM_FILENAMES+1] = { "0.mdr", 
-						   "1.mdr", 
-						   "2.mdr", 
-						   "3.mdr", 
-						   "4.mdr", 
-						   "5.mdr", 
-						   "6.mdr", 
-						   "7.mdr", 
-						   "8.mdr", 
-						   "9.mdr", 
-						   "10.mdr", 
-						   "11.mdr", 
-						   "12.mdr", 
-						   "13.mdr", 
-						   "14.mdr",
-						   NULL};
+static uint8_t *filenames[MAX_NUM_FILENAMES+1];
 
 static uint32_t selected_filename_index = 0;
 static uint32_t num_filenames_read;
 void gui_sm_show_insert_screen( fsm_t *fsm )
 {
-  num_filenames_read = 15; //read_directory_files( &filenames[selected_filename_index],
-  //		      MAX_NUM_FILENAMES );
+  num_filenames_read = read_directory_files( &filenames[0],
+					     MAX_NUM_FILENAMES );
 
   /* Fill in bottom of the array so it doesn't print rubbish off the bottom of the list */
-//  filenames[num_filenames_read] = NULL;
+  filenames[num_filenames_read] = NULL;
 
   draw_insert_screen( selected_filename_index, &filenames[0] );
 }

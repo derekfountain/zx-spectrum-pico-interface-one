@@ -117,17 +117,41 @@ uint8_t *next_config_entry( void )
 
 uint32_t read_directory_files( uint8_t **addr_ptr, uint32_t max_num_filenames )
 {
-  for( uint32_t filename_index = 0; filename_index < max_num_filenames; filename_index++ )
-  {
-    uint8_t name[9];
-    snprintf( name, 9, "%d.mdr", filename_index );
-    *addr_ptr = malloc( 9 );
-    strncpy( *addr_ptr, name, 9 );
+  DIR     dir;
+  FRESULT fr = f_opendir( &dir, "/" );
 
-    *addr_ptr++;
+  uint32_t filenames_read = 0;
+
+  if( fr == 0 )
+  {
+    while( filenames_read < max_num_filenames )
+    {
+      static FILINFO fno;
+
+      fr = f_readdir( &dir, &fno );
+      if( (fr != FR_OK) || (fno.fname[0] == 0) )
+	break;
+
+      if( fno.fattrib & AM_DIR )
+	continue;
+      
+      uint8_t filename_len = strlen( fno.fname );
+      if( filename_len < 5 )
+	continue;
+
+      if( strncmp( fno.fname+filename_len-4, ".mdr", 4 ) != 0 )
+	continue;
+
+      *addr_ptr = malloc( filename_len + 1 );
+      strncpy( *addr_ptr, fno.fname, filename_len );
+
+      *addr_ptr++;
+      
+      filenames_read++;
+    }
   }
 
-  return max_num_filenames;
+  return filenames_read;
 }
 
 
