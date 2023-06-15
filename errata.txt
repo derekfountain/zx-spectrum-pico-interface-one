@@ -223,6 +223,10 @@ reset the UI Pico. A push to make switch which grounds all the RUN pins would
 be very handy now.
 
 
+ZX Reset switch, since mine is currently a dangling microswitch.
+
+ZX power toggle, since I don't have one.
+
 Buzzer required
 : Or not. It'll sound crap.
 : I could use a motor, which will at least sound a bit more realistic
