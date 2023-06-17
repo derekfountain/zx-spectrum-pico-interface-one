@@ -157,6 +157,16 @@ PSRAM footprint is missing the pin-1 dot on the silkscreen.
 : Needs doing
 
 
+ROMCS needs to support devices like Multiface which might be behind the device.
+ROMCS into the ZX is permanently at 5V so as to disable the Spectrum's internal
+ROM. Leave that alone. Link the rear edge connector ROMCS to the data bus level
+shifter's /CE line via a weak pull down resistor. If a MF device pulls the line
+up because it wants to supply the ROM, this will disable my level shifter and
+the data bus will go HIZ.
+: Done on schematic
+: Tested on board, best I can
+
+
 OLED CLK and SDA signals are transposed. I've labelled Pico3 GPIO4 as CLK and
 GPIO5 and SDA. Check the A4 pin out diagram: GPIO4 is SDA and GPIO5 is CLK.
 This is a hardware I2C bus so I can't switch them in software.
@@ -178,19 +188,15 @@ to have the encorder out the front.
 Rotary encoder pins are in sequence SW, DT, CLK, the example code I had ready
 is CLK, DT, SW.
 : Fixed in code
-:: I need to decide whether to change this, it's probably OK as it is
 
 
-SPI is not suitable for the Pico to Pico comms. Switched to UART. Connected
-UART0 (GPIOs 0 to 3) on UI Pico to UART0 (GPIOs 12 to 15) on IO Pico.
+SPI is not suitable for the Pico to Pico comms. Switched to TP link, pins
+GPIO0 and GPI1 on the UI Pico, crossed over to pins GPIO12 and GPIO13
+on the IO Pico.
 : Fixed on board (soldered wires)
 : Fixed in code
 : Fixed on schematic
 :: Needs fixing on PCB
----
-: UARTs were too slow, I've switched again to the TP PIO link
-:: This freed up the CTS/RTS pair so I have 2 GPIOs free again
-:: Schematic and board updated, code working
 
 
 SD Card reader card detect pin needs connecting up.
@@ -199,40 +205,24 @@ SD Card reader card detect pin needs connecting up.
 :: Needs fixing on PCB
 
 
-LED output. 8 LEDs for 8 microdrives isn't practical, I don't have the GPIOs and
-the wiring is going to get very complicated. So 2 LEDs: one green to show any
-microdrive is inserted, and one red to show any microdrive is motor on. For the
-motor on LED, connect IO GPIO11 a output to a red LED via suitable resistor. Also
-connect that signal to UI Pico GPIO27 as input, allowing UI Pico to know when any
-motor is on. This is assumed to be useful for the GUI, but might not be
-required.
-For cartridge-inserted, connect UI GPIO11 as output to the green LED via series
-resistor according to LED chosen.
-Code can then set green LED on whenever a cartridge is inserted. Red LED can be lit
-by IO Pico when a motor is on, and the UI Pico will see that signal so can update
-the GUI if deemed required.
-: Schematic updated, nothing tested
-:: Confirm R value and footprint for suitable LEDs
-: All needs doing after test on breadboard
-** Undecided. A 74HS595 is serial in, 8-output, I have the GPIOs for that.
-** Still undecided. I do now have 8 GPIOs free, I could do it the easy way
+LED output. I'm going to do it the easy way: 8 red LEDs connected to
+8 GPIOs on the UI Pico.
+: Needs testing
 
 
 3-way RUN switch. I'm now having to power cycle the whole machine in order to
-reset the UI Pico. A push to make switch which grounds all the RUN pins would
-be very handy now.
+reset the UI Pico. A push to make switch which grounds all the RUN pins is
+required.
+: Tested, working on hardware
+: Added to schematic
 
 
 ZX Reset switch, since mine is currently a dangling microswitch.
+: Added to schematic
 
-ZX power toggle, since I don't have one.
-
-Buzzer required
-: Or not. It'll sound crap.
-: I could use a motor, which will at least sound a bit more realistic
 
 Input switches. The GUI is too messy with just the rotary encoder. I need a couple
-of switches as extra inputs, maybe like "Action" and "Cancel".
+of switches as extra inputs, "Action" and "Cancel".
 : Schematic updated
 : Tested and working on breadboard. I used UI GPIOs 26 and 22.
 
