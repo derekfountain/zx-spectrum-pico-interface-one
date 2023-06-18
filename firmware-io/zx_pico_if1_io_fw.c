@@ -797,6 +797,8 @@ int __time_critical_func(main)( void )
       io_to_ui_status_response_t status_response;
       for( uint8_t i=0; i < NUM_MICRODRIVES; i++ )
       {
+	status_response.motor_on[i] = is_mdr_motor_on( i );
+
 	if( is_cartridge_inserted(i) )
 	{
 	  if( is_cartridge_modified(i) )

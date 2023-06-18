@@ -255,6 +255,13 @@ void set_cartridge_ejected_to_sd( microdrive_index_t which )
 }
 
 
+/* Answers whether the given microdrive motor is on */
+bool is_mdr_motor_on( microdrive_index_t which )
+{
+  return microdrive[which].motor_on;
+}
+
+
 /*
  * Advance the given microdrive's head position on the tape.
  * Wrap at the "end" of the tape.

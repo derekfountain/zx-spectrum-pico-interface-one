@@ -206,8 +206,10 @@ SD Card reader card detect pin needs connecting up.
 
 
 LED output. I'm going to do it the easy way: 8 red LEDs connected to
-8 GPIOs on the UI Pico.
-: Needs testing
+8 GPIOs on the UI Pico. 330R with the 3mm reds I have looks perfect.
+: Schematic updated, 2 LEDs tested on prototype
+: Need to feed all 8 connections to a header, I don't think trying to
+  mount them on the PCB and then line them up with holes will work
 
 
 3-way RUN switch. I'm now having to power cycle the whole machine in order to

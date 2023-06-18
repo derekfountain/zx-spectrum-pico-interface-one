@@ -86,6 +86,16 @@ const uint8_t LED_PIN = PICO_DEFAULT_LED_PIN;
 #define ACTION_SW_GP  26
 #define CANCEL_SW_GP  22
 
+ /* LED pins */
+const uint8_t MD0_LED_GP =  9;
+const uint8_t MD1_LED_GP = 11;
+const uint8_t MD2_LED_GP = 12;
+const uint8_t MD3_LED_GP = 13;
+const uint8_t MD4_LED_GP = 14;
+const uint8_t MD5_LED_GP = 15;
+const uint8_t MD6_LED_GP = 20;
+const uint8_t MD7_LED_GP = 21;
+
 /* Test pin */
 const uint8_t  TEST_OUTPUT_GP = 10;
 
@@ -96,7 +106,7 @@ static live_microdrive_data_t live_microdrive_data;
 auto_init_mutex( live_microdrive_data_mutex );
 
 /* Timer used to fetch status from IO Pico every so often */
-#define STATUS_TIMER_PERIOD_MS 500
+#define STATUS_TIMER_PERIOD_MS 200
 static repeating_timer_t repeating_status_timer;
 
 /* Room for one full MDR image to work with. Includes w/p byte */
@@ -382,6 +392,16 @@ static void work_request_status( void )
   io_to_ui_status_response_t status_struct;
   ui_link_receive_buffer( pio0, linkin_sm, linkout_sm, (uint8_t*)&status_struct, sizeof(io_to_ui_status_response_t) );
 
+  /* Light the LEDs as per status from IO Pico */
+  gpio_put( MD0_LED_GP, status_struct.motor_on[0] );
+  gpio_put( MD1_LED_GP, status_struct.motor_on[1] );
+  gpio_put( MD2_LED_GP, status_struct.motor_on[2] );
+  gpio_put( MD3_LED_GP, status_struct.motor_on[3] );
+  gpio_put( MD4_LED_GP, status_struct.motor_on[4] );
+  gpio_put( MD5_LED_GP, status_struct.motor_on[5] );
+  gpio_put( MD6_LED_GP, status_struct.motor_on[6] );
+  gpio_put( MD7_LED_GP, status_struct.motor_on[7] );
+
   /* Look for microdrives which need their cartridge saving */
   for( microdrive_index_t microdrive_index = 0; microdrive_index < NUM_MICRODRIVES; microdrive_index++ )
   {
@@ -577,8 +597,17 @@ int main( void )
   set_sys_clock_khz( OVERCLOCK, 1 );
 #endif
 
-  gpio_init(LED_PIN); gpio_set_dir(LED_PIN, GPIO_OUT);
-  gpio_put( LED_PIN, 0 );
+  gpio_init( LED_PIN ); gpio_set_dir( LED_PIN, GPIO_OUT ); gpio_put( LED_PIN, 0 );
+
+  /* Drive motor LEDs are simple (at least for now while I have the GPIOs) */
+  gpio_init( MD0_LED_GP ); gpio_set_dir( MD0_LED_GP, GPIO_OUT ); gpio_put( MD0_LED_GP, 0 );
+  gpio_init( MD1_LED_GP ); gpio_set_dir( MD1_LED_GP, GPIO_OUT ); gpio_put( MD1_LED_GP, 0 );
+  gpio_init( MD2_LED_GP ); gpio_set_dir( MD2_LED_GP, GPIO_OUT ); gpio_put( MD2_LED_GP, 0 );
+  gpio_init( MD3_LED_GP ); gpio_set_dir( MD3_LED_GP, GPIO_OUT ); gpio_put( MD3_LED_GP, 0 );
+  gpio_init( MD4_LED_GP ); gpio_set_dir( MD4_LED_GP, GPIO_OUT ); gpio_put( MD4_LED_GP, 0 );
+  gpio_init( MD5_LED_GP ); gpio_set_dir( MD5_LED_GP, GPIO_OUT ); gpio_put( MD5_LED_GP, 0 );
+  gpio_init( MD6_LED_GP ); gpio_set_dir( MD6_LED_GP, GPIO_OUT ); gpio_put( MD6_LED_GP, 0 );
+  gpio_init( MD7_LED_GP ); gpio_set_dir( MD7_LED_GP, GPIO_OUT ); gpio_put( MD7_LED_GP, 0 );
 
   /* Test pin, blips the scope */
   gpio_init(TEST_OUTPUT_GP); gpio_set_dir(TEST_OUTPUT_GP, GPIO_OUT);
@@ -601,6 +630,7 @@ int main( void )
   gpio_init( CANCEL_SW_GP ); gpio_set_dir( CANCEL_SW_GP, GPIO_IN ); gpio_pull_up( CANCEL_SW_GP );
 
   /* Set the handler for all 3 GPIOs */
+  // Not sure I want to duplicate this, I have the action button.
   //gpio_set_irq_enabled_with_callback( ENCODER_SW_GP, GPIO_IRQ_EDGE_FALL, true, &gpios_callback );
   gpio_set_irq_enabled_with_callback( ENCODER_A_GP, GPIO_IRQ_EDGE_FALL, true, &gpios_callback );
   gpio_set_irq_enabled( ENCODER_B_GP, GPIO_IRQ_EDGE_FALL, true );
@@ -618,15 +648,14 @@ int main( void )
 
   /*
    * I've soldered this Pico's UART0 to the IO Pico. The link was
-   * originally SPI, so the IO Pico's UART pins are connected to
-   * this Pico's SPI1 device pins. I'll cut the tracks when I've
-   * finally decided what to do, but for now set this Pico's SPI
-   * pins to inputs so they don't interfere with the UART link.
+   * originally SPI, then UART, then PIO based comms. I've cut the
+   * tracks for GPIOs 14 and 15 so I can test the LEDs (which is
+   * what they are now used for). The others I have to set this
+   * Pico's SPI pins to inputs so they don't interfere with the
+   * PIO link.
    */
   gpio_init(12); gpio_set_dir(12, GPIO_IN);
   gpio_init(13); gpio_set_dir(13, GPIO_IN);
-  gpio_init(14); gpio_set_dir(14, GPIO_IN);
-  gpio_init(15); gpio_set_dir(15, GPIO_IN);
 
   /* Outbound link, to IO Pico */
   gpio_init(LINKOUT_PIN); gpio_set_dir(LINKOUT_PIN,GPIO_OUT); gpio_put(LINKOUT_PIN, 1);

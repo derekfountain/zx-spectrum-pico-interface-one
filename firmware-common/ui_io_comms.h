@@ -90,6 +90,7 @@ ui_to_io_request_status_t;
 typedef struct _io_to_ui_status_response_t
 {
   microdrive_status_t status[NUM_MICRODRIVES];
+  bool                motor_on[NUM_MICRODRIVES];
 }
 io_to_ui_status_response_t;
 

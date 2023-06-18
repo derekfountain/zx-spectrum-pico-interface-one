@@ -102,5 +102,6 @@ bool is_cartridge_modified( microdrive_index_t which );
 void set_cartridge_modified( microdrive_index_t which, bool modified );
 bool is_cartridge_ejected_pending_save( microdrive_index_t which );
 void set_cartridge_ejected_to_sd( microdrive_index_t which );
+bool is_mdr_motor_on( microdrive_index_t which );
 
 #endif
