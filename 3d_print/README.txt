@@ -41,7 +41,11 @@ the Spectrum.
 I'd like a nice aluminium panel for the top surface, with drilled
 LED holes and screen print. These are cheap on JLC, just remember
 to turn off the testing. Round the corners, needs 2 or 4 screw
-holes.
+holes. 90mm wide, 40mm high.
+
+ADDITIONAL: I've done the aluminium plate, but I'm not sure how the
+red LEDs will look against the silver. Might as well make a black
+one as well so I can choose.
 
 
 From TomD:
