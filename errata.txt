@@ -229,6 +229,12 @@ of switches as extra inputs, "Action" and "Cancel".
 : Tested and working on breadboard. I used UI GPIOs 26 and 22.
 
 
+Test blipper points were on header connectors. Those header connectors have
+been removed as they're no longer needed. The test blipper points are, so
+ensure they're exposed to a footprint.
+: Needed on PCB
+
+
 Case. 3D printed case required. I'm thinking of a tray to sit the lie-flat PCB in,
 edge connectors front and back. It'll need screw point to hold the board, so the
 board needs screw holes at the corners.

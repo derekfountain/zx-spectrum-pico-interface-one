@@ -1577,6 +1577,7 @@
     )
   )
 
+
   (junction (at 132.715 115.57) (diameter 0) (color 0 0 0 0)
     (uuid 18571ca4-65c3-4682-9906-fd8c41251325)
   )
@@ -2152,6 +2153,14 @@
   (text "STLINK-V2 programming connector" (at 134.747 180.975 0)
     (effects (font (size 1.27 1.27)) (justify left bottom))
     (uuid f0a9dea1-fa5e-4e7c-acb2-2799e2894ecb)
+  )
+  (text "EXCLUDED FROM BOARD" (at 85.09 94.488 0)
+    (effects (font (size 1.27 1.27)) (justify left bottom))
+    (uuid f284e134-479f-49fe-b527-c6c260342f88)
+  )
+  (text "EXCLUDED FROM BOARD" (at 130.048 196.596 0)
+    (effects (font (size 1.27 1.27)) (justify left bottom))
+    (uuid ff54da54-aa6a-42a2-bc0e-cc5a389093ad)
   )
 
   (global_label "ZXD1" (shape bidirectional) (at 26.67 36.83 180) (fields_autoplaced)
@@ -3489,7 +3498,7 @@
   )
 
   (symbol (lib_id "Connector:Conn_01x06_Female") (at 99.822 81.28 0) (unit 1)
-    (in_bom yes) (on_board yes) (fields_autoplaced)
+    (in_bom yes) (on_board no) (fields_autoplaced)
     (uuid b001f89d-9f48-429a-b10f-bfc22b561bf3)
     (property "Reference" "J101" (id 0) (at 101.6 81.2799 0)
       (effects (font (size 1.27 1.27)) (justify left))
@@ -3791,7 +3800,7 @@
   )
 
   (symbol (lib_id "Connector:Conn_01x03_Female") (at 148.082 190.5 0) (mirror y) (unit 1)
-    (in_bom yes) (on_board yes)
+    (in_bom yes) (on_board no)
     (uuid f1c41838-eb1e-47a4-8dba-8e7e84008063)
     (property "Reference" "J1" (id 0) (at 150.8252 183.261 0))
     (property "Value" "Conn_01x03_Female" (id 1) (at 150.8252 185.5724 0))
@@ -4045,14 +4054,14 @@
     (path "/95a6eb69-d4c1-4a7e-a8e8-144430faf0e2/ab3bf034-469b-4932-acf6-7702bff9ed96"
       (reference "J202") (unit 1) (value "Conn_01x06_Female") (footprint "Connector_PinHeader_2.54mm:PinHeader_1x06_P2.54mm_Vertical")
     )
-    (path "/acda4c69-0a65-473b-ab4f-e765252d7da2/cb841d88-a75c-4f80-ba44-02c4407c29e0"
-      (reference "J302") (unit 1) (value "Conn_01x04_Female") (footprint "Connector_PinHeader_2.54mm:PinHeader_1x04_P2.54mm_Vertical")
+    (path "/acda4c69-0a65-473b-ab4f-e765252d7da2/2e0e69b0-32c8-43e8-a14f-982c095ddf69"
+      (reference "J301") (unit 1) (value "Conn_01x10_Female") (footprint "")
     )
     (path "/acda4c69-0a65-473b-ab4f-e765252d7da2/93673449-babe-4629-b5c4-4cd05c3c812a"
       (reference "J303") (unit 1) (value "Conn_01x03_Female") (footprint "Connector_PinHeader_2.54mm:PinHeader_1x03_P2.54mm_Vertical")
     )
-    (path "/acda4c69-0a65-473b-ab4f-e765252d7da2/b286c952-0d40-46dc-91e0-859f779bcde5"
-      (reference "J304") (unit 1) (value "Conn_01x06_Female") (footprint "Connector_PinHeader_2.54mm:PinHeader_1x06_P2.54mm_Vertical")
+    (path "/acda4c69-0a65-473b-ab4f-e765252d7da2/3606aacd-196f-47ae-a3bb-b12457540919"
+      (reference "J?") (unit 1) (value "Conn_01x06_Female") (footprint "")
     )
     (path "/e33c0819-efed-4286-8863-9252958751f9"
       (reference "Q1") (unit 1) (value "PMBT2222A") (footprint "Package_TO_SOT_SMD:TSOT-23_HandSoldering")

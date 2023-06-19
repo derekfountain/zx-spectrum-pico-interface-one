@@ -798,6 +798,14 @@
     (effects (font (size 1.27 1.27)) (justify left bottom))
     (uuid 0b90d422-0e98-4541-bf14-be32925f63c2)
   )
+  (text "EXCLUDED FROM BOARD" (at 214.122 118.618 0)
+    (effects (font (size 1.27 1.27)) (justify left bottom))
+    (uuid 16d2e667-d32a-4996-8701-6e44aa055184)
+  )
+  (text "EXCLUDED FROM BOARD" (at 162.56 115.062 0)
+    (effects (font (size 1.27 1.27)) (justify left bottom))
+    (uuid 1de84cce-cc9d-496b-8ff3-aad6f2fded95)
+  )
   (text "Pico watches the /IORQ waiting for a Z80 IN or OUT. It knows which from the /RD and /WR lines.\nThe IF1_PORT_ACTIVE input comes from the ROM Pico (which has access to the address bus). That\nline active indicates the value on the lower address bus is one of the IF1 IO ports (0xE7 or\n0xEF).\n\nThis Pico does the data bus level shifter direction change for both a memory read and an IO\nread. The PIO program which changes the level shifter (BUS_DIRECTION) runs here. That's why\nROM_READ_INV_3V3 is required as an input here.\n\n/WAIT is output from here to the Z80 when the Pico code needs the Z80 to wait while the byte\nfor the microdrive is dealt with.\n\nMDR data image, plus status comms, etc., will come in from the UI Pico via PIO driven link.\n"
     (at 25.654 147.066 0)
     (effects (font (size 1.27 1.27)) (justify left bottom))
@@ -1138,7 +1146,7 @@
   )
 
   (symbol (lib_id "Connector:Conn_01x03_Female") (at 220.345 109.855 0) (mirror y) (unit 1)
-    (in_bom yes) (on_board yes)
+    (in_bom yes) (on_board no)
     (uuid 7fe63843-f758-4c7e-a4e3-75a239e41188)
     (property "Reference" "J201" (id 0) (at 223.0882 102.616 0))
     (property "Value" "Conn_01x03_Female" (id 1) (at 223.0882 104.9274 0))
@@ -1170,7 +1178,7 @@
   )
 
   (symbol (lib_id "Connector:Conn_01x06_Female") (at 180.34 101.346 0) (unit 1)
-    (in_bom yes) (on_board yes) (fields_autoplaced)
+    (in_bom yes) (on_board no) (fields_autoplaced)
     (uuid ab3bf034-469b-4932-acf6-7702bff9ed96)
     (property "Reference" "J202" (id 0) (at 181.61 101.3459 0)
       (effects (font (size 1.27 1.27)) (justify left))
