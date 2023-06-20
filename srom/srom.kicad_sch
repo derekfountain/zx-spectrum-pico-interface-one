@@ -3979,14 +3979,8 @@
     (path "/acda4c69-0a65-473b-ab4f-e765252d7da2/9111f657-cc15-4eeb-9b4d-78f61ca6b08c"
       (reference "#PWR0303") (unit 1) (value "GND") (footprint "")
     )
-    (path "/acda4c69-0a65-473b-ab4f-e765252d7da2/15cfbe23-377c-4969-ad37-1096d7e4c15a"
-      (reference "#PWR0304") (unit 1) (value "GND") (footprint "")
-    )
     (path "/acda4c69-0a65-473b-ab4f-e765252d7da2/ff245775-0305-430e-bd46-67e73abfc678"
       (reference "#PWR0305") (unit 1) (value "GND") (footprint "")
-    )
-    (path "/acda4c69-0a65-473b-ab4f-e765252d7da2/8b8721ba-6a83-408a-8bb7-b7a216eb7d4a"
-      (reference "#PWR0306") (unit 1) (value "GND") (footprint "")
     )
     (path "/acda4c69-0a65-473b-ab4f-e765252d7da2/a58c7f3b-6519-4b5a-8453-2d4882e5998e"
       (reference "#PWR0307") (unit 1) (value "GND") (footprint "")
@@ -4017,30 +4011,6 @@
     )
     (path "/986f0686-4dd2-4d11-a20b-857347ffd112"
       (reference "D1") (unit 1) (value "D_Schottky") (footprint "Diode_SMD:D_1206_3216Metric_Pad1.42x1.75mm_HandSolder")
-    )
-    (path "/acda4c69-0a65-473b-ab4f-e765252d7da2/dd1afd5a-4803-4c9f-9eed-69db22719f8f"
-      (reference "D301") (unit 1) (value "LED_Small") (footprint "LED_THT:LED_D3.0mm")
-    )
-    (path "/acda4c69-0a65-473b-ab4f-e765252d7da2/2be75773-d22c-488c-80e7-d1f5dc85562e"
-      (reference "D302") (unit 1) (value "LED_Small") (footprint "LED_THT:LED_D3.0mm")
-    )
-    (path "/acda4c69-0a65-473b-ab4f-e765252d7da2/9fab0b6b-f61f-450d-8d6b-05d54a281198"
-      (reference "D303") (unit 1) (value "LED_Small") (footprint "LED_THT:LED_D3.0mm")
-    )
-    (path "/acda4c69-0a65-473b-ab4f-e765252d7da2/05918a42-6bc7-4852-a5db-f96da147fe26"
-      (reference "D304") (unit 1) (value "LED_Small") (footprint "LED_THT:LED_D3.0mm")
-    )
-    (path "/acda4c69-0a65-473b-ab4f-e765252d7da2/dab0622e-5a34-439b-9a97-82d8a39e233f"
-      (reference "D305") (unit 1) (value "LED_Small") (footprint "LED_THT:LED_D3.0mm")
-    )
-    (path "/acda4c69-0a65-473b-ab4f-e765252d7da2/c89357af-2c16-4a83-a372-8885f91fa322"
-      (reference "D306") (unit 1) (value "LED_Small") (footprint "LED_THT:LED_D3.0mm")
-    )
-    (path "/acda4c69-0a65-473b-ab4f-e765252d7da2/fd1ed6b7-b499-4b54-9151-a9feee084dc5"
-      (reference "D307") (unit 1) (value "LED_Small") (footprint "LED_THT:LED_D3.0mm")
-    )
-    (path "/acda4c69-0a65-473b-ab4f-e765252d7da2/64ee3811-10fa-4d13-8406-7019cfb56722"
-      (reference "D308") (unit 1) (value "LED_Small") (footprint "LED_THT:LED_D3.0mm")
     )
     (path "/f1c41838-eb1e-47a4-8dba-8e7e84008063"
       (reference "J1") (unit 1) (value "Conn_01x03_Female") (footprint "Connector_PinHeader_2.54mm:PinHeader_1x03_P2.54mm_Vertical")
@@ -4102,14 +4072,8 @@
     (path "/aca8b71f-d8d3-458d-8dcf-b90c56b7fb1f"
       (reference "SW101") (unit 1) (value "SW_SPST") (footprint "Button_Switch_THT:SW_Tactile_SKHH_Angled")
     )
-    (path "/acda4c69-0a65-473b-ab4f-e765252d7da2/08ba02a4-e0bf-4061-acae-1741db9c8a7c"
-      (reference "SW301") (unit 1) (value "SW_MEC_5E") (footprint "Button_Switch_THT:SW_PUSH_6mm_H4.3mm")
-    )
     (path "/acda4c69-0a65-473b-ab4f-e765252d7da2/638a7863-4492-4017-868c-35057f4f521d"
       (reference "SW302") (unit 1) (value "RotaryEncoder_Switch") (footprint "Rotary_Encoder:RotaryEncoder_Bourns_Vertical_PEC12R-3xxxF-Sxxxx")
-    )
-    (path "/acda4c69-0a65-473b-ab4f-e765252d7da2/4dfaf842-7afe-4241-b04b-bf557cae6b52"
-      (reference "SW303") (unit 1) (value "SW_MEC_5E") (footprint "Button_Switch_THT:SW_PUSH_6mm_H4.3mm")
     )
     (path "/463638cf-e432-4d54-a565-24568ce0236f/5d2d49a1-2e35-4dec-956e-7027af4912e9"
       (reference "SW401") (unit 1) (value "SW_SPST") (footprint "Button_Switch_THT:SW_Tactile_SKHH_Angled")
