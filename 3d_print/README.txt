@@ -48,6 +48,9 @@ red LEDs will look against the silver. Might as well make a black
 one as well so I can choose.
 
 
+ADDITIONAL: I'm going to make another PCB for the controls.
+
+
 From TomD:
 
 "My side walls are 2mm thick and I find this strong enough for most
