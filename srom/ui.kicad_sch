@@ -1411,7 +1411,7 @@
       (effects (font (size 1.27 1.27)) (justify left) hide)
     )
   )
-  (global_label "3V3_PICO3" (shape input) (at 158.242 116.078 180) (fields_autoplaced)
+  (global_label "3V3_PICO1" (shape input) (at 158.242 116.078 180) (fields_autoplaced)
     (effects (font (size 1.27 1.27)) (justify right))
     (uuid 363c237b-4bac-4f15-b9e5-b4310dd091b6)
     (property "Intersheet References" "${INTERSHEET_REFS}" (id 0) (at 145.6689 115.9986 0)
