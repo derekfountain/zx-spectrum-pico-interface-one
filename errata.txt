@@ -138,7 +138,7 @@ v1.3 This version was made into board#2
 
 Stagger the rows of data bus resistors. Offset each from the ones either side of
 it so I can get the larger tweezers in. Or space them out a bit more.
-: Needs doing
+: Done
 
 
 First attempt NOPOPed the extra level shifter and added a series 100R resistor
@@ -150,11 +150,11 @@ timing.
   level was wrong. It went from 2.5V to about 1.5V. I didn't investigate, I
   just took the R100 off and added the level shifter.
 :: Remove the resistor footprint and NOPOP silkscreen
-: Needs doing
+: Footprints removed
 
 
 PSRAM footprint is missing the pin-1 dot on the silkscreen.
-: Needs doing
+: Done on all components
 
 
 ROMCS needs to support devices like Multiface which might be behind the device.
@@ -170,19 +170,18 @@ the data bus will go HIZ.
 OLED CLK and SDA signals are transposed. I've labelled Pico3 GPIO4 as CLK and
 GPIO5 and SDA. Check the A4 pin out diagram: GPIO4 is SDA and GPIO5 is CLK.
 This is a hardware I2C bus so I can't switch them in software.
-: Needs doing
+: Fixed on schematic and board
 
 
 OLED screen is currently mounted upside and out the back. Work out where the
 screen is going to be mounted and set the header correctly.
-: Needs doing
+: Checked, mounting is correct
 
 
 Rotary encoder connection is reversed on the board, it needs to stick out the
 back for the pins to be connected up correctly. I think it needs flipping over
-to have the encorder out the front.
-: Needs doing
-:: I need to decide on the final layout before changing this
+to have the encoder out the front.
+: Checked, it's now correct
 
 
 Rotary encoder pins are in sequence SW, DT, CLK, the example code I had ready
@@ -196,20 +195,19 @@ on the IO Pico.
 : Fixed on board (soldered wires)
 : Fixed in code
 : Fixed on schematic
-:: Needs fixing on PCB
+: Fixed on new board
 
 
 SD Card reader card detect pin needs connecting up.
 : Done on board, I used GPIO28 as input
 : Fixed on schematic
-:: Needs fixing on PCB
+: Fixed on new board
 
 
 LED output. I'm going to do it the easy way: 8 red LEDs connected to
 8 GPIOs on the UI Pico. 330R with the 3mm reds I have looks perfect.
 : Schematic updated, 2 LEDs tested on prototype
-: Need to feed all 8 connections to a header, I don't think trying to
-  mount them on the PCB and then line them up with holes will work
+: New board has 8 signals and their return on a header
 
 
 3-way RUN switch. I'm now having to power cycle the whole machine in order to
@@ -217,42 +215,50 @@ reset the UI Pico. A push to make switch which grounds all the RUN pins is
 required.
 : Tested, working on hardware
 : Added to schematic
+: Fixed on new board
 
 
 ZX Reset switch, since mine is currently a dangling microswitch.
 : Added to schematic
+: Fixed on new board
 
 
 Input switches. The GUI is too messy with just the rotary encoder. I need a couple
 of switches as extra inputs, "Action" and "Cancel".
 : Schematic updated
 : Tested and working on breadboard. I used UI GPIOs 26 and 22.
+: Fixed on new board
 
 
 Test blipper points were on header connectors. Those header connectors have
 been removed as they're no longer needed. The test blipper points are, so
 ensure they're exposed to a footprint.
-: Needed on PCB
+: Done
 
 
 Case. 3D printed case required. I'm thinking of a tray to sit the lie-flat PCB in,
-edge connectors front and back. It'll need screw point to hold the board, so the
-board needs screw holes at the corners.
+edge connectors front and back. Add a couple of holes for posts or screws.
+: Holes in PCB added
 
 
-Daughterboard. The screen, rotary and 2 input switches need to be on a separate
-daughterboard. This will be screw-mounted on mountpoints on the 3D printed case
-and connected to the main PCB via a ribbon cable. I need
+Daughterboard, fits on top like a shield. The screen, 2 input switches and 8 LED
+signals need to be on a separate daughterboard. This will be mounted over the top
+of the PCB, above the Picos. Connected via 3 rows of header pins, sockets on PCB
+which should be spaced out so they provide mechanical support for the top board.
+The aluminium faceplate sits over the top of this. I need
 
 3V3
 GND
 OLED CLK
 OLED DAT
-Rotary DT
-Rotary CLK
-Rotary Switch
 Action switch signal
 Cancel switch signal
+LEDs 0 to 7 inclusive
+Common LEDs return
 
-which is 9 signals. Short length of ribbon cable with crimped connectors should do
-the job.
+which is 15 signals, all carried via header pins.
+
+This board should be 2.0mm if possible so it can handle the pressing of the buttons.
+I've got the header right under the button so it should be OK at 1.6mm.
+: Headers added to the PCB
+: Daughterboard design needs doing
