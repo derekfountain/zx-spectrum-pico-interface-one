@@ -45,13 +45,14 @@ typedef struct _microdrive_inserted_data_t
   char                    *filename;                // Name of SD card file loaded
   uint32_t                 cartridge_data_length;   // Number of bytes in the cartridge image
   write_protect_t          write_protected;         // Whether the cartridge is write protected in the IO Pico
+  cartridge_error_t        cartridge_error;         // Cartridge error status
 }
 microdrive_inserted_data_t;
 
 
 typedef struct _live_microdrive_data_t
 {
-  microdrive_index_t         microdrive_saving_to_sd;             // Which MD, if any, needs saving data out to SD
+  microdrive_index_t         microdrive_saving_to_sd;              // Which MD, if any, needs saving data out to SD
   microdrive_inserted_data_t currently_inserted[NUM_MICRODRIVES];
 }
 live_microdrive_data_t;

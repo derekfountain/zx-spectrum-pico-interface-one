@@ -45,6 +45,7 @@ typedef enum
 }
 UI_TO_IO_CMD;
 
+
 /*
  * Status the drive can be in. Whether it has a cartridge inserted,
  * whether that cartridge has been modified, etc.
@@ -57,14 +58,6 @@ typedef enum
   MD_STATUS_MDR_EJECTED_NEEDS_SAVING,
 }
 microdrive_status_t;
-
-
-/* Not sure where this is going yet */
-typedef struct _io_status_t
-{
-  uint8_t error;
-}
-io_status_t;
 
 
 /* Data structure for MDR insert command */
@@ -91,6 +84,7 @@ typedef struct _io_to_ui_status_response_t
 {
   microdrive_status_t status[NUM_MICRODRIVES];
   bool                motor_on[NUM_MICRODRIVES];
+  cartridge_error_t   cartridge_error[NUM_MICRODRIVES];
 }
 io_to_ui_status_response_t;
 

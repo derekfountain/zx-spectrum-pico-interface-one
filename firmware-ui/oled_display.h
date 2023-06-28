@@ -38,6 +38,7 @@ void oled_display_inserted_num_blocks( uint8_t num_blocks );
 void oled_display_inserted_write_protected( int8_t write_protected );
 void oled_display_msg_requesting_status( void );
 void oled_display_msg_saving_mdr_data( microdrive_index_t microdrive_index );
+void oled_display_cartridge_error( uint8_t *str );
 void oled_display_clear_msg( void );
 void oled_display_test_value( uint32_t val );
 void oled_display_eject_option( void );

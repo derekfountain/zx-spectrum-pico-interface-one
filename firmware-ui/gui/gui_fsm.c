@@ -83,6 +83,24 @@ void gui_sm_show_status( fsm_t *fsm )
     status.inserting       = false;
   }
 
+  switch( live_microdrive_data->currently_inserted[status.selected].cartridge_error )
+  {
+  case CARTRIDGE_ERR_CHECKSUM_INCORRECT:
+    status.cartridge_error_str = "Error: checksum";
+    break;
+
+  case CARTRIDGE_ERR_NEED_EJECT_BEFORE_INSERT:
+    status.cartridge_error_str = "Error: Eject first";
+    break;
+
+  case CARTRIDGE_ERR_NEED_SAVE_BEFORE_INSERT:
+    status.cartridge_error_str = "Error: Save first";
+    break;
+
+  default:
+    status.cartridge_error_str = "No error"; //NULL
+  }
+
   draw_status_screen( &status );
 }
 

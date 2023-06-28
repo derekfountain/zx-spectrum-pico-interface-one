@@ -150,23 +150,22 @@ void if1_init( void )
  * "Insert" one of the tape images into the PSRAM buffer. The PSRAM buffer
  * is where the image will be read from and written to.
  */
-void if1_mdr_insert( const microdrive_index_t which, const uint32_t psram_offset, const uint32_t length_in_bytes,
-                     const write_protect_t write_protected )
+cartridge_error_t if1_mdr_insert( const microdrive_index_t which, const uint32_t psram_offset, const uint32_t length_in_bytes,
+				  const write_protect_t write_protected )
 {
   /*
    * We can't insert a new image if there's already one there, or the ejected
    * one hasn't yet been written out to SD card. In theory the UI won't request
-   * a new insert until those conditions are sorted out. I just return
-   * quietly.
+   * a new insert until those conditions are sorted out.
    */
   if( microdrive[which].cartridge_inserted )
   {
-    return;
+    return CARTRIDGE_ERR_NEED_EJECT_BEFORE_INSERT;
   }
 
   if( microdrive[which].cartridge_ejected_pending_save )
   {
-    return;
+    return CARTRIDGE_ERR_NEED_SAVE_BEFORE_INSERT;
   }
 
   microdrive[which].cartridge_data_psram_offset = psram_offset;
@@ -193,7 +192,7 @@ void if1_mdr_insert( const microdrive_index_t which, const uint32_t psram_offset
 
   trace(TRC_IMAGE_INIT, which);
 
-  return;
+  return CARTRIDGE_ERR_OK;
 }
 
 

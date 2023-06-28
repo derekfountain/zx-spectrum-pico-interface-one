@@ -146,6 +146,17 @@ void oled_display_inserted_write_protected( int8_t write_protected )
 }
 
 
+void oled_display_cartridge_error( uint8_t *str )
+{
+  ssd1306_clear_square( &display, 0, 40, 127, 40+8 );  
+
+  if( str )
+  {
+    ssd1306_draw_string( &display, 0, 40, 1, str, 0 );
+  }
+}
+
+
 void oled_display_msg_requesting_status( void )
 {
   oled_display_clear_msg();

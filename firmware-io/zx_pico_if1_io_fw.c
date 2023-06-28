@@ -202,9 +202,9 @@ static void __time_critical_func(blip_test_pin)( void )
  * (gdb) set max-value-size unlimited
  * (gdb) p trace_table
  */
-TRACE_TYPE trace_table[NUM_TRACE_ENTRIES];
-uint8_t  trace_active=1;
-uint32_t trace_index=0;
+static TRACE_TYPE trace_table[NUM_TRACE_ENTRIES];
+static uint8_t  trace_active=1;
+static uint32_t trace_index=0;
 
 void trace( TRACE_CODE code, uint32_t data )
 {
@@ -225,8 +225,8 @@ void trace( TRACE_CODE code, uint32_t data )
  * wants to send a byte back to the ZX, or when this code wants
  * to send a byte from the IF1 back to the ZX.
  */
-PIO pio;
-uint sm_mreq;
+static PIO pio;
+static uint sm_mreq;
 
 /*
  * Mutex to protect the PSRAM SPI device from concurrent access.
@@ -235,6 +235,9 @@ uint sm_mreq;
  * on the PSRAM.
  */
 auto_init_mutex( psram_mutex );
+
+/* Each microdrive's error status as far as this code is concerned */
+static cartridge_error_t cartridge_error_status[NUM_MICRODRIVES];
 
 /*
  * I/O port handling runs in the second core.
@@ -526,6 +529,11 @@ int __time_critical_func(main)( void )
   set_sys_clock_khz( OVERCLOCK, 1 );
 #endif
 
+  for( uint8_t microdrive_index = 0; microdrive_index < NUM_MICRODRIVES; microdrive_index++ )
+  {
+    cartridge_error_status[microdrive_index] = CARTRIDGE_ERR_OK;
+  }
+
   trace(TRC_DATA_CONV,0 );
 
   /* Pull the buses to zeroes. Most of the address bus info comes from the ROM Pico */
@@ -618,6 +626,7 @@ int __time_critical_func(main)( void )
 
   if( (id1 != 0x0D) || (id2 != 0x5D) )
   {
+// Send an error to the UI here, not sure what it can do with it though
     while(1)
     {
       gpio_put(LED_PIN, 1);
@@ -768,21 +777,16 @@ int __time_critical_func(main)( void )
       if( checksum == cmd_struct.checksum )
       {
 	/* Insert MDR image in PSRAM into the IF1 code so it can be accessed */
-	if1_mdr_insert( cmd_struct.microdrive_index,
-			MICRODRIVE_CARTRIDGE_LENGTH * cmd_struct.microdrive_index,
-			cmd_struct.data_size,
-			cmd_struct.write_protected );
+	cartridge_error_status[cmd_struct.microdrive_index] =
+	                                 if1_mdr_insert( cmd_struct.microdrive_index,
+							 MICRODRIVE_CARTRIDGE_LENGTH * cmd_struct.microdrive_index,
+							 cmd_struct.data_size,
+							 cmd_struct.write_protected );
       }
       else
       {
-	/* FIXME Need to send back a try-again or something */
-	while(1)
-	{
-	  gpio_put(LED_PIN, 0);
-	  busy_wait_us_32(25000);
-	  gpio_put(LED_PIN, 1);
-	  busy_wait_us_32(25000);
-	}
+	/* Corruption in the UI->IO Pico transfer, this is unheard of in my testing */
+	cartridge_error_status[cmd_struct.microdrive_index] = CARTRIDGE_ERR_CHECKSUM_INCORRECT;
       }
     }
     break;
@@ -797,7 +801,8 @@ int __time_critical_func(main)( void )
       io_to_ui_status_response_t status_response;
       for( uint8_t i=0; i < NUM_MICRODRIVES; i++ )
       {
-	status_response.motor_on[i] = is_mdr_motor_on( i );
+	status_response.motor_on[i]        = is_mdr_motor_on( i );
+	status_response.cartridge_error[i] = cartridge_error_status[i];
 
 	if( is_cartridge_inserted(i) )
 	{

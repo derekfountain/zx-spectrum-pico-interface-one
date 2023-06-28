@@ -24,6 +24,19 @@
 typedef uint8_t tape_byte_t;
 
 /*
+ * Errors associated with cartridge insertion, etc, reported back to
+ * the GUI to give the user a clue why a cartridge hasn't inserted
+ */
+typedef enum
+{
+  CARTRIDGE_ERR_OK = 0,
+  CARTRIDGE_ERR_CHECKSUM_INCORRECT,
+  CARTRIDGE_ERR_NEED_EJECT_BEFORE_INSERT,
+  CARTRIDGE_ERR_NEED_SAVE_BEFORE_INSERT,
+}
+cartridge_error_t;
+
+/*
  * Enum just to make the code more readable. "Non zero if write protected" is defined in the MDR
  * fornmat so it's a binary flag
  */

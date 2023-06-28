@@ -349,6 +349,7 @@ static void work_insert_mdr_file( uint8_t which, uint8_t *filename )
   live_microdrive_data.currently_inserted[which].filename              = filename;
   live_microdrive_data.currently_inserted[which].cartridge_data_length = bytes_read-1;
   live_microdrive_data.currently_inserted[which].write_protected       = write_protected;
+  live_microdrive_data.currently_inserted[which].cartridge_error       = CARTRIDGE_ERR_OK;
   mutex_exit( &live_microdrive_data_mutex );
 
   /* Poke state machine to update GUI */
@@ -389,6 +390,7 @@ static void work_request_status( void )
     };
   ui_link_send_buffer( pio0, linkout_sm, linkin_sm, (uint8_t*)&cmd_struct, sizeof(ui_to_io_request_status_t) );
 
+  /* IO Pico will now send a buffer of status information */
   io_to_ui_status_response_t status_struct;
   ui_link_receive_buffer( pio0, linkin_sm, linkout_sm, (uint8_t*)&status_struct, sizeof(io_to_ui_status_response_t) );
 
@@ -409,7 +411,7 @@ static void work_request_status( void )
 	||
         (status_struct.status[microdrive_index] == MD_STATUS_MDR_EJECTED_NEEDS_SAVING) )
     {
-      /* If this one needs its data saving back to SD card, request the data for the IO Pico */
+      /* If this one needs its data saving back to SD card, request the data from the IO Pico */
       add_work_request_mdr_data( microdrive_index );
     } 
 
@@ -438,6 +440,10 @@ static void work_request_status( void )
       break;
     }
 
+    /* Finally, take a copy of the cartridge error status as reported by the IO Pico */
+    mutex_enter_blocking( &live_microdrive_data_mutex );
+    live_microdrive_data.currently_inserted[microdrive_index].cartridge_error = status_struct.cartridge_error[microdrive_index];
+    mutex_exit( &live_microdrive_data_mutex );
   }
 
   generate_stimulus( gui_fsm, ST_REQUEST_STATUS_DONE );
