@@ -734,7 +734,7 @@ int __time_critical_func(main)( void )
       /*
        * There isn't enough room to store the whole 137KB image, so receive it in 256 byte pages.
        */
-      uint8_t  checksum = 0;
+      bool     checksum_error = false;
       uint32_t pages = cmd_struct.data_size / 256;
       uint32_t final_page_size = cmd_struct.data_size - (pages * 256);
       for( uint32_t page=0; page < pages; page++ )
@@ -743,22 +743,22 @@ int __time_critical_func(main)( void )
         uint8_t page_buffer[ 256 ];
 	ui_link_receive_buffer( pio1, linkin_sm, linkout_sm, page_buffer, sizeof(page_buffer) );
 
-// Receive 2 more bytes, which is checksum for these 256 bytes
-// If they're OK, write to psram
-// Otherwise give up.
-// Might as well set a flag indicating the error and just continue the loop
+	uint16_t checksum;
+	ui_link_receive_buffer( pio1, linkin_sm, linkout_sm, (uint8_t*)&checksum, 2 );
 
-	for( uint32_t checksum_index=0; checksum_index < 256; checksum_index++ )
+	if( fletcher16( page_buffer, 256 ) == checksum )
 	{
-	  checksum += page_buffer[checksum_index];
+	  /* Work out where to store this page in the PSRAM and write it in */
+	  uint32_t psram_offset = (MICRODRIVE_CARTRIDGE_LENGTH * cmd_struct.microdrive_index)
+                                   +
+                                  (page*256);
+
+	  write_psram_block( psram_offset, page_buffer, sizeof(page_buffer) );
 	}
-
-        /* Work out where to store this page in the PSRAM and write it in */
-        uint32_t psram_offset = (MICRODRIVE_CARTRIDGE_LENGTH * cmd_struct.microdrive_index)
-                                 +
-                                (page*256);
-
-        write_psram_block( psram_offset, page_buffer, sizeof(page_buffer) );
+	else
+	{
+	  checksum_error = true;
+	}
       }
 
       /* Do the last bit */
@@ -767,26 +767,29 @@ int __time_critical_func(main)( void )
         uint8_t page_buffer[ final_page_size ];
 	ui_link_receive_buffer( pio1, linkin_sm, linkout_sm, page_buffer, sizeof(page_buffer) );
 
-// Same checksum approach here
+	uint16_t checksum;
+	ui_link_receive_buffer( pio1, linkin_sm, linkout_sm, (uint8_t*)&checksum, 2 );
 
-	for( uint32_t checksum_index=0; checksum_index < final_page_size; checksum_index++ )
+	if( fletcher16( page_buffer, final_page_size ) == checksum )
 	{
-	  checksum += page_buffer[checksum_index];
+	  uint32_t psram_offset = (MICRODRIVE_CARTRIDGE_LENGTH * cmd_struct.microdrive_index)
+                                   +
+                                  (pages*256);
+
+	  write_psram_block( psram_offset, page_buffer, final_page_size );
 	}
-
-        uint32_t psram_offset = (MICRODRIVE_CARTRIDGE_LENGTH * cmd_struct.microdrive_index)
-                                 +
-                                (pages*256);
-
-        write_psram_block( psram_offset, page_buffer, final_page_size );
+	else
+	{
+	  checksum_error = true;
+	}
       }
 
-/// Tricky, the alternative is write a fletcher function which checksums an area of 
-/// psram. That looks easier.
-
-// Check flag here
-//      if( checksum == cmd_struct.checksum )
-      if( 1 )
+      /*
+       * If the file contents came over correctly, insert cartridge into microdrive.
+       * Otherwise set the error flag, which will go back to the UI Pico in the
+       * next status report
+       */
+      if( ! checksum_error )
       {
 	/* Insert MDR image in PSRAM into the IF1 code so it can be accessed */
 	cartridge_error_status[cmd_struct.microdrive_index] =

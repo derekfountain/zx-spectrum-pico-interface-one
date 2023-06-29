@@ -319,8 +319,20 @@ static void work_insert_mdr_file( uint8_t which, uint8_t *filename )
   UI_TO_IO_CMD ack;
   while( ui_link_receive_acked_byte( pio0, linkin_sm, linkout_sm, &ack ) != LINK_BYTE_DATA );
 
-// Can't do this in one go, break into 256 byte chunks with 2 byte checksums at the end of each one
-  ui_link_send_buffer( pio0, linkout_sm, linkin_sm, working_image_buffer, cmd_struct.data_size );
+  /* Can't do this in one go, break into 256 byte chunks with 2 byte checksums at the end of each one */
+  uint32_t pages = cmd_struct.data_size / 256;
+  uint32_t final_page_size = cmd_struct.data_size - (pages * 256);
+  for( uint32_t page=0; page < pages; page++ )
+  {
+    ui_link_send_buffer( pio0, linkout_sm, linkin_sm, working_image_buffer+(page*256), 256 );
+
+    uint16_t checksum = fletcher16( working_image_buffer+(page*256), 256 );
+    ui_link_send_buffer( pio0, linkout_sm, linkin_sm, (uint8_t*)&checksum, 2 );
+  }
+
+  ui_link_send_buffer( pio0, linkout_sm, linkin_sm, working_image_buffer+(pages*256), final_page_size );
+  uint16_t checksum = fletcher16( working_image_buffer+(pages*256), final_page_size );
+  ui_link_send_buffer( pio0, linkout_sm, linkin_sm, (uint8_t*)&checksum, 2 );
 
   /*
    * Store away what the IO Pico is using. The other core is continuously reading

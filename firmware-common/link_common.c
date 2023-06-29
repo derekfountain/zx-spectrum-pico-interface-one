@@ -186,7 +186,6 @@ void ui_link_wait_for_init_sequence( PIO pio, int linkin_sm, int linkout_sm )
 
 /*
  * Standard 16 bit checksum, nicked from the Wikipedia entry.
- * Not part of the protocol as such, but might be useful.
  */
 uint16_t fletcher16( uint8_t *data, int count )
 {
