@@ -305,13 +305,6 @@ static void work_insert_mdr_file( uint8_t which, uint8_t *filename )
 
   (void)send_cmd( UI_TO_IO_INSERT_MDR );
 
-  /* Calculate the correct checksum */
-  uint8_t checksum = 0;
-  for( uint32_t i=0; i < bytes_read-1; i++ )
-  {
-    checksum += working_image_buffer[i];
-  }
-
   /* Write the data which describes the command */
   write_protect_t write_protected = working_image_buffer[bytes_read-1] ? WRITE_PROTECT_ON : WRITE_PROTECT_OFF;
   ui_to_io_insert_mdr_t cmd_struct =
@@ -319,26 +312,15 @@ static void work_insert_mdr_file( uint8_t which, uint8_t *filename )
       .microdrive_index   = which,
       .data_size          = bytes_read-1,
       .write_protected    = write_protected,
-      .checksum           = checksum
     };
   ui_link_send_buffer( pio0, linkout_sm, linkin_sm, (uint8_t*)&cmd_struct, sizeof(cmd_struct) );
 
+  /* IO Pico acks the command structure */
   UI_TO_IO_CMD ack;
   while( ui_link_receive_acked_byte( pio0, linkin_sm, linkout_sm, &ack ) != LINK_BYTE_DATA );
 
-  if( ack != UI_TO_IO_ACK )
-    gpio_put( LED_PIN, 1 );
-
-  for( uint32_t i=0; i < cmd_struct.data_size; i++ )
-  {
-    /* Feedback on screen, probably redundant when I get a proper GUI */
-    if( (i % 16384) == 0 )
-    {
-      // FIXME Do i need feedback here?
-    }
-
-    ui_link_send_byte( pio0, linkout_sm, linkin_sm, working_image_buffer[i] );
-  }
+// Can't do this in one go, break into 256 byte chunks with 2 byte checksums at the end of each one
+  ui_link_send_buffer( pio0, linkout_sm, linkin_sm, working_image_buffer, cmd_struct.data_size );
 
   /*
    * Store away what the IO Pico is using. The other core is continuously reading

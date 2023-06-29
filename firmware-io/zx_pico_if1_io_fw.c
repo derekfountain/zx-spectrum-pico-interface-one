@@ -743,6 +743,11 @@ int __time_critical_func(main)( void )
         uint8_t page_buffer[ 256 ];
 	ui_link_receive_buffer( pio1, linkin_sm, linkout_sm, page_buffer, sizeof(page_buffer) );
 
+// Receive 2 more bytes, which is checksum for these 256 bytes
+// If they're OK, write to psram
+// Otherwise give up.
+// Might as well set a flag indicating the error and just continue the loop
+
 	for( uint32_t checksum_index=0; checksum_index < 256; checksum_index++ )
 	{
 	  checksum += page_buffer[checksum_index];
@@ -762,6 +767,8 @@ int __time_critical_func(main)( void )
         uint8_t page_buffer[ final_page_size ];
 	ui_link_receive_buffer( pio1, linkin_sm, linkout_sm, page_buffer, sizeof(page_buffer) );
 
+// Same checksum approach here
+
 	for( uint32_t checksum_index=0; checksum_index < final_page_size; checksum_index++ )
 	{
 	  checksum += page_buffer[checksum_index];
@@ -774,7 +781,12 @@ int __time_critical_func(main)( void )
         write_psram_block( psram_offset, page_buffer, final_page_size );
       }
 
-      if( checksum == cmd_struct.checksum )
+/// Tricky, the alternative is write a fletcher function which checksums an area of 
+/// psram. That looks easier.
+
+// Check flag here
+//      if( checksum == cmd_struct.checksum )
+      if( 1 )
       {
 	/* Insert MDR image in PSRAM into the IF1 code so it can be accessed */
 	cartridge_error_status[cmd_struct.microdrive_index] =

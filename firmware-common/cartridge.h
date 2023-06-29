@@ -25,7 +25,7 @@ typedef uint8_t tape_byte_t;
 
 /*
  * Errors associated with cartridge insertion, etc, reported back to
- * the GUI to give the user a clue why a cartridge hasn't inserted
+ * the GUI to give the user a clue why a cartridge hasn't inserted.
  */
 typedef enum
 {

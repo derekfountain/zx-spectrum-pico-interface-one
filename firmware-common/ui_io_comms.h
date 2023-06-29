@@ -66,7 +66,6 @@ typedef struct _ui_to_io_insert_mdr_t
   microdrive_index_t microdrive_index;                 // Which microdrive
   write_protect_t    write_protected;                  // Whether the cartridge is write protected
   uint32_t           data_size;                        // Size of cartridge data in bytes
-  uint8_t            checksum;                         // Very basic 8 bit addition checksum, need to improve this
 }
 ui_to_io_insert_mdr_t;
 
@@ -79,7 +78,9 @@ typedef struct _ui_to_io_request_status_t
 ui_to_io_request_status_t;
 
 
-/* Response from IO Pico informing status of each microdrive */
+/*
+ * Response from IO Pico informing status of each microdrive
+ */
 typedef struct _io_to_ui_status_response_t
 {
   microdrive_status_t status[NUM_MICRODRIVES];

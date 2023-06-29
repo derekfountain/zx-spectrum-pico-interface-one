@@ -148,7 +148,11 @@ void if1_init( void )
 
 /*
  * "Insert" one of the tape images into the PSRAM buffer. The PSRAM buffer
- * is where the image will be read from and written to.
+ * is where the image will be read from and written to. The offset and
+ * length given are assumed to point to a valid MDR image which has been
+ * loaded into the PSRAM. If it hasn't, and what is there isn't a valid
+ * MDR image, puzzling things will happen, much like if you put a cartridge
+ * containing nonsense into a real microdrive.
  */
 cartridge_error_t if1_mdr_insert( const microdrive_index_t which, const uint32_t psram_offset, const uint32_t length_in_bytes,
 				  const write_protect_t write_protected )

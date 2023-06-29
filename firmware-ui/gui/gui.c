@@ -26,13 +26,6 @@
 /*
 FIXME:
 
-Instead of the hardcoded list of MDR images to load, have an optional
-file of mdr filenames. If the file exists, load each file named in it
-into a MD at startup.
-
-When selection cursor is on an empty microdrive, clicking needs to
-bring up a file selector.
-
 Need some sort of error handling. Invalid file, etc.
 
 Indication of SD card not inserted. Won't be able to save data if
