@@ -248,11 +248,18 @@ static bool send_cmd( UI_TO_IO_CMD cmd )
 
 
 /* Timer function, called repeatedly to set up a request of status from the IO Pico */
+static work_request_status_t  request_status;
+static work_request_status_t *request_status_ptr = NULL;
 static bool add_work_request_status( repeating_timer_t *rt )
 {
-  work_request_status_t *request_status_ptr = malloc( sizeof(work_request_status_t) );
-  request_status_ptr->dummy = 0;
-  insert_work( WORK_REQUEST_STATUS, request_status_ptr );
+  /* Only one of these is active at any one time */
+  if( request_status_ptr == NULL )
+  {
+    request_status_ptr = &request_status;
+
+    request_status_ptr->dummy = 0;
+    insert_work( WORK_REQUEST_STATUS, request_status_ptr );
+  }
 
   return true;
 }
@@ -480,6 +487,7 @@ static void work_request_status( void )
     mutex_exit( &live_microdrive_data_mutex );
   }
 
+  request_status_ptr = NULL;
   generate_stimulus( gui_fsm, ST_REQUEST_STATUS_DONE );
 }
 
@@ -652,10 +660,7 @@ static void __time_critical_func(core1_main)( void )
       case WORK_REQUEST_STATUS:
       {
 	/* Work required is to ask the IO Pico to send its status */
-	work_request_status_t *request_status_data = (work_request_status_t*)data;
-
 	work_request_status();
-	free(request_status_data);
       }
       break;
 
