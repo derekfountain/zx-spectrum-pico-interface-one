@@ -809,30 +809,6 @@ int main( void )
   /* Set requests for microdrive status running */
   add_repeating_timer_ms( STATUS_TIMER_PERIOD_MS, add_work_request_status, NULL, &repeating_status_timer );
 
-#define TEST_SETUP 0
-#if TEST_SETUP
-  /* Read named files from SD card and insert each one that exists */
-  uint8_t *mdr_files[] = {"1.mdr", 
-			  "2.mdr", 
-			  "3.mdr", 
-			  "4.mdr", 
-			  "5.mdr", 
-			  "6.mdr", 
-			  "7.mdr", 
-			  "8.mdr"};
-
-  for( uint8_t mdr_file_index=0; mdr_file_index < (sizeof(mdr_files)/sizeof(uint8_t*)); mdr_file_index++ )
-  {
-    /* Insert MDR files into some drives. This is test code, to be removed */
-    work_insert_mdr_t *work_ptr = malloc( sizeof(work_insert_mdr_t) );
-
-    work_ptr->microdrive_index = mdr_file_index;
-    work_ptr->filename         = mdr_files[mdr_file_index];
-
-    insert_work( WORK_INSERT_MDR, work_ptr );
-  }
-#endif
-
   /* Loop over contents of config file on the SD card, load each image into a drive */
   uint8_t *mdr_filename;
   if( (mdr_filename = open_config_file()) != NULL )
