@@ -820,8 +820,7 @@ int main( void )
       work_insert_mdr_t *work_ptr = malloc( sizeof(work_insert_mdr_t) );
 
       work_ptr->microdrive_index = mdr_index;
-      work_ptr->filename         = malloc( strlen( mdr_filename )+1 );
-      strcpy( work_ptr->filename, mdr_filename );
+      strncpy( work_ptr->filename, mdr_filename, MAX_INSERT_FILENAME_LEN );
 
       insert_work( WORK_INSERT_MDR, work_ptr );
     }
