@@ -640,10 +640,7 @@ static void __time_critical_func(core1_main)( void )
       case WORK_INIT_IO_LINK:
       {
 	/* Work required is to link to the IO Pico, can't proceed without this */
-	work_init_io_link_t *init_io_link_data = (work_init_io_link_t*)data;
-
 	work_init_io_link();
-	free(init_io_link_data);
       }
       break;
 
@@ -806,8 +803,8 @@ int main( void )
   multicore_launch_core1( core1_main ); 
 
   /* First piece of work is to establish the link to the IO Pico */
-  work_init_io_link_t *init_io_work_ptr = malloc( sizeof(work_init_io_link_t) );
-  insert_work( WORK_INIT_IO_LINK, init_io_work_ptr );
+  work_init_io_link_t init_io_work;
+  insert_work( WORK_INIT_IO_LINK, &init_io_work );
 
   /* Set requests for microdrive status running */
   add_repeating_timer_ms( STATUS_TIMER_PERIOD_MS, add_work_request_status, NULL, &repeating_status_timer );
