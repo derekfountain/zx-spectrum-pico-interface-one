@@ -268,13 +268,15 @@ static bool add_work_request_status( repeating_timer_t *rt )
 /*
  * When status indicates the IO Pico has a microdrive with a cartridge
  * which has changed data, add a work item to request the data so it
- * can be saved back to SD card
+ * can be saved back to SD card.
+ * In theory all 8 microdrives could need their data requesting all at
+ * once, so there's an array of these structures.
  */
+static work_request_mdr_data_t request_data[NUM_MICRODRIVES];
 static bool add_work_request_mdr_data( microdrive_index_t microdrive_index )
 {
-  work_request_mdr_data_t *request_data_ptr = malloc( sizeof(work_request_mdr_data_t) );
-  request_data_ptr->microdrive_index = microdrive_index;
-  insert_work( WORK_REQUEST_MDR_DATA, request_data_ptr );
+  request_data[microdrive_index].microdrive_index = microdrive_index;
+  insert_work( WORK_REQUEST_MDR_DATA, &request_data[microdrive_index] );
 
   return true;
 }
@@ -667,7 +669,6 @@ static void __time_critical_func(core1_main)( void )
 	work_request_mdr_data_t *request_mdr_data = (work_request_mdr_data_t*)data;
 
 	work_request_mdr_data_to_save( request_mdr_data->microdrive_index );
-	free(request_mdr_data);
       }
       break;
 
