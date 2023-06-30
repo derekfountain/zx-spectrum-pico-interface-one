@@ -64,7 +64,7 @@ void draw_status_screen( status_screen_t *status )
     oled_display_msg_requesting_status();
   }
 
-  oled_display_cartridge_error( status->cartridge_error_str );
+  oled_display_cartridge_error( status->error_str );
 
   // Sometimes useful for printing a debug value
   oled_display_test_value( status->test_value );

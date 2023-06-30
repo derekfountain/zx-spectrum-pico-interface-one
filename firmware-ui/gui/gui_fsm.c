@@ -86,19 +86,52 @@ void gui_sm_show_status( fsm_t *fsm )
   switch( live_microdrive_data->currently_inserted[status.selected].cartridge_error )
   {
   case CARTRIDGE_ERR_CHECKSUM_INCORRECT:
-    status.cartridge_error_str = "Error: checksum";
+    status.error_str = "Error: checksum";
     break;
 
   case CARTRIDGE_ERR_NEED_EJECT_BEFORE_INSERT:
-    status.cartridge_error_str = "Error: Eject first";
+    status.error_str = "Error: Eject first";
     break;
 
   case CARTRIDGE_ERR_NEED_SAVE_BEFORE_INSERT:
-    status.cartridge_error_str = "Error: Save first";
+    status.error_str = "Error: Save first";
     break;
 
   default:
-    status.cartridge_error_str = "No error"; //NULL
+    status.error_str = NULL;
+  }
+
+  if( status.error_str == NULL )
+  {
+    switch( live_microdrive_data->currently_inserted[status.selected].gui_error )
+    {
+    case GUI_ERR_CHECKSUM_INCORRECT:
+      status.error_str = "Err: save checksum";
+      break;
+
+    case GUI_ERR_FILE_NOT_FOUND:
+      status.error_str = "Err: Can't read file";
+      break;
+      
+    case GUI_ERR_FILE_EMPTY:
+      status.error_str = "Err: File empty";
+      break;
+
+    case GUI_ERR_NOT_EVEN_BLOCKS:
+      status.error_str = "Err: Not even blocks";
+      break;
+
+    case GUI_ERR_FILE_TOO_SMALL:
+      status.error_str = "Err: File too small";
+      break;
+
+    case GUI_ERR_FILE_TOO_LARGE:
+      status.error_str = "Err: File too large";
+      break;
+
+    default:
+      status.error_str = NULL;
+    }
   }
 
   draw_status_screen( &status );

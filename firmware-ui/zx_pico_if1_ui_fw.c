@@ -53,7 +53,6 @@
 #include "sd_card.h"
 
 #include "oled_display.h"
-#include "ssd1306.h"
 #include "gui.h"
 
 /* Link to IO Pico is done with transputer based PIO code */
@@ -279,19 +278,53 @@ static void work_insert_mdr_file( uint8_t which, uint8_t *filename )
   /* Load full image, inc w/p byte, into the working buffer */
   uint32_t bytes_read;
   if( read_mdr_file( filename, working_image_buffer, MICRODRIVE_MDR_MAX_LENGTH, &bytes_read ) != 0 )
+  {
+    mutex_enter_blocking( &live_microdrive_data_mutex );
+    live_microdrive_data.currently_inserted[which].gui_error = GUI_ERR_FILE_NOT_FOUND;
+    mutex_exit( &live_microdrive_data_mutex );
+
     return;
+  }
   
   /* Empty file? Not good... */
   if( bytes_read == 0 )
+  {
+    mutex_enter_blocking( &live_microdrive_data_mutex );
+    live_microdrive_data.currently_inserted[which].gui_error = GUI_ERR_FILE_EMPTY;
+    mutex_exit( &live_microdrive_data_mutex );
+
     return;
+  }
 
   /* Must be a round number of blocks otherwise it's probably not an MDR file */
   if( ((bytes_read-1) / MICRODRIVE_BLOCK_LEN) * MICRODRIVE_BLOCK_LEN != (bytes_read-1) )
+  {
+    mutex_enter_blocking( &live_microdrive_data_mutex );
+    live_microdrive_data.currently_inserted[which].gui_error = GUI_ERR_NOT_EVEN_BLOCKS;
+    mutex_exit( &live_microdrive_data_mutex );
+
     return;
+  }
 
   /* Minimum size in blocks, arbitrary for now */
   if( (bytes_read-1) / MICRODRIVE_BLOCK_LEN < 10 )
+  {
+    mutex_enter_blocking( &live_microdrive_data_mutex );
+    live_microdrive_data.currently_inserted[which].gui_error = GUI_ERR_FILE_TOO_SMALL;
+    mutex_exit( &live_microdrive_data_mutex );
+
     return;
+  }
+
+  /* Maximum size in blocks, 254 is IF1 maximum */
+  if( (bytes_read-1) / MICRODRIVE_BLOCK_LEN > MICRODRIVE_BLOCK_MAX )
+  {
+    mutex_enter_blocking( &live_microdrive_data_mutex );
+    live_microdrive_data.currently_inserted[which].gui_error = GUI_ERR_FILE_TOO_LARGE;
+    mutex_exit( &live_microdrive_data_mutex );
+
+    return;
+  }
 
   mutex_enter_blocking( &live_microdrive_data_mutex );
   live_microdrive_data.currently_inserted[which].status   = LIVE_STATUS_INSERTING;
@@ -330,13 +363,19 @@ static void work_insert_mdr_file( uint8_t which, uint8_t *filename )
     ui_link_send_buffer( pio0, linkout_sm, linkin_sm, (uint8_t*)&checksum, 2 );
   }
 
-  ui_link_send_buffer( pio0, linkout_sm, linkin_sm, working_image_buffer+(pages*256), final_page_size );
-  uint16_t checksum = fletcher16( working_image_buffer+(pages*256), final_page_size );
-  ui_link_send_buffer( pio0, linkout_sm, linkin_sm, (uint8_t*)&checksum, 2 );
+  if( final_page_size > 0 )
+  {
+    ui_link_send_buffer( pio0, linkout_sm, linkin_sm, working_image_buffer+(pages*256), final_page_size );
+    uint16_t checksum = fletcher16( working_image_buffer+(pages*256), final_page_size );
+    ui_link_send_buffer( pio0, linkout_sm, linkin_sm, (uint8_t*)&checksum, 2 );
+  }
 
   /*
    * Store away what the IO Pico is using. The other core is continuously reading
-   * this structure so mutex is required
+   * this structure so mutex is required.
+   *
+   * This point assumes success. If the IO Pico failed to load the file we'll know
+   * about it next time status is read.
    */
   mutex_enter_blocking( &live_microdrive_data_mutex );
   live_microdrive_data.currently_inserted[which].status                = LIVE_STATUS_INSERTED;
@@ -344,6 +383,7 @@ static void work_insert_mdr_file( uint8_t which, uint8_t *filename )
   live_microdrive_data.currently_inserted[which].cartridge_data_length = bytes_read-1;
   live_microdrive_data.currently_inserted[which].write_protected       = write_protected;
   live_microdrive_data.currently_inserted[which].cartridge_error       = CARTRIDGE_ERR_OK;
+  live_microdrive_data.currently_inserted[which].gui_error             = GUI_ERR_OK;
   mutex_exit( &live_microdrive_data_mutex );
 
   /* Poke state machine to update GUI */
@@ -478,16 +518,75 @@ static void work_request_mdr_data_to_save( microdrive_index_t microdrive_index )
     };
   ui_link_send_buffer( pio0, linkout_sm, linkin_sm, (uint8_t*)&cmd_struct, sizeof(ui_to_io_request_mdr_data_t) );
 
-  /* Read the cartridge contents back. This is sent by the IO Pico in pages, but arrives all in one go */
-  ui_link_receive_buffer( pio0, linkin_sm, linkout_sm, working_image_buffer, bytes_expected );
+  /* Read the cartridge contents back. This is sent by the IO Pico in pages, checksum for each page */
+  bool     checksum_error = false;
+  uint32_t pages = cmd_struct.bytes_expected / 256;
+  uint32_t final_page_size = cmd_struct.bytes_expected - (pages * 256);
+  for( uint32_t page=0; page < pages; page++ )
+  {
+    /* Load a page from the UI Pico into a local buffer */
+    uint8_t page_buffer[ 256 ];
+    ui_link_receive_buffer( pio0, linkin_sm, linkout_sm, page_buffer, sizeof(page_buffer) );
 
+    uint16_t checksum;
+    ui_link_receive_buffer( pio0, linkin_sm, linkout_sm, (uint8_t*)&checksum, 2 );
+
+    if( fletcher16( page_buffer, 256 ) == checksum )
+    {
+      memcpy( working_image_buffer+(page*256), page_buffer, sizeof(page_buffer) );
+    }
+    else
+    {
+      checksum_error = true;
+    }
+  }
+
+  if( final_page_size > 0 )
+  {
+    /* Load a page from the UI Pico into a local buffer */
+    uint8_t page_buffer[ final_page_size ];
+    ui_link_receive_buffer( pio0, linkin_sm, linkout_sm, page_buffer, sizeof(page_buffer) );
+
+    uint16_t checksum;
+    ui_link_receive_buffer( pio0, linkin_sm, linkout_sm, (uint8_t*)&checksum, 2 );
+
+    if( fletcher16( page_buffer, final_page_size ) == checksum )
+    {
+      memcpy( working_image_buffer+(pages*256), page_buffer, sizeof(page_buffer) );
+    }
+    else
+    {
+      checksum_error = true;
+    }
+  }
+
+  /* Write protect flag isn't sent by IO Pico, we already have that here */
   working_image_buffer[bytes_expected] = write_protected;
   
-  /* Write the MDR file back out to SD card */
-  uint32_t bytes_written;
-  write_mdr_file( filename, working_image_buffer, bytes_expected+1, &bytes_written );
+  if( ! checksum_error )
+  {
+    /* Write the MDR file back out to SD card */
+    uint32_t bytes_written;
+    write_mdr_file( filename, working_image_buffer, bytes_expected+1, &bytes_written );
 
+    /* Clear error condition */
+    mutex_enter_blocking( &live_microdrive_data_mutex );
+    live_microdrive_data.currently_inserted[microdrive_index].gui_error = GUI_ERR_OK;
+    mutex_exit( &live_microdrive_data_mutex );
+  }
+  else
+  {
+    /* Set error condition */
+    mutex_enter_blocking( &live_microdrive_data_mutex );
+    live_microdrive_data.currently_inserted[microdrive_index].gui_error = GUI_ERR_CHECKSUM_INCORRECT;
+    mutex_exit( &live_microdrive_data_mutex );
+  }
+
+  /* Saving to SD procedure is complete */
+  mutex_enter_blocking( &live_microdrive_data_mutex );
   live_microdrive_data.microdrive_saving_to_sd = -1;
+  mutex_exit( &live_microdrive_data_mutex );
+
   generate_stimulus( gui_fsm, ST_DATA_SAVED );
 
   /* Restart the status timer */

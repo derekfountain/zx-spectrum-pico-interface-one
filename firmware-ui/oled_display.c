@@ -148,7 +148,7 @@ void oled_display_inserted_write_protected( int8_t write_protected )
 
 void oled_display_cartridge_error( uint8_t *str )
 {
-  ssd1306_clear_square( &display, 0, 40, 127, 40+8 );  
+  ssd1306_clear_square( &display, 0, 40, 100, 40+8 );  // 100, don't blat the activity indicator
 
   if( str )
   {

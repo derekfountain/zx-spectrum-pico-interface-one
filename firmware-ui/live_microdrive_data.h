@@ -22,6 +22,7 @@
 
 #include "microdrive.h"
 #include "cartridge.h"
+#include "gui/gui.h"
 
 typedef enum
 {
@@ -46,6 +47,7 @@ typedef struct _microdrive_inserted_data_t
   uint32_t                 cartridge_data_length;   // Number of bytes in the cartridge image
   write_protect_t          write_protected;         // Whether the cartridge is write protected in the IO Pico
   cartridge_error_t        cartridge_error;         // Cartridge error status
+  gui_error_t              gui_error;               // GUI error status
 }
 microdrive_inserted_data_t;
 

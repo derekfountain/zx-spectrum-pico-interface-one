@@ -23,6 +23,18 @@
 #include "pico/stdlib.h"
 #include "microdrive.h"
 
+typedef enum
+{
+  GUI_ERR_OK                  = 100,
+  GUI_ERR_CHECKSUM_INCORRECT,
+  GUI_ERR_FILE_NOT_FOUND,
+  GUI_ERR_FILE_EMPTY,
+  GUI_ERR_NOT_EVEN_BLOCKS,
+  GUI_ERR_FILE_TOO_SMALL,
+  GUI_ERR_FILE_TOO_LARGE,
+}
+gui_error_t;
+
 typedef struct _status_screen_t
 {
   bool               requesting_status;
@@ -36,7 +48,7 @@ typedef struct _status_screen_t
   uint8_t            num_blocks;
   bool               write_protected;
 
-  uint8_t           *cartridge_error_str;
+  uint8_t           *error_str;
 
   uint8_t            test_value;
 }

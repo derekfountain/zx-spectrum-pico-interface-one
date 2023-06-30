@@ -871,7 +871,10 @@ int __time_critical_func(main)( void )
       set_cartridge_modified( cmd_struct.microdrive_index, false );
       set_cartridge_ejected_to_sd( cmd_struct.microdrive_index );
 
-      /* Send it page by page over to the UI Pico */
+      /*
+       * Send it page by page over to the UI Pico. The UI Pico controls the data size, it told us 
+       * in the command structure how many bytes it's expecting
+       */
       uint32_t pages = cmd_struct.bytes_expected / 256;
       uint32_t final_page_size = cmd_struct.bytes_expected - (pages * 256);
       for( uint32_t page=0; page < pages; page++ )
@@ -883,6 +886,10 @@ int __time_critical_func(main)( void )
 	/* Send it over to the UI Pico for saving to SD card */
 	ui_link_send_buffer( pio1, linkout_sm, linkin_sm, page_buffer, sizeof(page_buffer) );
 
+	/* Checksum for this 256 byte block */
+	uint16_t checksum = fletcher16( page_buffer, sizeof(page_buffer) );
+	ui_link_send_buffer( pio1, linkout_sm, linkin_sm, (uint8_t*)&checksum, 2 );
+
         /* Work out where the start of the next page is */
         psram_offset += 256;
       }
@@ -892,6 +899,9 @@ int __time_critical_func(main)( void )
 	uint8_t page_buffer[final_page_size];
 	read_psram_block( psram_offset, page_buffer, final_page_size );
 	ui_link_send_buffer( pio1, linkout_sm, linkin_sm, page_buffer, sizeof(page_buffer) );
+
+	uint16_t checksum = fletcher16( page_buffer, sizeof(page_buffer) );
+	ui_link_send_buffer( pio1, linkout_sm, linkin_sm, (uint8_t*)&checksum, 2 );
       }
 
       /* I don't send back the w/p flag, the UI Pico already has that */
