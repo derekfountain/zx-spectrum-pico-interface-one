@@ -41,7 +41,7 @@ typedef struct _work_init_io_link_t
 work_init_io_link_t;
 
 
-#define MAX_INSERT_FILENAME_LEN 128
+#define MAX_INSERT_FILENAME_LEN 64
 typedef struct _work_insert_mdr_t
 {
   uint8_t microdrive_index;

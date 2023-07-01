@@ -147,13 +147,32 @@ void gui_sm_show_eject_screen( fsm_t *fsm )
 }
 
 
-#define MAX_NUM_FILENAMES 25
+/*
+ * Keep an array of pointers to filenames, as fetched by the SD card
+ * directory-reading library code. The array is filled when the insert
+ * screen is loaded, and cleared out when the insert screen is cleared
+ * (either because a file was chosen or the screen was cancelled).
+ *
+ * Each pointer holds a malloc'ed filename buffer. Not ideal, but the
+ * option is either a large static array or to somehow dynamically
+ * present the contents of the SD card directory on demand. This is
+ * much easier and since it's the only place in the whole program
+ * which uses malloc/free I wouldn't expect it to fragment too much.
+ *
+ * FIXME What if the card is ejected while the file list is displayed?
+ * That could realistically happen if the user decides the SD card
+ * doesn't contain the file they want.
+ */
+#define MAX_NUM_FILENAMES 1024           /* This many pointers */
 static uint8_t *filenames[MAX_NUM_FILENAMES+1];
 
 static uint32_t selected_filename_index = 0;
 static uint32_t num_filenames_read;
 void gui_sm_show_insert_screen( fsm_t *fsm )
 {
+  for( uint32_t i=0; i<MAX_NUM_FILENAMES; i++ )
+    filenames[i] = NULL;
+
   num_filenames_read = read_directory_files( &filenames[0],
 					     MAX_NUM_FILENAMES );
 
@@ -202,6 +221,16 @@ void gui_sm_action_insert( fsm_t *fsm )
   insert_work( WORK_INSERT_MDR, work_ptr );
 
   clear_insert_screen();  
+
+  for( uint32_t i=0; i<MAX_NUM_FILENAMES; i++ )
+  {
+    if( filenames[i] )
+    {
+      free( filenames[i] );
+      filenames[i] = NULL;
+    }
+  }
+
   generate_stimulus( fsm, ST_BUILTIN_YES );    
 }
 
@@ -209,6 +238,16 @@ void gui_sm_action_insert( fsm_t *fsm )
 void gui_sm_cancel_insert( fsm_t *fsm )
 {
   clear_insert_screen();  
+
+  for( uint32_t i=0; i<MAX_NUM_FILENAMES; i++ )
+  {
+    if( filenames[i] )
+    {
+      free( filenames[i] );
+      filenames[i] = NULL;
+    }
+  }
+
   generate_stimulus( fsm, ST_BUILTIN_YES );  
 }
 

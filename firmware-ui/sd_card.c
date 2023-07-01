@@ -17,6 +17,12 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  */
 
+/*
+ * This is a really basic interface to the the SD card. Minimal error
+ * checking, no support for directory structure, etc. Massive
+ * improvements required here, but it works for now.
+ */
+
 /* These are the FAT filesystem library headers */
 #include "f_util.h"
 #include "ff.h"
@@ -24,13 +30,14 @@
 #include "sd_card.h"
 #include "hw_config.h"
 
+#include "work_queue.h"    /* For MAX_INSERT_FILENAME_LEN */
 #include <stdint.h>
 #include <string.h>
 #include <stdlib.h>
 #include <stdio.h>
 #include "sd_card.h"
 
-/* There's only one SD card reader on the device, and this is it's file object */
+/* There's only one SD card reader on the device, and this is its file object */
 static FIL fil;
 static sd_card_t *pSD;
 
@@ -66,8 +73,17 @@ uint8_t unmount_sd_card( void )
 }
 
 
-#define MAX_MDR_FILENAME_LENGTH 32
-static uint8_t config_mdr_filename[MAX_MDR_FILENAME_LENGTH+1];
+/*
+ * The config file is simply a list of filenames, one per line.
+ * Each line is expected to be the name of a file on the SD
+ * card. They will be loaded into the microdrives, starting at
+ * drive 0, in the order they're given. That's it, nothing
+ * clever, no comments, nothing else.
+ *
+ * This routine opens the file and returns the first filename
+ * from it, or NULL.
+ */
+static uint8_t config_mdr_filename[MAX_INSERT_FILENAME_LEN+1];
 static FIL     config_file_handle;
 static bool    config_file_open;
 uint8_t *open_config_file( void )
@@ -78,7 +94,7 @@ uint8_t *open_config_file( void )
   if( fr )
     return NULL;
   
-  if( f_gets( config_mdr_filename, MAX_MDR_FILENAME_LENGTH, &config_file_handle ) == NULL )
+  if( f_gets( config_mdr_filename, MAX_INSERT_FILENAME_LEN, &config_file_handle ) == NULL )
   {
     f_close( &config_file_handle );
     return NULL;
@@ -93,11 +109,15 @@ uint8_t *open_config_file( void )
 }
 
 
+/*
+ * Read another line from the config file. Returns NULL when the
+ * file is exhausted.
+ */
 uint8_t *next_config_entry( void )
 {
   if( config_file_open )
   {
-    if( f_gets( config_mdr_filename, MAX_MDR_FILENAME_LENGTH, &config_file_handle ) == NULL )
+    if( f_gets( config_mdr_filename, MAX_INSERT_FILENAME_LEN, &config_file_handle ) == NULL )
     {
       f_close( &config_file_handle );
       config_file_open = false;
@@ -128,22 +148,27 @@ uint32_t read_directory_files( uint8_t **addr_ptr, uint32_t max_num_filenames )
     {
       static FILINFO fno;
 
+      /* Read a filename entry, break when there's no more */
       fr = f_readdir( &dir, &fno );
       if( (fr != FR_OK) || (fno.fname[0] == 0) )
 	break;
 
+      /* Ignore directories */
       if( fno.fattrib & AM_DIR )
 	continue;
       
+      /* Must be at least <something>.mdr */
       uint8_t filename_len = strlen( fno.fname );
       if( filename_len < 5 )
 	continue;
 
+      /* Ignore anything which doesn't end in ".mdr" */
       if( strncmp( fno.fname+filename_len-4, ".mdr", 4 ) != 0 )
 	continue;
 
+      /* OK, it's a file we can use */
       *addr_ptr = malloc( filename_len + 1 );
-      strncpy( *addr_ptr, fno.fname, filename_len );
+      strncpy( *addr_ptr, fno.fname, filename_len+1 );
 
       *addr_ptr++;
       
