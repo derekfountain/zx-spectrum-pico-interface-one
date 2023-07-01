@@ -61,6 +61,10 @@ bool work_queue_is_empty( void )
 }
 
 
+/*
+ * Insert a work item into the work queue. Data needs to remain
+ * static until the work item is complete.
+ */
 void insert_work( work_queue_type_t type, void *data )
 {
   work_queue_entry_t entry;

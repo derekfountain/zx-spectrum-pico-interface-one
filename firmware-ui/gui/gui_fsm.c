@@ -18,6 +18,7 @@
  */
 
 #include <stdlib.h>
+#include <string.h>
 
 #include "fsm.h"
 #include "gui_fsm.h"
@@ -185,13 +186,18 @@ void gui_sm_selecting_previous_file( fsm_t *fsm )
 }
 
 
+/*
+ * This array of reusable structures duplicates the one in zx_pico_if1_ui_fw.c.
+ * It would better to keep just the one array somewhere where both bits of
+ * code can access it. But it's a trivial issue.
+ */
+static work_insert_mdr_t insert_data[NUM_MICRODRIVES];
 void gui_sm_action_insert( fsm_t *fsm )
 {
-  /* Insert MDR files into some drives. This is test code, to be removed */
-  work_insert_mdr_t *work_ptr = malloc( sizeof(work_insert_mdr_t) );
+  work_insert_mdr_t *work_ptr = &insert_data[status.selected];
 
   work_ptr->microdrive_index = status.selected;
-  work_ptr->filename         = filenames[selected_filename_index];
+  strncpy( work_ptr->filename, filenames[selected_filename_index], MAX_INSERT_FILENAME_LEN );
 
   insert_work( WORK_INSERT_MDR, work_ptr );
 
@@ -329,11 +335,12 @@ void gui_sm_md_selected( fsm_t *fsm )
 /*
  * User has confirmed they want to eject
  */
+static work_eject_mdr_data_t eject_data[NUM_MICRODRIVES];
 void gui_sm_action_eject( fsm_t *fsm )
 {
   live_microdrive_data_t *live_microdrive_data = (live_microdrive_data_t*)fsm->fsm_data;
 
-  work_eject_mdr_data_t *eject_data_ptr = malloc( sizeof(work_eject_mdr_data_t) );
+  work_eject_mdr_data_t *eject_data_ptr = &eject_data[status.selected];
   eject_data_ptr->microdrive_index = status.selected;
   insert_work( WORK_EJECT_MDR, eject_data_ptr );
   

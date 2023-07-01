@@ -40,12 +40,15 @@ typedef struct _work_init_io_link_t
 }
 work_init_io_link_t;
 
+
+#define MAX_INSERT_FILENAME_LEN 128
 typedef struct _work_insert_mdr_t
 {
-  uint8_t  microdrive_index;
-  uint8_t *filename;
+  uint8_t microdrive_index;
+  uint8_t filename[MAX_INSERT_FILENAME_LEN];
 }
 work_insert_mdr_t;
+
 
 typedef struct _work_request_status_t
 {
@@ -53,11 +56,13 @@ typedef struct _work_request_status_t
 }
 work_request_status_t;
 
+
 typedef struct _work_request_mdr_data_t
 {
   microdrive_index_t microdrive_index;
 }
 work_request_mdr_data_t;
+
 
 typedef struct _work_eject_mdr_data_t
 {

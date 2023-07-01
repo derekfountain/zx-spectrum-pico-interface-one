@@ -282,6 +282,11 @@ static bool add_work_request_mdr_data( microdrive_index_t microdrive_index )
 }
 
 
+/*
+ * All 8 MDs could have an insertion pending, so 8 of these structures
+ * are required
+ */
+static work_insert_mdr_t insert_data[NUM_MICRODRIVES];
 static void work_insert_mdr_file( uint8_t which, uint8_t *filename )
 {
   /* Load full image, inc w/p byte, into the working buffer */
@@ -652,7 +657,6 @@ static void __time_critical_func(core1_main)( void )
 	work_insert_mdr_t *insert_mdr_data = (work_insert_mdr_t*)data;
 
 	work_insert_mdr_file( insert_mdr_data->microdrive_index, insert_mdr_data->filename );
-	free(insert_mdr_data);
       }
       break;
 
@@ -678,7 +682,6 @@ static void __time_critical_func(core1_main)( void )
 	work_eject_mdr_data_t *eject_mdr_data = (work_eject_mdr_data_t*)data;
 
 	work_eject_mdr( eject_mdr_data->microdrive_index );
-	free(eject_mdr_data);
       }
       break;
 
@@ -818,7 +821,7 @@ int main( void )
     do
     {
       /* Insert MDR file from config into drive */
-      work_insert_mdr_t *work_ptr = malloc( sizeof(work_insert_mdr_t) );
+      work_insert_mdr_t *work_ptr = &insert_data[mdr_index];
 
       work_ptr->microdrive_index = mdr_index;
       strncpy( work_ptr->filename, mdr_filename, MAX_INSERT_FILENAME_LEN );
