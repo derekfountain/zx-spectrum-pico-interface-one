@@ -111,6 +111,13 @@ void oled_display_eject_option( void )
 }
 
 
+void oled_display_no_files( void )
+{
+  ssd1306_draw_string( &display, 22, 24, 2, "No files", 0 );
+  ssd1306_draw_line(&display, 22, 24+16, 22+90, 24+16, 0);
+}
+
+
 void oled_display_inserted_filename( uint8_t *filename )
 {
   ssd1306_clear_square( &display, 0, 16, 127, 16+8 );  

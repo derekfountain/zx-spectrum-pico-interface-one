@@ -176,10 +176,25 @@ void gui_sm_show_insert_screen( fsm_t *fsm )
   num_filenames_read = read_directory_files( &filenames[0],
 					     MAX_NUM_FILENAMES );
 
-  /* Fill in bottom of the array so it doesn't print rubbish off the bottom of the list */
-  filenames[num_filenames_read] = NULL;
+  if( num_filenames_read == 0 )
+  {
+    generate_stimulus( fsm, ST_BUILTIN_NO );  
+  }
+  else
+  {
+    /* Fill in bottom of the array so it doesn't print rubbish off the bottom of the list */
+    filenames[num_filenames_read] = NULL;
 
-  draw_insert_screen( selected_filename_index, &filenames[0] );
+    draw_insert_screen( selected_filename_index, &filenames[0] );
+  }
+}
+
+
+void gui_sm_no_files( fsm_t *fsm )
+{
+  draw_no_files_screen();
+
+  generate_stimulus( fsm, ST_BUILTIN_YES );  
 }
 
 

@@ -135,7 +135,15 @@ uint8_t *next_config_entry( void )
 }
 
 
-uint32_t read_directory_files( uint8_t **addr_ptr, uint32_t max_num_filenames )
+/*
+ * Read the filenames from the SD card's root directory into the array given.
+ * Each new entry is just the filename, and the memory for the string is
+ * malloced. The memory is freed when the file for insertion is selected or
+ * the insert operation is cancelled.
+ *
+ * Returns the number of filenames read into the array.
+ */
+uint32_t read_directory_files( uint8_t *addr_ptr[], uint32_t max_num_filenames )
 {
   DIR     dir;
   FRESULT fr = f_opendir( &dir, "/" );
@@ -166,12 +174,45 @@ uint32_t read_directory_files( uint8_t **addr_ptr, uint32_t max_num_filenames )
       if( strncmp( fno.fname+filename_len-4, ".mdr", 4 ) != 0 )
 	continue;
 
-      /* OK, it's a file we can use */
-      *addr_ptr = malloc( filename_len + 1 );
-      strncpy( *addr_ptr, fno.fname, filename_len+1 );
+      /* OK, it's a file we can use, claim some memory for it */
+      void *filename_ptr = malloc( filename_len + 1 );
+      if( filename_ptr == NULL )
+      {
+	/* OOM, won't end well but not much I can do here */
+	break;
+      }
+      /* Copy filename from SD card entry into new memory */
+      strncpy( filename_ptr, fno.fname, filename_len+1 );
 
-      *addr_ptr++;
-      
+      /* Find the slot in the pointers array where this new filename goes */
+      uint32_t i;
+      for( i=0; i<filenames_read; i++ )
+      {
+	/*
+	 * Make the list alphabetical.
+	 * 
+	 * This is a crude insertion sort. Walk down to find the slot where
+	 * the new entry fits, then shuffle everything down to make room for
+	 * it. Unless someone has an SD card with hundreds of entries I'd
+	 * expect this to be adequate.
+	 */
+	if( strcmp( fno.fname, addr_ptr[i]  ) < 0 )
+	{
+	  /*
+	   * i is the index of the slot this filename needs to go in at,
+	   * shuffle the rest of the array down one
+	   */
+
+	  for( uint32_t walk_down=max_num_filenames-2; walk_down>i; walk_down-- )
+	  {
+	    addr_ptr[walk_down] = addr_ptr[walk_down-1];
+	  }
+	  break;
+	}
+      }
+
+      addr_ptr[i] = filename_ptr;
+
       filenames_read++;
     }
   }

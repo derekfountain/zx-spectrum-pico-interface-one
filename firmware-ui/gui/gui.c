@@ -26,8 +26,6 @@
 /*
 FIXME:
 
-Need some sort of error handling. Invalid file, etc.
-
 Indication of SD card not inserted. Won't be able to save data if
 SD card is ejected.
 
@@ -88,6 +86,18 @@ void draw_eject_screen( status_screen_t *status )
 }
 
 
+void draw_no_files_screen( void )
+{
+  oled_clear();
+
+  oled_display_no_files();
+
+  oled_update();  
+
+  /* Wait for next stimulus, which is user pressing any button */
+}
+
+
 void draw_insert_screen( uint32_t index, uint8_t *filename_ptr[] )
 {
   oled_clear();
@@ -109,7 +119,7 @@ void draw_insert_screen( uint32_t index, uint8_t *filename_ptr[] )
 	oled_display_selectable_filename( filename_ptr[display_index], line, (line == 27) );
       }
       line += 9;
-
+      
       display_index++;
     }
   }
