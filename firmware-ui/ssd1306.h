@@ -256,5 +256,6 @@ void ssd1306_draw_string(ssd1306_t *p, uint32_t x, uint32_t y, uint32_t scale, c
 /* DF additions */
 
 void ssd1306_clear_pixel(ssd1306_t *p, uint32_t x, uint32_t y);
+void ssd1306_draw_inverted_char(ssd1306_t *p, uint32_t x, uint32_t y, uint32_t scale, char c);
 
 #endif

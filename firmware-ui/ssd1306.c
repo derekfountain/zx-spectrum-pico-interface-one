@@ -23,6 +23,11 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 */
 
+/*
+ * This has turned into a horrible hacked mess. The functions are as required
+ * for the project, it's not going to be reusable
+ */
+
 #include <pico/stdlib.h>
 #include <hardware/i2c.h>
 #include <pico/binary_info.h>
@@ -209,27 +214,75 @@ void ssd1306_draw_empty_square(ssd1306_t *p, uint32_t x, uint32_t y, uint32_t wi
   ssd1306_draw_line(p, x+width, y, x+width, y+height, 0);
 }
 
-void ssd1306_draw_char_with_font(ssd1306_t *p, uint32_t x, uint32_t y, uint32_t scale, const uint8_t *font, char c, bool invert) {
-    if(c<font[3]||c>font[4])
-        return;
+void ssd1306_draw_char_with_font(ssd1306_t *p, uint32_t x, uint32_t y, uint32_t scale, const uint8_t *font, char c, bool invert)
+{
+  if(c<font[3]||c>font[4])
+    return;
+  
+  if( invert )
+  {
+    uint8_t h = font[0];
+    uint8_t w = font[1]+font[3];
+    ssd1306_draw_filled_square( p, x, y, w*scale, h*scale);
+  }
 
-    uint32_t parts_per_line=(font[0]>>3)+((font[0]&7)>0);
-    for(uint8_t w=0; w<font[1]; ++w) { // width
-        uint32_t pp=(c-font[3])*font[1]*parts_per_line+w*parts_per_line+5;
-        for(uint32_t lp=0; lp<parts_per_line; ++lp) {
-            uint8_t line=font[pp];
+  uint32_t parts_per_line=(font[0]>>3)+((font[0]&7)>0);
 
-            for(int8_t j=0; j<8; ++j, line>>=1) {
-                if(line & 1)
-		  if( invert )
-		    ssd1306_clear_square(p, x+w*scale, y+((lp<<3)+j)*scale, scale, scale);
-		  else
-		    ssd1306_draw_filled_square(p, x+w*scale, y+((lp<<3)+j)*scale, scale, scale);
-            }
+  for(uint8_t w=0; w<font[1]; ++w)     // width
+  {
+    // font[1] is the height, font[3] is additional spacing between chars
 
-            ++pp;
-        }
+    uint32_t pp=(c-font[3])*font[1]*parts_per_line+w*parts_per_line+5;  
+    
+    for(uint32_t lp=0; lp<parts_per_line; ++lp)
+    {
+      uint8_t line=font[pp];
+      
+      for(int8_t j=0; j<8; ++j, line>>=1)
+      {
+	if(line & 1)
+	{
+	  if( invert )
+	    ssd1306_clear_square(p, x+w*scale, y+((lp<<3)+j)*scale, scale, scale);
+	  else
+	    ssd1306_draw_filled_square(p, x+w*scale, y+((lp<<3)+j)*scale, scale, scale);
+	}
+      }
+	
+      ++pp;
     }
+  }
+}
+
+/* Draws the char inverted, but without drawing the filled background first */
+void ssd1306_draw_inverted_char_with_font(ssd1306_t *p, uint32_t x, uint32_t y, uint32_t scale, const uint8_t *font, char c)
+{
+  if(c<font[3]||c>font[4])
+    return;
+  
+  uint32_t parts_per_line=(font[0]>>3)+((font[0]&7)>0);
+
+  for(uint8_t w=0; w<font[1]; ++w)     // width
+  {
+    // font[1] is the height, font[3] is additional spacing between chars
+
+    uint32_t pp=(c-font[3])*font[1]*parts_per_line+w*parts_per_line+5;  
+    
+    for(uint32_t lp=0; lp<parts_per_line; ++lp)
+    {
+      uint8_t line=font[pp];
+      
+      for(int8_t j=0; j<8; ++j, line>>=1)
+      {
+	if(line & 1)
+	{
+	  ssd1306_clear_square(p, x+w*scale, y+((lp<<3)+j)*scale, scale, scale);
+	}
+      }
+	
+      ++pp;
+    }
+  }
 }
 
 void ssd1306_draw_string_with_font(ssd1306_t *p, uint32_t x, uint32_t y, uint32_t scale, const uint8_t *font, const char *s, bool invert) {
@@ -240,6 +293,10 @@ void ssd1306_draw_string_with_font(ssd1306_t *p, uint32_t x, uint32_t y, uint32_
 
 void ssd1306_draw_char(ssd1306_t *p, uint32_t x, uint32_t y, uint32_t scale, char c, bool invert) {
     ssd1306_draw_char_with_font(p, x, y, scale, font_8x5, c, invert);
+}
+
+void ssd1306_draw_inverted_char(ssd1306_t *p, uint32_t x, uint32_t y, uint32_t scale, char c) {
+    ssd1306_draw_inverted_char_with_font(p, x, y, scale, font_8x5, c);
 }
 
 void ssd1306_draw_string(ssd1306_t *p, uint32_t x, uint32_t y, uint32_t scale, const char *s, bool invert) {

@@ -42,6 +42,57 @@ void oled_display_init( void )
   ssd1306_init( &display, OLED_WIDTH, OLED_HEIGHT, OLED_ADDR, OLED_I2C );
   ssd1306_clear( &display );
 
+#if 0
+  // Display tests can go here
+
+#if 0
+  // Fill, knock out corners
+  ssd1306_draw_filled_square(&display, 0, 0, 128, 64);
+  ssd1306_clear_pixel(&display,   0,  0);
+  ssd1306_clear_pixel(&display, 127,  0);
+  ssd1306_clear_pixel(&display,   0, 63);
+  ssd1306_clear_pixel(&display, 127, 63);
+
+  ssd1306_clear_square(&display, 1,1, 2,2);
+#endif
+
+#if 0
+  // Check inverted text is OK
+  ssd1306_draw_char(&display, 0,0, 1, '8', false);
+  ssd1306_draw_char(&display, 0,8, 1, '8', true);
+
+  ssd1306_draw_string(&display, 0,16, 1, "Hello world", true );
+#endif
+
+#if 0
+  // Filled squares side by side, should see a solid block
+  ssd1306_draw_filled_square(&display, 0,  0, 5, 8);
+  ssd1306_draw_filled_square(&display, 5,  0, 5, 8);
+  ssd1306_draw_filled_square(&display, 10, 0, 5, 8);
+  ssd1306_draw_filled_square(&display, 15, 0, 5, 8);
+#endif
+
+#if 0
+  // Another inverted text check
+  ssd1306_draw_char(&display,  0,0, 1, 'H', false);
+  ssd1306_draw_char(&display,  5,0, 1, 'e', false);
+  ssd1306_draw_char(&display, 10,0, 1, 'l', false);
+  ssd1306_draw_char(&display, 15,0, 1, 'l', false);
+  ssd1306_draw_char(&display, 20,0, 1, 'o', false);
+
+  ssd1306_draw_char(&display,  0,8, 1, 'H', true);
+  ssd1306_draw_char(&display,  5,8, 1, 'e', true);
+  ssd1306_draw_char(&display, 10,8, 1, 'l', true);
+  ssd1306_draw_char(&display, 15,8, 1, 'l', true);
+  ssd1306_draw_char(&display, 20,8, 1, 'o', true);
+
+  ssd1306_draw_string(&display, 0,24, 1, "Hello", true );
+#endif
+
+  ssd1306_show(&display);
+  while(1);
+#endif
+
   return;
 }
 
@@ -79,9 +130,10 @@ void oled_draw_status_microdrive( microdrive_index_t microdrive_index, bool inse
   ssd1306_clear_pixel(&display, x_offset+12, md_y_pos);
   
   /* Number */
-  uint8_t num_str[2];
-  snprintf( num_str, 2, "%01d", microdrive_index+1 );
-  ssd1306_draw_string(&display, x_offset+4, md_y_pos+2, 1, num_str, inserted);
+  if( inserted )
+    ssd1306_draw_inverted_char(&display, x_offset+4, md_y_pos+2, 1, '1'+microdrive_index);
+  else
+    ssd1306_draw_char(&display, x_offset+4, md_y_pos+2, 1, '1'+microdrive_index, false);
   
   /* Add or clear selection device */
   if( selected )
@@ -201,16 +253,6 @@ void oled_display_selectable_filename( uint8_t *filename, uint32_t ypos, bool in
 {
   if( filename != NULL )
   {
-    // FIXME I want this displayed in inverse, but there's a bug in the display routine
-    // which stops that working. Need to fix that, but in the meantime I highlight with
-    // a different > display < 
-    if( invert )
-    {
-      uint8_t line[32];
-      snprintf( line, 32, ">%s<", filename );
-      ssd1306_draw_string( &display, 0, ypos, 1, line, 0 );
-    }
-    else
-      ssd1306_draw_string( &display, 6, ypos, 1, filename, 0 );
+    ssd1306_draw_string( &display, 0, ypos, 1, filename, invert );
   }
 }
