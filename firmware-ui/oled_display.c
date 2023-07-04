@@ -129,7 +129,7 @@ void oled_draw_status_microdrive( microdrive_index_t microdrive_index, bool inse
   ssd1306_clear_pixel(&display, x_offset, md_y_pos);
   ssd1306_clear_pixel(&display, x_offset+12, md_y_pos);
   
-  /* Number */
+  /* Number, normal for not inserted, knock out the filled area for inserted */
   if( inserted )
     ssd1306_draw_inverted_char(&display, x_offset+4, md_y_pos+2, 1, '1'+microdrive_index);
   else
@@ -172,7 +172,7 @@ void oled_display_no_files( void )
 
 void oled_display_inserted_filename( uint8_t *filename )
 {
-  ssd1306_clear_square( &display, 0, 16, 127, 16+8 );  
+  ssd1306_clear_square( &display, 0, 16, 128, 8 );  
 
   if( filename != NULL )
   {
@@ -183,7 +183,7 @@ void oled_display_inserted_filename( uint8_t *filename )
 
 void oled_display_inserted_num_blocks( uint8_t num_blocks )
 {
-  ssd1306_clear_square( &display, 0, 24, 127, 24+8 );  
+  ssd1306_clear_square( &display, 0, 24, 128, 8 );  
 
   if( num_blocks != 0 )
   {
@@ -196,7 +196,7 @@ void oled_display_inserted_num_blocks( uint8_t num_blocks )
 
 void oled_display_inserted_write_protected( int8_t write_protected )
 {
-  ssd1306_clear_square( &display, 0, 32, 127, 32+8 );  
+  ssd1306_clear_square( &display, 0, 32, 128, 8 );  
 
   if( write_protected != -1 )
   {
@@ -207,7 +207,7 @@ void oled_display_inserted_write_protected( int8_t write_protected )
 
 void oled_display_cartridge_error( uint8_t *str )
 {
-  ssd1306_clear_square( &display, 0, 40, 100, 40+8 );  // 100, don't blat the activity indicator
+  ssd1306_clear_square( &display, 0, 40, 128, 8 );
 
   if( str )
   {

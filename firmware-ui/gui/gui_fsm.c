@@ -87,15 +87,15 @@ void gui_sm_show_status( fsm_t *fsm )
   switch( live_microdrive_data->currently_inserted[status.selected].cartridge_error )
   {
   case CARTRIDGE_ERR_CHECKSUM_INCORRECT:
-    status.error_str = "Error: checksum";
+    status.error_str = "E_C_CHECKSUM";
     break;
 
   case CARTRIDGE_ERR_NEED_EJECT_BEFORE_INSERT:
-    status.error_str = "Error: Eject first";
+    status.error_str = "E_EJECT_FIRST";
     break;
 
   case CARTRIDGE_ERR_NEED_SAVE_BEFORE_INSERT:
-    status.error_str = "Error: Save first";
+    status.error_str = "E_SAVE_FIRST";
     break;
 
   default:
@@ -107,27 +107,27 @@ void gui_sm_show_status( fsm_t *fsm )
     switch( live_microdrive_data->currently_inserted[status.selected].gui_error )
     {
     case GUI_ERR_CHECKSUM_INCORRECT:
-      status.error_str = "Err: save checksum";
+      status.error_str = "E_S_CHECKSUM";
       break;
 
     case GUI_ERR_FILE_NOT_FOUND:
-      status.error_str = "Err: Can't read file";
+      status.error_str = "E_NO_FILE";
       break;
       
     case GUI_ERR_FILE_EMPTY:
-      status.error_str = "Err: File empty";
+      status.error_str = "E_FILE_EMPTY";
       break;
 
     case GUI_ERR_NOT_EVEN_BLOCKS:
-      status.error_str = "Err: Not even blocks";
+      status.error_str = "E_BAD_BLOCKS";
       break;
 
     case GUI_ERR_FILE_TOO_SMALL:
-      status.error_str = "Err: File too small";
+      status.error_str = "E_FILE_TOO_SMALL";
       break;
 
     case GUI_ERR_FILE_TOO_LARGE:
-      status.error_str = "Err: File too large";
+      status.error_str = "E_FILE_TOO_LARGE";
       break;
 
     default:
