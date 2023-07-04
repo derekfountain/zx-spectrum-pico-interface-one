@@ -135,6 +135,8 @@ void gui_sm_show_status( fsm_t *fsm )
     }
   }
 
+  status.sd_card_inserted = live_microdrive_data->sd_card_inserted;
+
   draw_status_screen( &status );
 }
 

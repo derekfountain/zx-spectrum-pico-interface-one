@@ -35,6 +35,11 @@ typedef enum
 }
 gui_error_t;
 
+/*
+ * Data to place on status page. Typically the details of the currently
+ * selected microdrive, plus the insertion status of each of them for the
+ * line of microdrive graphics, any errors, etc.
+ */
 typedef struct _status_screen_t
 {
   bool               requesting_status;
@@ -49,6 +54,8 @@ typedef struct _status_screen_t
   bool               write_protected;
 
   uint8_t           *error_str;
+
+  bool               sd_card_inserted;
 
   uint8_t            test_value;
 }

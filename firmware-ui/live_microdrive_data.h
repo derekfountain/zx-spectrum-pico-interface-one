@@ -54,6 +54,7 @@ microdrive_inserted_data_t;
 
 typedef struct _live_microdrive_data_t
 {
+  bool                       sd_card_inserted;
   microdrive_index_t         microdrive_saving_to_sd;              // Which MD, if any, needs saving data out to SD
   microdrive_inserted_data_t currently_inserted[NUM_MICRODRIVES];
 }

@@ -98,6 +98,9 @@ const uint8_t MD7_LED_GP = 21;
 /* Test pin */
 const uint8_t  TEST_OUTPUT_GP = 10;
 
+/* SD card detect pin */
+const uint8_t  SD_CARD_DETECT_GP = 28;
+
 static fsm_t *gui_fsm;
 
 /* Keep tabs on what's happening so the GUI can offer the correct options */
@@ -172,6 +175,12 @@ void gpios_callback( uint gpio, uint32_t events )
   {
     /* Rotary encoder has its own handler */
     return encoder_callback( gpio, events );
+  }
+  else if( gpio == SD_CARD_DETECT_GP )
+  {
+    /* Track GPIO which indicates if an SD card is inserted - GPIO is logically inverted */
+    live_microdrive_data.sd_card_inserted = !gpio_get( SD_CARD_DETECT_GP );
+    gpio_put( LED_PIN, live_microdrive_data.sd_card_inserted );    
   }
   else
   {
@@ -718,6 +727,9 @@ int main( void )
   gpio_init(TEST_OUTPUT_GP); gpio_set_dir(TEST_OUTPUT_GP, GPIO_OUT);
   gpio_put(TEST_OUTPUT_GP, 0);
 
+  /* Card detect GPIO, inverted, so 0 means card present, 1 means no card */
+  gpio_init(SD_CARD_DETECT_GP); gpio_set_dir(SD_CARD_DETECT_GP, GPIO_IN);
+
   /*
    * First, set up the screen. It's an I2C device.
    */
@@ -743,8 +755,22 @@ int main( void )
   gpio_set_irq_enabled( ACTION_SW_GP, GPIO_IRQ_EDGE_FALL, true );
   gpio_set_irq_enabled( CANCEL_SW_GP, GPIO_IRQ_EDGE_FALL, true );
 
-  /* Mount the SD card, if it's ready */
-  mount_sd_card();
+  gpio_set_irq_enabled( SD_CARD_DETECT_GP, GPIO_IRQ_EDGE_FALL|GPIO_IRQ_EDGE_RISE, true );
+
+  /*
+   * Mount the SD card, if it's ready. Annoyingly, this library code
+   * interferes with the LED. It's non trivial to rebuild it with that
+   * turned off
+   */
+  if( mount_sd_card() != 0 )
+  {
+    /* SD card didn't mount */
+    gpio_put( LED_PIN, 0 );
+  }
+  else
+  {
+    gpio_put( LED_PIN, 1 );
+  }
 
   /*
    * Set up the link to the IO Pico. This uses a pair of PIO programs to send and receive
@@ -784,7 +810,8 @@ int main( void )
    */
   ui_link_send_init_sequence( pio0, linkout_sm, linkin_sm );
 
-  /* Initialise the live data */
+  /* Initialise the live data - SD card detect GPIO is logically inverted */
+  live_microdrive_data.sd_card_inserted = !gpio_get( SD_CARD_DETECT_GP );
   live_microdrive_data.microdrive_saving_to_sd = -1;
   for( microdrive_index_t microdrive_index = 0; microdrive_index < NUM_MICRODRIVES; microdrive_index++ )
   {

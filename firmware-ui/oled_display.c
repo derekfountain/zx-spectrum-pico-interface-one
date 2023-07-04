@@ -216,6 +216,16 @@ void oled_display_cartridge_error( uint8_t *str )
 }
 
 
+void oled_display_sd_card_status( bool inserted )
+{
+  ssd1306_clear_square( &display, 0, 48, 128, 8 );  
+  if( ! inserted )
+  {
+    ssd1306_draw_string( &display, 0, 48, 1, "SD card not inserted", 0 );
+  }
+}
+
+
 void oled_display_msg_requesting_status( void )
 {
   oled_display_clear_msg();
