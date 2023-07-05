@@ -162,10 +162,6 @@ void gui_sm_show_eject_screen( fsm_t *fsm )
  * present the contents of the SD card directory on demand. This is
  * much easier and since it's the only place in the whole program
  * which uses malloc/free I wouldn't expect it to fragment too much.
- *
- * FIXME What if the card is ejected while the file list is displayed?
- * That could realistically happen if the user decides the SD card
- * doesn't contain the file they want.
  */
 #define MAX_NUM_FILENAMES 1024           /* This many pointers */
 static uint8_t *filenames[MAX_NUM_FILENAMES+1];
@@ -179,18 +175,17 @@ void gui_sm_show_insert_screen( fsm_t *fsm )
   for( uint32_t i=0; i<MAX_NUM_FILENAMES; i++ )
     filenames[i] = NULL;
 
-  if( live_microdrive_data->sd_card_inserted )
-  {
-    num_filenames_read = read_directory_files( &filenames[0],
-					       MAX_NUM_FILENAMES );
-  }
-  else
-  {
-    num_filenames_read = 0;
-  }
+  /*
+   * If the card is ejected before or while the file list is displayed
+   * the read_directory_files() function will return no files and the
+   * list will appear empty.
+   */
+  num_filenames_read = read_directory_files( &filenames[0],
+					     MAX_NUM_FILENAMES );
 
   if( num_filenames_read == 0 )
   {
+    /* No files */
     generate_stimulus( fsm, ST_BUILTIN_NO );  
   }
   else

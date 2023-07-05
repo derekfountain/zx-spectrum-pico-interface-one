@@ -23,14 +23,6 @@
 #include "ssd1306.h"
 #include "oled_display.h"
 
-/*
-FIXME:
-
-Indication of SD card not inserted. Won't be able to save data if
-SD card is ejected.
-
-*/
-
 void draw_status_screen( status_screen_t *status )
 {
   for( uint8_t microdrive_index=0; microdrive_index< NUM_MICRODRIVES; microdrive_index++ )
