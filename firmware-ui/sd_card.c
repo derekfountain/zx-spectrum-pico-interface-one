@@ -43,7 +43,7 @@ static sd_card_t *pSD;
 
 static uint8_t sd_card_mounted = 0;
 
-uint8_t query_ds_card_mounted( void )
+uint8_t query_sd_card_mounted( void )
 {
   return sd_card_mounted;
 }
@@ -55,6 +55,12 @@ uint8_t mount_sd_card( void )
 
   /* FatFs, on the SD card. Set up via hw_config.c */
   pSD = sd_get_by_num( 0 );
+
+  /*
+   * This appears buggy. The 1 says force mount the device and fail if
+   * you can't, but the function always returns OK even if there's no
+   * card in the slot
+   */
   if( f_mount( &pSD->fatfs, pSD->pcName, 1 ) != FR_OK )
     return 1;
 
@@ -224,17 +230,19 @@ uint32_t read_directory_files( uint8_t *addr_ptr[], uint32_t max_num_filenames )
 uint8_t read_mdr_file( uint8_t *filename, uint8_t *buffer, uint32_t max_length, uint32_t *bytes_read_ptr )
 {
   FIL fsrc;
-  UINT bytes_read;
+  UINT bytes_read = 0;
 
-  FRESULT fr = f_open( &fsrc, filename, FA_READ );
-  if( fr )
-    return (uint8_t)fr;
+  if( sd_card_mounted )
+  {
+    FRESULT fr = f_open( &fsrc, filename, FA_READ );
+    if( fr )
+      return (uint8_t)fr;
 
-  *bytes_read_ptr = 0;
-  f_read( &fsrc, buffer, max_length, &bytes_read );
+    *bytes_read_ptr = 0;
+    f_read( &fsrc, buffer, max_length, &bytes_read );
 
-  f_close(&fsrc);
-
+    f_close(&fsrc);
+  }
   *bytes_read_ptr = bytes_read;
 
   return 0;
@@ -244,17 +252,19 @@ uint8_t read_mdr_file( uint8_t *filename, uint8_t *buffer, uint32_t max_length, 
 uint8_t write_mdr_file( uint8_t *filename, uint8_t *buffer, uint32_t length, uint32_t *bytes_written_ptr )
 {
   FIL fsrc;
-  UINT bytes_written;
+  UINT bytes_written = 0;
 
-  FRESULT fr = f_open( &fsrc, filename, FA_WRITE | FA_OPEN_ALWAYS );
-  if( fr )
-    return (uint8_t)fr;
+  if( sd_card_mounted )
+  {
+    FRESULT fr = f_open( &fsrc, filename, FA_WRITE | FA_OPEN_ALWAYS );
+    if( fr )
+      return (uint8_t)fr;
 
-  *bytes_written_ptr = 0;
-  f_write( &fsrc, buffer, length, &bytes_written );
+    *bytes_written_ptr = 0;
+    f_write( &fsrc, buffer, length, &bytes_written );
 
-  f_close(&fsrc);
-
+    f_close(&fsrc);
+  }
   *bytes_written_ptr = bytes_written;
 
   return 0;

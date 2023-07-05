@@ -31,8 +31,6 @@ FSM gui
       ST_DATA_SAVED                     STATE_GUI_DATA_SAVED
       ST_MDR_INSERTING                  STATE_GUI_INSERTING_MDR
       ST_MDR_INSERTED                   STATE_GUI_INSERTED_MDR
-      ST_SD_CARD_INSERTED               STATE_GUI_INSERTING_SD_CARD
-      ST_SD_CARD_EJECTED                STATE_GUI_EJECTING_SD_CARD
       ST_BUILTIN_TIMEOUT_1              STATE_GUI_SCROLLING_FILENAME
       ST_ROTATE_CW                      STATE_GUI_SELECTING_PREVIOUS_MD
       ST_ROTATE_CCW                     STATE_GUI_SELECTING_NEXT_MD
@@ -95,32 +93,6 @@ FSM gui
   STATE STATE_GUI_INSERTED_MDR
     ENTRY
       gui_sm_inserted_mdr
-
-    TRANSITIONS
-      ST_BUILTIN_YES                    STATE_GUI_SHOW_STATUS
-    END_TRANSITIONS
-
-
-  // An SD card has been inserted. Deal with it, then drop back
-  // to the status screen.
-  // Needs error handling, maybe
-  //
-  STATE STATE_GUI_INSERTING_SD_CARD
-    ENTRY
-      gui_sm_insert_sd_card
-
-    TRANSITIONS
-      ST_BUILTIN_YES                    STATE_GUI_SHOW_STATUS
-    END_TRANSITIONS
-
-
-  // The SD card has been ejected. Deal with it, then drop back
-  // to the status screen
-  // Needs error handling, maybe
-  //
-  STATE STATE_GUI_EJECTING_SD_CARD
-    ENTRY
-      gui_sm_eject_sd_card
 
     TRANSITIONS
       ST_BUILTIN_YES                    STATE_GUI_SHOW_STATUS

@@ -137,6 +137,8 @@ void gui_sm_show_status( fsm_t *fsm )
 
   status.sd_card_inserted = live_microdrive_data->sd_card_inserted;
 
+  status.test_value = 0;
+
   draw_status_screen( &status );
 }
 
@@ -172,11 +174,20 @@ static uint32_t selected_filename_index = 0;
 static uint32_t num_filenames_read;
 void gui_sm_show_insert_screen( fsm_t *fsm )
 {
+  live_microdrive_data_t *live_microdrive_data = (live_microdrive_data_t*)fsm->fsm_data;
+
   for( uint32_t i=0; i<MAX_NUM_FILENAMES; i++ )
     filenames[i] = NULL;
 
-  num_filenames_read = read_directory_files( &filenames[0],
-					     MAX_NUM_FILENAMES );
+  if( live_microdrive_data->sd_card_inserted )
+  {
+    num_filenames_read = read_directory_files( &filenames[0],
+					       MAX_NUM_FILENAMES );
+  }
+  else
+  {
+    num_filenames_read = 0;
+  }
 
   if( num_filenames_read == 0 )
   {
@@ -352,12 +363,6 @@ void gui_sm_data_saved( fsm_t *fsm )
 }
 
 
-void gui_sm_insert_sd_card( fsm_t *fsm )
-{
-}
-void gui_sm_eject_sd_card( fsm_t *fsm )
-{
-}
 void gui_sm_scroll_inserted_filename( fsm_t *fsm )
 {
 }

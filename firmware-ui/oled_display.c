@@ -221,7 +221,7 @@ void oled_display_sd_card_status( bool inserted )
   ssd1306_clear_square( &display, 0, 48, 128, 8 );  
   if( ! inserted )
   {
-    ssd1306_draw_string( &display, 0, 48, 1, "SD card not inserted", 0 );
+    ssd1306_draw_string( &display, 0, 48, 1, "     No SD card    ", 0 );
   }
 }
 
@@ -252,8 +252,8 @@ void oled_display_clear_msg( void )
 
 void oled_display_test_value( uint32_t val )
 {
-  uint8_t value_str[32];
-  snprintf( value_str, 32, "%d", val );
+  uint8_t value_str[11];
+  snprintf( value_str, 11, "0x%08X", val );
   ssd1306_clear_square( &display, 0, 48, 128, 8 );  
   ssd1306_draw_string( &display, 0, 48, 1, value_str, 0 );
 }

@@ -111,6 +111,10 @@ auto_init_mutex( live_microdrive_data_mutex );
 #define STATUS_TIMER_PERIOD_MS 200
 static repeating_timer_t repeating_status_timer;
 
+/* Timer used to check whether the SD card has been ejected and needs unmounting */
+#define SD_CARD_TIMER_PERIOD_MS 500
+static repeating_timer_t repeating_sd_card_timer;
+
 /* Room for one full MDR image to work with. Includes w/p byte */
 static uint8_t working_image_buffer[MICRODRIVE_MDR_MAX_LENGTH];
 
@@ -178,9 +182,8 @@ void gpios_callback( uint gpio, uint32_t events )
   }
   else if( gpio == SD_CARD_DETECT_GP )
   {
-    /* Track GPIO which indicates if an SD card is inserted - GPIO is logically inverted */
-    live_microdrive_data.sd_card_inserted = !gpio_get( SD_CARD_DETECT_GP );
-    gpio_put( LED_PIN, live_microdrive_data.sd_card_inserted );    
+    /* GPIO indicates SD card was inserted, it's just been taken out: hot unplug */
+    live_microdrive_data.sd_card_inserted = false;
   }
   else
   {
@@ -268,6 +271,50 @@ static bool add_work_request_status( repeating_timer_t *rt )
 
     request_status_ptr->dummy = 0;
     insert_work( WORK_REQUEST_STATUS, request_status_ptr );
+  }
+
+  return true;
+}
+
+
+/*
+ * The switch in the SD card reader is monitored by an interrupt on the
+ * GPIO. That routine just sets a flag in live_microdrive_data. This
+ * routine is called periodically to poll that flag. It it indicates
+ * the card has been inserted or removed it runs the SD card mount
+ * or unmount functions.
+ */
+static bool check_sd_card_mount( repeating_timer_t *rt )
+{
+  if( live_microdrive_data.sd_card_inserted && !query_sd_card_mounted() )
+  {
+    /* SD card is inserted, but it's not mounted. It must have just been put in */
+
+#if 0
+    /*
+     * This call causes a hang, I don't know why. I'm not sure where it's
+     * hanging, it could be the SD library code, or maybe the state machine
+     * is locking up, it's hard to debug. For now I'm just going to say
+     * that users hot plugging SD cards isn't supported.
+     */
+
+    if( mount_sd_card() != 0 )
+    {
+      /* SD card failed to mount */
+    }
+#endif
+
+  }
+  else if( !live_microdrive_data.sd_card_inserted && query_sd_card_mounted() )
+  {
+    /*
+     * Hot unplug. The card has gone by the time this runs, but the SD card
+     * code needs to tidy up and set its flag so it doesn't try to save anything
+     */
+    if( unmount_sd_card() != 0 )
+    {
+      /* SD card failed to unmount */
+    }
   }
 
   return true;
@@ -510,6 +557,13 @@ static void work_request_status( void )
 
 static void work_request_mdr_data_to_save( microdrive_index_t microdrive_index )
 {
+  /* If there's no SD card we can't save the data. Just skip the whole thing. */
+  if( !live_microdrive_data.sd_card_inserted )
+  {
+    generate_stimulus( gui_fsm, ST_DATA_SAVED );
+    return;
+  }
+
   live_microdrive_data.microdrive_saving_to_sd = microdrive_index;
   generate_stimulus( gui_fsm, ST_REQUEST_DATA_TO_SAVE );
 
@@ -589,7 +643,11 @@ static void work_request_mdr_data_to_save( microdrive_index_t microdrive_index )
   
   if( ! checksum_error )
   {
-    /* Write the MDR file back out to SD card */
+    /*
+     * Write the MDR file back out to SD card. At this level we make the call regardless
+     * of whether the SD card is mounted or not, there's a check in the write_mdr_file()
+     * function which will quietly skip the write if the SD card has been ejected.
+     */
     uint32_t bytes_written;
     write_mdr_file( filename, working_image_buffer, bytes_expected+1, &bytes_written );
 
@@ -727,9 +785,6 @@ int main( void )
   gpio_init(TEST_OUTPUT_GP); gpio_set_dir(TEST_OUTPUT_GP, GPIO_OUT);
   gpio_put(TEST_OUTPUT_GP, 0);
 
-  /* Card detect GPIO, inverted, so 0 means card present, 1 means no card */
-  gpio_init(SD_CARD_DETECT_GP); gpio_set_dir(SD_CARD_DETECT_GP, GPIO_IN);
-
   /*
    * First, set up the screen. It's an I2C device.
    */
@@ -755,22 +810,43 @@ int main( void )
   gpio_set_irq_enabled( ACTION_SW_GP, GPIO_IRQ_EDGE_FALL, true );
   gpio_set_irq_enabled( CANCEL_SW_GP, GPIO_IRQ_EDGE_FALL, true );
 
-  gpio_set_irq_enabled( SD_CARD_DETECT_GP, GPIO_IRQ_EDGE_FALL|GPIO_IRQ_EDGE_RISE, true );
-
   /*
    * Mount the SD card, if it's ready. Annoyingly, this library code
    * interferes with the LED. It's non trivial to rebuild it with that
-   * turned off
+   * turned off.
+   * Due to what is surely a bug in the SD card library, this always
+   * returns OK even if there's no SD card in the slot.
+   * There's also something odd going on with the SD card detect GPIO. At 
+   * this point it reports true regardless of whether there's a SD card
+   * installed or not, so I can't even check that manually.
+   * I'm calling this on the assumption it does some sort of initialisation.
    */
-  if( mount_sd_card() != 0 )
+  mount_sd_card();
+
+  /*
+   * Now the SD card detect works correctly, so the code underlying the SD
+   * card mount must set it up somehow. Whatever, I can now collect the
+   * SD card status.
+   *
+   * Card detect GPIO is inverted, so 0 means card present, 1 means no card
+   */
+  gpio_init(SD_CARD_DETECT_GP); gpio_set_dir(SD_CARD_DETECT_GP, GPIO_IN);
+  live_microdrive_data.sd_card_inserted = !gpio_get( SD_CARD_DETECT_GP );
+
+  /*
+   * If there's no card inserted do the unmount. Useless at the SD card
+   * level, but it sets flags and stuff in my code
+   */
+  if( ! live_microdrive_data.sd_card_inserted )
   {
-    /* SD card didn't mount */
-    gpio_put( LED_PIN, 0 );
+    unmount_sd_card();
   }
   else
   {
-    gpio_put( LED_PIN, 1 );
+    /* There is a card inserted, monitor for it being removed */
+    gpio_set_irq_enabled( SD_CARD_DETECT_GP, GPIO_IRQ_EDGE_RISE, true );
   }
+
 
   /*
    * Set up the link to the IO Pico. This uses a pair of PIO programs to send and receive
@@ -811,7 +887,6 @@ int main( void )
   ui_link_send_init_sequence( pio0, linkout_sm, linkin_sm );
 
   /* Initialise the live data - SD card detect GPIO is logically inverted */
-  live_microdrive_data.sd_card_inserted = !gpio_get( SD_CARD_DETECT_GP );
   live_microdrive_data.microdrive_saving_to_sd = -1;
   for( microdrive_index_t microdrive_index = 0; microdrive_index < NUM_MICRODRIVES; microdrive_index++ )
   {
@@ -839,6 +914,9 @@ int main( void )
 
   /* Set requests for microdrive status running */
   add_repeating_timer_ms( STATUS_TIMER_PERIOD_MS, add_work_request_status, NULL, &repeating_status_timer );
+
+  /* Set monitoring of SD card mount status running */
+  add_repeating_timer_ms( SD_CARD_TIMER_PERIOD_MS, check_sd_card_mount, NULL, &repeating_sd_card_timer );
 
   /* Loop over contents of config file on the SD card, load each image into a drive */
   uint8_t *mdr_filename;
