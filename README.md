@@ -16,31 +16,38 @@ Open source, open hardware design.
 
 ## Status
 
-As of May 2023 the hardware design is on the second prototype. It looks like
+As of July 2023 the hardware design is on the second prototype. It looks like
 this:
 
 ![alt text](images/prototype2.jpg "Prototype 2 board")
 
 Yes, it's enormous, but I'm currently working with the hardware all the
 time and having it this big means it's easier to get the soldering iron
-between the components. I envisage the final version to be much smaller,
-probably with a lay-flat design.
+between the components.
 
-The user interface is currently very fluid. At the moment the hardware
-for that consists of an OLED screen and a rotary encoder:
+The third prototype, which ideally would be the final hardware design
+but in practise will probably be the penultimate one, is currently being
+fabricated. It's much smaller than the second prototype pictured and has
+a lay-flat design and rear throughport edge connector.
+
+The user interface is now built in to the unit and is as complete as it's
+likely to get for the time being. As per the prototype photo below it
+consists of an OLED screen, a rotary encoder and 2 input buttons. There
+are now 8 individual LEDs to match the 8 microdrive motor LEDs.
 
 ![alt text](images/prototype2_gui.jpg "Prototype 2 board user interface")
 
-The hardware and software have reached what might be termed "Minimum
-Viable Product" stage:
+The hardware and software are now working:
 
 * Spectrum can read and write all 8 microdrives
+* Uses "MDR" image format for "cartridges", fully compatible with emulators
 * Full ZX Interface One ROM support, all native BASIC commands and extensions work as designed
-* Uses "MDR" image format, supported by all emulators
+* Bug for bug compatible
 * MDR files loaded from, and saved back to, SD card
+* User interface uses file selector to choose and "insert" a cartridge
+* Cartridge eject works, allowing cartridges to be changed as required
+* Configuration file allows auto-insertion of selected cartridges at start up
 
-The project is a work in progress.
+The project remains a work in progress, but is approaching completion.
 
-
-
-Derek Fountain, May 2023
+Derek Fountain, July 2023
