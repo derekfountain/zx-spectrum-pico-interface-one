@@ -262,3 +262,11 @@ This board should be 2.0mm if possible so it can handle the pressing of the butt
 I've got the header right under the button so it should be OK at 1.6mm.
 : Headers added to the PCB
 : Daughterboard design needs doing
+
+
+v1.4 This was the first lie-flat prototype
+====
+
+The rear edge connector footprint doesn't have the slot cut out.
+I need to add that to the library footprint.
+

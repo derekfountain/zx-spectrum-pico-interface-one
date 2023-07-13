@@ -853,17 +853,6 @@ int main( void )
    * over an asynchronous, 2 wire link. See https://github.com/derekfountain/pico-pio-connect
    */
 
-  /*
-   * I've soldered this Pico's UART0 to the IO Pico. The link was
-   * originally SPI, then UART, then PIO based comms. I've cut the
-   * tracks for GPIOs 14 and 15 so I can test the LEDs (which is
-   * what they are now used for). The others I have to set this
-   * Pico's SPI pins to inputs so they don't interfere with the
-   * PIO link.
-   */
-  gpio_init(12); gpio_set_dir(12, GPIO_IN);
-  gpio_init(13); gpio_set_dir(13, GPIO_IN);
-
   /* Outbound link, to IO Pico */
   gpio_init(LINKOUT_PIN); gpio_set_dir(LINKOUT_PIN,GPIO_OUT); gpio_put(LINKOUT_PIN, 1);
   gpio_set_function(LINKOUT_PIN, GPIO_FUNC_PIO0);
