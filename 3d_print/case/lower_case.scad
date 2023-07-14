@@ -3,8 +3,7 @@ pcb_length=99.96;               // ZX edge connector to rear of PCB, as per KiCA
 side_wall_thickness=2.0;        // Left and right side walls
 far_wall_thickness=1.0;         // Wall as rear of device, might obstruct plugging in
 closest_wall_thickness=1.0;     // Wall closest to ZX, might obstruct plugging in
-//base_thickness=1.0;             // Mustn't be too high, PCB will lift as it is
-base_thickness=0.5;  // Thin while working, make it ~1mm final
+base_thickness=1.0;             // Mustn't be too high, PCB will lift as it is
 
 walls_height=10.0;              // For now, keep the walls low
 
@@ -42,7 +41,7 @@ locating_post2_ypos_centre=84.6;
 sd_card_offset=9.0;             // From front edge of board to SD card reader
 sd_card_width=13.0;             // Width of the SD card reader I'm using, inc solder tabs
 
-switches_offset=4.25;           // From left side to left edge of first switch
+switches_offset=3.75;           // From left side to left edge of first switch
 
 // This needs to be about 16mm, but that leaves a thin little post between the
 // switches aperture and the rear edge connector aperture. That will be hard to

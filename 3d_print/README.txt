@@ -7,39 +7,28 @@ signals, one at the back for the screen, and one on the right side
 which isn't connected to anything. (The rotary is mounted on the
 main board.)
 
-This means I need a duplicate board to sit on top, male
-connectors in the same places. LEDs and screen will mount on
-that.
+LEDs, buttons and screen mount on the daughterboard which fits on
+top of the main board.
 
-The screen can go where I like, the connector I currently have
-on the PCB isn't where the screen plugs in.
-
-I'd like a nice aluminium panel for the top surface, with drilled
+There's a nice aluminium panel for the top surface, with drilled
 LED holes and screen print. These are cheap on JLC, just remember
-to turn off the testing. Round the corners, needs 2 or 4 screw
-holes. 90mm wide, 40mm high.
+to turn off the testing. Round the corners, needs 4 screw holes
+in the corners.
+
+Any components needed on the daughterboard board can go on the
+underside. That will allow the aluninimum panel to lay on top.
+
+
 
 ADDITIONAL: I've done the aluminium plate, but I'm not sure how the
 red LEDs will look against the silver. Might as well make a black
 one as well so I can choose.
-
-ADDITIONAL: The PCB is now significantly smaller than the original.
-The plate I have is too big. Design is nice, but it needs
-reducing.
-
-Any components needed on the top board can go on the underside.
-That will allow the aluninimum panel to lay on top.
-
 
 
 Height, assuming Picos in header sockets, would be about 20mm
 from tip of pin on underside to top surface of Pico. The Spectrum
 is just over 30mm, so I'll make the case flush with the top of
 the Spectrum.
-
-
-
-
 
 
 From TomD:
