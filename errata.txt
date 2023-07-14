@@ -278,6 +278,14 @@ how I managed that.
 : Fixed in software
 
 
+The rotary encoder's direction has somehow got reversed. I turn the
+knob one way and the microdrive selector icon moves the other way.
+...
+On reflection, maybe it's right after all? I'm not sure which way
+things should move in the MD selector or the files list.
+: I tweaked the state machine, I think I'm happy with it now.
+
+
 Sometimes a LED before the one which should light, lights. I think
 this is due to the shift register approach of the LED motor-on design.
 a CAT 8 sends the motor-on logic 1 to all 7 preceding microdrives. If
