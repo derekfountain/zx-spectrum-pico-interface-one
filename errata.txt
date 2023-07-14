@@ -270,3 +270,17 @@ v1.4 This was the first lie-flat prototype
 The rear edge connector footprint doesn't have the slot cut out.
 I need to add that to the library footprint.
 
+
+The LEDs on the daughterboard aren't connected properly. M0_LED
+goes to the right most LED, which is correct. M1_LED goes to the
+left most LED, it should go to the second rightmost. Not sure
+how I managed that.
+: Fixed in software
+
+
+Sometimes a LED before the one which should light, lights. I think
+this is due to the shift register approach of the LED motor-on design.
+a CAT 8 sends the motor-on logic 1 to all 7 preceding microdrives. If
+the status is picked up during that shift, whichever one has the current
+shifted 1 will report as motor-on and the LED lights.
+: Need to investigate and fix in software

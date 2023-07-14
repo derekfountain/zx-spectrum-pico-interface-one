@@ -85,15 +85,15 @@ const uint8_t LED_PIN = PICO_DEFAULT_LED_PIN;
 #define ACTION_SW_GP  26
 #define CANCEL_SW_GP  22
 
- /* LED pins */
+ /* LED pins. I messed up the layout, so these are in an odd order */
 const uint8_t MD0_LED_GP =  9;
-const uint8_t MD1_LED_GP = 11;
-const uint8_t MD2_LED_GP = 12;
-const uint8_t MD3_LED_GP = 13;
-const uint8_t MD4_LED_GP = 14;
+const uint8_t MD1_LED_GP = 12;
+const uint8_t MD2_LED_GP = 14;
+const uint8_t MD3_LED_GP = 20;
+const uint8_t MD4_LED_GP = 21;
 const uint8_t MD5_LED_GP = 15;
-const uint8_t MD6_LED_GP = 20;
-const uint8_t MD7_LED_GP = 21;
+const uint8_t MD6_LED_GP = 13;
+const uint8_t MD7_LED_GP = 11;
 
 /* Test pin */
 const uint8_t  TEST_OUTPUT_GP = 10;
