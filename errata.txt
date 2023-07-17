@@ -292,3 +292,26 @@ a CAT 8 sends the motor-on logic 1 to all 7 preceding microdrives. If
 the status is picked up during that shift, whichever one has the current
 shifted 1 will report as motor-on and the LED lights.
 : Need to investigate and fix in software
+
+
+The 3-way connector near the rotary encoder which is used to separate
+the two boards is a bit flimsy. It bends over. Make it a 6 way.
+: Needs doing
+
+
+Any expansion which is plugged into the back will foul on the reset
+switches if it's wider than the connector (many, probably most, are).
+Move the switches. There's room for one near the SD card slot. The
+other can stay in that corner but be turned out sideways, facing left.
+
+
+The front of the case can't have a wall, it obstructs the connection
+to the Spectrum. Knock out 2mm strips in the corners of the PCBs so
+the case can go around at least a bit.
+: Needs doing on main PCB
+: Needs doing on daughterboard PCB
+
+
+The Cancel and Action buttons are too far to the left. Spacing is correct,
+but they need moving to the right so they centre on the rotary knob. The
+distance moved will need to be reflected in the case holes.

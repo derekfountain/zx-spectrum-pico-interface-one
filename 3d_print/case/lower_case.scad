@@ -1,11 +1,19 @@
 pcb_width=99.85;                // Across the back of the ZX, as per KiCAD PCB layout
 pcb_length=99.96;               // ZX edge connector to rear of PCB, as per KiCAD PCB layout
 side_wall_thickness=2.0;        // Left and right side walls
-far_wall_thickness=1.0;         // Wall as rear of device, might obstruct plugging in
-closest_wall_thickness=1.0;     // Wall closest to ZX, might obstruct plugging in
-base_thickness=1.0;             // Mustn't be too high, PCB will lift as it is
+far_wall_thickness=1.0;         // Wall at rear of device, might obstruct plugging in
+closest_wall_thickness=0.0;     // Wall closest to ZX, might obstruct plugging in
 
-walls_height=10.0;              // For now, keep the walls low
+// Base mustn't be too high, PCB will lift as it is. 0.5mm printed as 0.7mm,
+// but it's too flimsy, it needs to be thicker than that. There are no front
+// or rear walls anymore
+//
+base_thickness=1.0;
+
+// The walls need to be high enough such that the lid sits on the tops of
+// the walls, not on the components or connector tips of the top board.
+//
+walls_height=27.5;
 
 // These are from the rear edge, which is slightly wider than the front
 //
@@ -28,20 +36,21 @@ pcb_aperture_length = spacing + pcb_length + spacing;
 // This means the rear of the Spectrum will need to be raised up and supported
 // from underneath, like the IF1 but on a smaller scale. I'll create a new
 // support for that.
+// Original case was 5mm, but it can sit a bit lower than that.
 //
-standoff_height=5;
+standoff_height=3.5;
 
-locating_post_height=standoff_height + 8;
+locating_post_height=standoff_height + 4;
 locating_post_hole_diameter=4.3;
 locating_post1_xpos_centre=19.11;
 locating_post1_ypos_centre=11.01;
 locating_post2_xpos_centre=69.2;
 locating_post2_ypos_centre=84.6;
 
-sd_card_offset=9.0;             // From front edge of board to SD card reader
+sd_card_offset=8.0;             // From front edge of board to SD card reader
 sd_card_width=13.0;             // Width of the SD card reader I'm using, inc solder tabs
 
-switches_offset=3.75;           // From left side to left edge of first switch
+switches_offset=3.0;            // From left side to left edge of first switch
 
 // This needs to be about 16mm, but that leaves a thin little post between the
 // switches aperture and the rear edge connector aperture. That will be hard to
