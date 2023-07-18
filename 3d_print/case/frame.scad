@@ -37,7 +37,7 @@ translate([0, 0, frame_height])
     
     translate([side_border_width, bottom_border_width, 0])
     {
-      #cube([frame_width-(side_border_width*2),
+      cube([frame_width-(side_border_width*2),
             frame_length-bottom_border_width-top_border_width,
             frame_raise]);
     }
