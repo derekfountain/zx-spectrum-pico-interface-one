@@ -23,7 +23,7 @@ Click through for a brief demonstration:
 
 [![IMAGE ALT TEXT](http://img.youtube.com/vi/kph2aS7qcVc/0.jpg)](http://www.youtube.com/watch?v=kph2aS7qcVc "ZX Spectrum Expansion System, Recreated")
 
-https://youtube.com/kph2aS7qcVc?feature=share
+https://www.youtube.com/watch?v=kph2aS7qcVc
 
 ## Status
 
