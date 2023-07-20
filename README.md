@@ -116,12 +116,28 @@ Also, from your parts bin:
 <br>
 1x KY-040 rotary encoder. Mine came with a 90degree header pin which I replaced with a straight header
 <br>
-1x 90degree ZX Spectrum Edge Connector socket. I went for <a href="https://www.ebay.co.uk/itm/394156247495">this one</a>.
+1x 90degree ZX Spectrum Edge Connector socket. I went for [this one](https://www.ebay.co.uk/itm/394156247495).
 <br>
 2x SPST switch. Any single pole, single throw switch should do, they are the reset buttons.
 <br>
-1x Push-push type SD card reader. I used <a href="https://www.ebay.co.uk/itm/133222265884">this one</a>.
+1x Push-push type SD card reader. I used [this one](https://www.ebay.co.uk/itm/133222265884).
 <br>
 1x 0.96" OLED display (SSD1306 based)
 <br>
 8x 3.0mm red LEDs. The faceplate holes are drilled for 3.0mm LEDs.
+
+
+# Acknowledgements
+
+[Andrew Menadue](http://trochilidae.blogspot.com/)
+for his Pico to Pico PIO [communications code](https://github.com/blackjetrock/picoputer),
+and his patiently answering so many of my questions.
+
+[Tomaz Solc](https://www.tablix.org/~avian/blog/articles/about/) for his superb
+[IF1 ROM disassembly][(https://www.tablix.org/~avian/spectrum/rom/if1_2.htm), which I
+suspect I now understand better than he does.
+
+Gergely Szasz, Philip Kendall and Stuart Brady from the
+[FUSE Emulator Project](https://sourceforge.net/projects/fuse-emulator/).
+[This](https://sourceforge.net/p/fuse-emulator/fuse/ci/master/tree/peripherals/if1.c)
+one source file probably saved me weeks of work.
