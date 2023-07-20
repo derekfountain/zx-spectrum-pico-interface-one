@@ -13,9 +13,9 @@ The first version supports the ZX Microdrives; RS232 and ZX Net might follow.
 
 Open source, open hardware design.
 
-[![IMAGE ALT TEXT](http://img.youtube.com/vi/urgi2iz9P6U/0.jpg)](http://www.youtube.com/watch?v=urgi2iz9P6U "ZX Spectrum Expansion System, Recreated")
+[![IMAGE ALT TEXT](http://img.youtube.com/vi/kph2aS7qcVc/0.jpg)](http://www.youtube.com/watch?v=kph2aS7qcVc "ZX Spectrum Expansion System, Recreated")
 
-https://youtube.com/shorts/urgi2iz9P6U?feature=share
+https://youtube.com/shorts/kph2aS7qcVc?feature=share
 
 ## Status
 
