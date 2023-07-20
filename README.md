@@ -7,13 +7,17 @@ functionality of the original 1984 "ZX Spectrum Expansion System". It
 emulates a ZX Interface One with 8 ZX Microdrives.
 
 The device is completely compatible with all 1980s software. It uses no
-ROM modifications or other hacks.
+ROM modifications or other hacks. To my knowledge there are no
+limitations or caveats to its use.
 
 The first version is complete and supports the ZX Microdrives as
 designed; the RS232 and ZX Net features of the Interface One might follow.
 
 The project is open source, open hardware design, distributed under the
 GPL licence.
+
+There's lots more information on the [project page](https://www.derekfountain.org/zses.php)
+on [my website](https://www.derekfountain.org/).
 
 Click through for a brief demonstration:
 
@@ -37,20 +41,22 @@ It is functionally complete:
 * Cartridge eject, allowing cartridges to be changed as required
 * Configuration file allows auto-insertion of selected cartridges at start up
 
+I'd be interested to receive feedback from anyone who tries to build one.
+
 Derek Fountain, July 2023
 
 
 # Operation
 
 It should be fairly obvious. Select the Microdrive with the rotary encoder, click the right
-button to bring up the file selector, use the rotary to select and click the right button
+button to bring up the file selector, use the rotary to select a cartridge file, then click the right button
 again. The left button cancels.
 
 The file selector only brings up files named *.mdr, and it doesn't do subdirectories. This
 could be improved.
 
 If you create a file in the root of your SD card called zxes_config.txt (that's not a
-typo, I have an issue open to rename that file to match the reset of the project) and
+typo, I have an issue open to rename that file to match the rest of the project) and
 enter up to 8 lines, each with a filename giving the name of an MDR file on your SD card,
 those cartridge images will be loaded into the Microdrives on startup. (Startup meaning the
 Pico startup, not the Spectrum start up.)
@@ -134,7 +140,7 @@ for his Pico to Pico PIO [communications code](https://github.com/blackjetrock/p
 and his patiently answering so many of my questions.
 
 [Tomaz Solc](https://www.tablix.org/~avian/blog/articles/about/) for his superb
-[IF1 ROM disassembly][(https://www.tablix.org/~avian/spectrum/rom/if1_2.htm), which I
+[IF1 ROM disassembly](https://www.tablix.org/~avian/spectrum/rom/if1_2.htm), which I
 suspect I now understand better than he does.
 
 Gergely Szasz, Philip Kendall and Stuart Brady from the
