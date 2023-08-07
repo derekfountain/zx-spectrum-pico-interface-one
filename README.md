@@ -43,7 +43,7 @@ It is functionally complete:
 
 I'd be interested to receive feedback from anyone who tries to build one.
 
-Derek Fountain, July 2023
+[Derek Fountain](https://www.derekfountain.org/), July 2023
 
 
 # Operation
