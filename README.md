@@ -27,7 +27,7 @@ https://www.youtube.com/watch?v=kph2aS7qcVc
 
 ## Status
 
-As of July 2023, version 1.0 is complete:
+As of September 2023, version 1.0 is complete:
 
 ![alt text](images/zses_2.jpg "v1.0")
 
@@ -43,7 +43,7 @@ It is functionally complete:
 
 I'd be interested to receive feedback from anyone who tries to build one.
 
-[Derek Fountain](https://www.derekfountain.org/), July 2023
+[Derek Fountain](https://www.derekfountain.org/), September 2023
 
 
 # Operation
@@ -69,6 +69,16 @@ There are a few, um, anomalies, which you might want to consider or work around.
 another spin of the boards I should be able to clear these up.
 
 That said...
+
+The KiCad files for the main board are in /srom/srom.kicad_pro. (The project started off as a port
+of my [Spectrum Pico ROM](https://github.com/derekfountain/zx-spectrum-pico-rom), and the directory
+name got ported over.)
+
+The KiCad files for the top board (the daughter board with the screen and buttons) are in
+/ui_daughterboard/ui_daughterboard.kicad_pro.
+
+The silver faceplate is a (non functional) PCB. I had JLCPCB make it up in aluminium. The design
+for that is in with the case design: /3d_print/top_panel/top_panel.kicad_pro.
 
 All my surface mount component footprints are metric 3216 sized (1206i). Those are easy to hand solder.
 

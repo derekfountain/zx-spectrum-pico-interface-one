@@ -3,3 +3,5 @@ TAGS
 *~
 gui_fsm.gen.c
 gui_fsm.gen.h
+fp-info-cache
+*-backups
