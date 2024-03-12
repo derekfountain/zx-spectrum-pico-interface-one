@@ -22,7 +22,7 @@ standard error handler point.
 0x08 is called via a RST 8 instruction. That's got CALL semantics, it PUSHes the
 PC ready for a RET.
 
-There's a disassembly of the IF1 ROM here: https://www.tablix.org/~avian/spectrum/rom/if1_2.htm
+There's a disassembly of the IF1 ROM here: https://www.derekfountain.org/misc/spectrum/if1_2.txt
 
 The IF1 hardware traps the address and Z80 lines when it goes to read an instruction from
 address 0x08. Thus, when the ROM (or user program) calls that address the IF1 ROM is
@@ -446,3 +446,32 @@ Mark map showing sector is now used
 
 OTIR is here:
 https://www.tablix.org/~avian/spectrum/rom/if1_2.htm#L15D0
+
+
+New version based on smaller RP2040 board
+=========================================
+
+I tried to find a way to reliably solder the RP2040 package using the tools
+I have (iron and hot air). I failed. Next version will therefore have to 
+be based on a 3rd party mini RP2040 board. Options:
+
+Pimoroni Tiny 2040, Seeed XIAO and Waveshare RP2040 Tiny all have limited GPIOs.
+Those are therefore no use, I need all GPIOs.
+
+Adafruit Feather and Waveshare RP2040 Plus are both Pico sized boards.
+
+Solder Party Stamp looks ideal, but it's £10, plus £10 shipping from Sweden.
+It's open source, but I couldn't work out how to get JLCPCB to quote for
+manufacturing it based on KiCAD sources.
+
+Waveshare RP2040 Zero looks good, only some of the GPIOs are on solder pads
+on the underside of the board. Bit of a pain, but I could manage with that,
+I think. £10 on Amazon, cheaper elsewhere, and £3 or less for non-Waveshare
+knockoffs on AliExpress.
+
+PGA2040 looks good, all GPIOs are broken out. It has the crystal and flash
+in place. £7.50 from Pimoroni, plus about £.50 shipping, so still not
+outrageous. This looks like the one to use.
+https://shop.pimoroni.com/products/pga2040?variant=39359629656147
+Discussion:
+https://forums.raspberrypi.com/viewtopic.php?t=334099

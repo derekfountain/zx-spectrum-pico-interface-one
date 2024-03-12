@@ -149,7 +149,7 @@ Also, from your parts bin:
 for his Pico to Pico PIO [communications code](https://github.com/blackjetrock/picoputer),
 and his patiently answering so many of my questions.
 
-Geoff Wearmouth and others for their superb [IF1 ROM disassembly](https://www.tablix.org/~avian/spectrum/rom/if1_2.htm), which I suspect I now understand better than them.
+Geoff Wearmouth and others for their superb [IF1 ROM disassembly](https://www.derekfountain.org/misc/spectrum/if1_2.txt), which I suspect I now understand better than them.
 
 Gergely Szasz, Philip Kendall and Stuart Brady from the
 [FUSE Emulator Project](https://sourceforge.net/projects/fuse-emulator/).
