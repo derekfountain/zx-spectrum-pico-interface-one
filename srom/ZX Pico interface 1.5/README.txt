@@ -1,0 +1,1 @@
+Cut the slot out in the rear expantion port and made the board shorter to fit the Spectrum better.
