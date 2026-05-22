@@ -315,3 +315,43 @@ the case can go around at least a bit.
 The Cancel and Action buttons are too far to the left. Spacing is correct,
 but they need moving to the right so they centre on the rotary knob. The
 distance moved will need to be reflected in the case holes.
+
+
+Update time, May'26
+===================
+
+All the v1.4 stuff above, plus:
+
+The 90deg edge connector is causing a problem. The main PCB lies too low
+such that when it's plugged into the ZX the interface sits too low and the
+ZX needs jacking up with foot stands.
+: The solution is to use the regular straight through edge connector.
+  Soldering will be tricker, but the PCB will sit quite a bit higher.
+  The case base will need to be strengthed to support where it gets pressed.
+  Even with this adjustment, there's no room underneath to put the Picos
+  on the underside so the double layer design needs to stay.
+
+
+The Picos can be soldered directly onto the board, but that means no access
+to their USB ports. Programming will be via SWD only. With non-H Picos I'll
+need to add a 3 pin header to each SWD port unless I can bring out the SWD
+header somewhere on the board.
+: When relaying out the board, create 3 3-pin headers for the Picos' SWD
+  ports. If that's not possible, solder pins to the Picos directly.
+
+
+With the Picos flat on the board the high headers aren't required. I can use
+standard ones instead.
+: Check standard header sockets are taller than a Pico.
+
+
+I think all the above leaves the rotary switch module as the highest
+component on the board. It can be soldered directly. Its securing nut
+might be usable for anchoring down the top PCB or the case.
+: Investigate the options
+
+
+Ideally the two boards will be joined electronically via a ribbon cable, and
+separated via spacers. The header pins and sockets are a pain.
+: Investigate the options
+
