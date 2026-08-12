@@ -1,15 +1,12 @@
 # ZX Spectrum Expansion System, Recreated
 
-** Update May'26: following recent interest in this project, including
-requests to purchase, I've been reviewing it. There are a number of rough
-edges, particularly to the hardware layout, switch positioning, component
-selection, etc., some of which rather seriously impact usability. I'm
-therefore looking at fixing these issues and producing a revised version.**
+**Update August'26:
+Following recent interest in this project I've been
+making a few interfaces up so people can buy them. The [project page](https://www.derekfountain.org/zses.php)
+on [my personal website](https://www.derekfountain.org/) has the details
+on how to get hold of one.**
 
-** I suggest anyone thinking of making one hold off a while. If you want
-more information, or to purchase boards or a unit, contact me. **
-
-** <derek@scratters.com> **
+**<derek@scratters.com>**
 
 ## An Interface One / Microdrive Emulation for the ZX Spectrum
 
